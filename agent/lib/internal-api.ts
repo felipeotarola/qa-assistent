@@ -1,5 +1,5 @@
 export function appOrigin() {
-  const configured = process.env.BETTER_AUTH_URL?.trim().replace(/\/$/, "");
+  const configured = (process.env.APP_URL || process.env.BETTER_AUTH_URL)?.trim().replace(/\/$/, "");
   if (configured) {
     return configured;
   }

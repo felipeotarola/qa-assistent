@@ -2,7 +2,7 @@ import { relations } from "drizzle-orm";
 import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
-export const userProfiles = pgTable("user_profiles", {
+export const userProfiles = pgTable("pat_user_profiles", {
   userId: text("user_id")
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -13,7 +13,7 @@ export const userProfiles = pgTable("user_profiles", {
     .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
-});
+}).enableRLS();
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
   user: one(user, {

@@ -8,7 +8,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-export const user = pgTable("user", {
+export const user = pgTable("pat_user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
@@ -19,10 +19,10 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
-});
+}).enableRLS();
 
 export const session = pgTable(
-  "session",
+  "pat_session",
   {
     id: text("id").primaryKey(),
     expiresAt: timestamp("expires_at").notNull(),
@@ -37,11 +37,11 @@ export const session = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
   },
-  (table) => [index("session_userId_idx").on(table.userId)],
-);
+  (table) => [index("pat_session_userId_idx").on(table.userId)],
+).enableRLS();
 
 export const account = pgTable(
-  "account",
+  "pat_account",
   {
     id: text("id").primaryKey(),
     issuer: text("issuer").notNull(),
@@ -63,16 +63,16 @@ export const account = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("account_issuer_accountId_uidx").on(
+    uniqueIndex("pat_account_issuer_accountId_uidx").on(
       table.issuer,
       table.accountId,
     ),
-    index("account_userId_idx").on(table.userId),
+    index("pat_account_userId_idx").on(table.userId),
   ],
-);
+).enableRLS();
 
 export const verification = pgTable(
-  "verification",
+  "pat_verification",
   {
     id: text("id").primaryKey(),
     identifier: text("identifier").notNull(),
@@ -84,8 +84,8 @@ export const verification = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("verification_identifier_idx").on(table.identifier)],
-);
+  (table) => [index("pat_verification_identifier_idx").on(table.identifier)],
+).enableRLS();
 
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),

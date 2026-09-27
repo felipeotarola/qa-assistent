@@ -2,7 +2,7 @@ import { relations } from "drizzle-orm";
 import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
-export const threads = pgTable("threads", {
+export const threads = pgTable("pat_threads", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
@@ -16,8 +16,8 @@ export const threads = pgTable("threads", {
     .$onUpdate(() => new Date())
     .notNull(),
 }, (table) => [
-  index("threads_user_updated_idx").on(table.userId, table.updatedAt),
-]);
+  index("pat_threads_user_updated_idx").on(table.userId, table.updatedAt),
+]).enableRLS();
 
 export const threadsRelations = relations(threads, ({ one }) => ({
   user: one(user, {

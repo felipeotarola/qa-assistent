@@ -12,8 +12,10 @@ cp .env.example .env
 
 | Variable | How to get it |
 |----------|---------------|
-| `BETTER_AUTH_SECRET` | Run `openssl rand -base64 32` |
-| `BETTER_AUTH_URL` | `http://localhost:3000` locally, or your production URL |
+| `SUPABASE_URL` | Supabase project URL (NEXT_PUBLIC_SUPABASE_URL also accepted) |
+| `SUPABASE_PUBLISHABLE_KEY` | Public project key (NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY also accepted) |
+| `DATABASE_URL` | Supabase PostgreSQL connection string |
+| `APP_URL` | `http://localhost:3000` locally, or your production URL |
 | `INTERNAL_API_SECRET` | Run `openssl rand -base64 32` (must match on web + eve services) |
 
 On Vercel, set them on **both** the `web` and `eve` services — and add a database (see below).
@@ -22,14 +24,22 @@ On Vercel, set them on **both** the `web` and `eve` services — and add a datab
 
 ### `DATABASE_URL` (required everywhere)
 
-NuxtHub is pinned to PostgreSQL with the `postgres-js` driver, so a database is
-required in development too — there is no local file fallback. Without it every
-command that loads Nuxt stops with:
+NuxtHub uses PostgreSQL with the postgres-js driver in development and production.
+Set DATABASE_URL to your Supabase PostgreSQL connection string (API keys alone
+are not sufficient). The existing database can be shared: application tables,
+indexes and the migration ledger use the pat_ prefix. Existing unprefixed tables
+are left untouched. RLS is enabled; these tables are accessed by the trusted
+server database connection, not directly through the Supabase public API.
 
-```
-postgres-js driver requires DATABASE_URL, POSTGRES_URL, or POSTGRESQL_URL
-environment variable when applyMigrationsDuringBuild is enabled
-```
+pnpm db:migrate uses Drizzle with public.pat_migrations. Both pnpm dev and
+pnpm build run it automatically. NuxtHub's default migration runner is disabled
+to avoid creating an unprefixed migration ledger in the shared database.
+The initial migration targets a fresh pat_ installation; an existing installation
+using unprefixed tables needs a separate data migration before switching.
+
+The project declares Node 24 in package.json (devEngines.runtime). Run pnpm install
+once; pnpm downloads the compatible runtime and uses it for pnpm dev and other
+project scripts, even when the system-wide Node is older.
 
 Provision [Neon from the Vercel Marketplace](https://vercel.com/marketplace/neon) — the
 Deploy button in the README includes it — or add it to an existing project:
@@ -64,22 +74,28 @@ Canonical URL for SEO — used for Open Graph images, Twitter cards, and canonic
 
 ## Authentication
 
-### `BETTER_AUTH_SECRET` (required)
+Supabase Auth is the identity provider. Existing users in this Supabase project's
+Authentication users list can sign in with their email and password. Database
+credentials, Supabase dashboard credentials, and accounts in unrelated public
+tables are not Auth accounts.
 
-Random secret used by [Better Auth](https://www.better-auth.com/docs/installation#set-environment-variables) to sign sessions and tokens.
+Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY on both web and Eve. The existing
+NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY names are also
+accepted. Only the publishable key is exposed to the browser; no service-role key
+is needed. Cookies are scoped with the pat_supabase_auth name.
 
-```bash
-openssl rand -base64 32
-```
+For sign-up confirmation, allow http://localhost:3000/auth/callback (and the
+production equivalent) in Supabase Auth URL Configuration. Confirmation requires
+the same browser that initiated sign-up for the PKCE exchange; users can sign in
+normally after confirming elsewhere. The app displays a confirmation notice when
+Supabase requires email verification.
 
-### `BETTER_AUTH_URL` (required)
+APP_URL is the Nuxt origin for Eve's internal API calls. It defaults to
+http://localhost:3000 locally. BETTER_AUTH_URL is accepted as a legacy fallback;
+BETTER_AUTH_SECRET is no longer used.
 
-Public URL of the Nuxt app. Used for auth callbacks and as the base URL for agent → Nuxt internal API calls.
-
-| Environment | Value |
-|-------------|-------|
-| Local | `http://localhost:3000` |
-| Production | `https://your-domain.vercel.app` |
+Supabase UUIDs are mirrored to pat_user on authenticated requests. Legacy Better
+Auth accounts are not automatically merged by email, and their data is retained.
 
 ## Internal API
 
@@ -102,15 +118,25 @@ Eve's `fileMemory()` provider stores one private Blob document per user at
 `BLOB_READ_WRITE_TOKEN` is provided automatically; without one the agent fails
 on its first memory recall.
 
-## AI provider
+## AI provider — Grunden
 
-This template does not define AI keys in `.env.example`. The default model is set in [`agent/agent.ts`](../agent/agent.ts):
+Set GRUNDEN_API_TOKEN on the Eve service (and in the local .env). The agent
+calls https://api.grunden.ai/v1/chat/completions through the OpenAI-compatible
+AI SDK provider. No Vercel AI Gateway key is needed for these models.
 
-```typescript
-model: "anthropic/claude-sonnet-5"
-```
+The chat composer offers GLM 5.3 (glm-5.3, default) and Flash
+(glm-5.3-flash). The browser remembers the preference in pat_chat_model and
+sends the allowlisted choice with each Eve request. Eve carries it in the
+authenticated turn's attributes and resolves the provider at each model step.
+Changing models applies to the next message in the same conversation.
+Non-web channels default to GLM 5.3. Both models advertise a usable context
+of 190,000 tokens in Grunden's model registry.
 
-On Vercel, Eve handles provider configuration through the platform. For local development, follow [Eve docs](https://eve.dev) for your chosen provider.
+GRUNDEN_HMAC_KEY is for verifying asynchronous webhook deliveries; the
+interactive chat uses streaming responses and does not need this key.
+Neither credential is exposed in the browser runtime config or request headers.
+The openai-compatible provider version is pinned to match the AI SDK/Eve
+provider types; upgrade these packages together.
 
 ## Vercel Connect (optional)
 
@@ -137,12 +163,11 @@ These paths are gitignored and should never be committed:
 | `.eve/` | Eve dev cache |
 | `.vercel/` | Vercel CLI link metadata |
 
-Reset the database — destructive, it drops every table:
+For a clean development database, use a separate Supabase project or Neon branch.
+Do not reset the public schema of a shared database.
 
-```bash
-psql "$DATABASE_URL" -c 'drop schema public cascade; create schema public;'
-pnpm db:migrate
-```
-
-Pointing `DATABASE_URL` at a fresh Neon branch does the same without dropping
-anything.
+The Reasoning selector offers low, high and max for both Grunden models. Max is
+the default, matching the provider. The pat_chat_reasoning cookie remembers the
+selection; x-pat-reasoning carries it into the authenticated turn and the provider
+sends it as reasoning_effort. Invalid values fall back to max. Both selectors
+are disabled while a reply is in progress and changes apply to the next message.

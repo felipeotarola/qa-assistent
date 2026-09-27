@@ -1,12 +1,8 @@
 import type { H3Event } from "h3";
-import { fromNodeHeaders } from "better-auth/node";
-import { auth } from "~~/auth";
-import { getNodeRequest } from "~~/server/utils/h3-node";
+import { getAppSession } from "./supabase";
 
 export async function requireSessionUserId(event: H3Event): Promise<string> {
-  const session = await auth.api.getSession({
-    headers: fromNodeHeaders(getNodeRequest(event).headers),
-  });
+  const session = await getAppSession(event);
 
   if (!session?.user?.id) {
     throw createError({

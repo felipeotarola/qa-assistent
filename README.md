@@ -51,7 +51,7 @@ Morning briefing skill: active focus from recalled memory, assigned Linear issue
                                 │ /api/internal/* (Bearer auth)
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│       Nuxt (UI + Nitro API + Better Auth + PostgreSQL)         │
+│       Nuxt (UI + Nitro API + Supabase Auth + PostgreSQL)         │
 └───────────────────────────────┬─────────────────────────────────┘
                                 ▼
                       Vercel Connect (Linear, Slack)
@@ -84,8 +84,10 @@ Open [http://localhost:3000](http://localhost:3000), create an account, and star
 **Required environment variables:**
 
 ```bash
-BETTER_AUTH_SECRET=...       # openssl rand -base64 32
-BETTER_AUTH_URL=http://localhost:3000
+SUPABASE_URL=...
+SUPABASE_PUBLISHABLE_KEY=...
+DATABASE_URL=...
+APP_URL=http://localhost:3000
 INTERNAL_API_SECRET=...      # openssl rand -base64 32 — same on web + eve
 ```
 
@@ -118,7 +120,7 @@ Documents live in private Vercel Blob storage — attach a Blob store to the pro
 
 > For the full technical deep-dive, see [Architecture](./docs/ARCHITECTURE.md).
 
-1. **Auth**: Users sign in via Better Auth (email/password)
+1. **Auth**: Users sign in via Supabase Auth (email/password)
 2. **Each turn**: Eve recalls the `profile` memory slot for the authenticated principal
 3. **Chat**: Web UI streams through Eve; Slack events hit the slack channel
 4. **Tools**: Agent calls weather, GitHub, Linear MCP and its memory tools as needed
@@ -130,7 +132,7 @@ Documents live in private Vercel Blob storage — attach a Blob store to the pro
 pnpm dev          # Nuxt + Eve (eve/nuxt module — see Eve docs)
 pnpm typecheck    # TypeScript check
 pnpm build        # Production build
-pnpm db:generate  # Regenerate the auth schema, then the migration
+pnpm db:generate  # Generate a migration from the Drizzle schema
 pnpm db:migrate   # Apply migrations
 ```
 
@@ -142,7 +144,7 @@ See [AGENTS.md](./AGENTS.md) for notes aimed at AI coding assistants.
 - [Nuxt](https://nuxt.com) — Full-stack Vue framework
 - [Nuxt UI](https://ui.nuxt.com) — UI component library
 - [NuxtHub](https://hub.nuxt.com) — PostgreSQL database
-- [Better Auth](https://www.better-auth.com) — Authentication
+- [Supabase Auth](https://supabase.com/docs/guides/auth) — Authentication
 - [Drizzle ORM](https://orm.drizzle.team) — Type-safe database queries
 - [Vercel Connect](https://vercel.com/docs/connect) — Linear and Slack integrations
 

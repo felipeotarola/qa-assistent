@@ -1,6 +1,6 @@
 import { index, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
-export const slackLinks = pgTable("slack_links", {
+export const slackLinks = pgTable("pat_slack_links", {
   appUserId: text("app_user_id").notNull(),
   slackTeamId: text("slack_team_id").notNull(),
   slackUserId: text("slack_user_id").notNull(),
@@ -12,10 +12,10 @@ export const slackLinks = pgTable("slack_links", {
     .defaultNow(),
 }, (table) => [
   primaryKey({ columns: [table.slackTeamId, table.slackUserId] }),
-  uniqueIndex("slack_links_app_user_idx").on(table.appUserId),
-]);
+  uniqueIndex("pat_slack_links_app_user_idx").on(table.appUserId),
+]).enableRLS();
 
-export const slackLinkCodes = pgTable("slack_link_codes", {
+export const slackLinkCodes = pgTable("pat_slack_link_codes", {
   code: text().primaryKey(),
   appUserId: text("app_user_id").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
@@ -23,5 +23,5 @@ export const slackLinkCodes = pgTable("slack_link_codes", {
     .notNull()
     .defaultNow(),
 }, (table) => [
-  index("slack_link_codes_app_user_idx").on(table.appUserId),
-]);
+  index("pat_slack_link_codes_app_user_idx").on(table.appUserId),
+]).enableRLS();

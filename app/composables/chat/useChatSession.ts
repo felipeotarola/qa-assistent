@@ -6,6 +6,7 @@ import { recordAuthorizationEvent } from "~/composables/chat/useAuthorizationCha
 import { persistThreadSession, resumeOptionsFromThread } from "~/composables/chat/thread-session";
 import { recordStreamEvent } from "~/composables/chat/stream-log";
 import { clearTurnFailure, recordTurnFailure, turnFailure } from "~/composables/chat/turn-errors";
+import { CHAT_MODEL_HEADER, REASONING_HEADER } from "#shared/chat-models";
 
 /** The four statuses the Nuxt UI chat components understand. */
 export type ChatStatus = "ready" | "submitted" | "streaming" | "error";
@@ -35,9 +36,15 @@ function lastUserMessageText(data: EveMessageData) {
 export function useChatSession(thread: ThreadRecord) {
   const chatId = thread.id;
   const initial = resumeOptionsFromThread(thread);
+  const selectedModel = useChatModel();
+  const selectedReasoning = useChatReasoning();
 
   const agent = useEveAgent({
     ...initial,
+    headers: () => ({
+      [CHAT_MODEL_HEADER]: selectedModel.value,
+      [REASONING_HEADER]: selectedReasoning.value,
+    }),
     onSessionChange: (session) => {
       // eve mints the session on the first message; bind it once.
       if (session && session.sessionId !== thread.sessionId) {
@@ -133,6 +140,8 @@ export function useChatSession(thread: ThreadRecord) {
   }
 
   return {
+    selectedModel,
+    selectedReasoning,
     messages,
     status,
     error,

@@ -9,6 +9,8 @@ minimumReleaseAgeExclude:
 
 # pnpm 10+ requires each build script to be allowed explicitly.
 allowBuilds:
+  "@mongodb-js/zstd": false
+  node-liblzma: false
   "@parcel/watcher": true
   better-sqlite3: true
   esbuild: true

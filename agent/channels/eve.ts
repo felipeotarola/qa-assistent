@@ -1,26 +1,27 @@
 import type { AuthFn } from "eve/channels/auth";
 import { eveChannel } from "eve/channels/eve";
 import { vercelOidc } from "eve/channels/auth";
-import { auth } from "../../auth";
+import { createRequestSupabase } from "../../shared/supabase";
+import { CHAT_MODEL_HEADER, REASONING_HEADER, resolveChatModel, resolveReasoning } from "../../shared/chat-models";
 
 function appSession(): AuthFn<Request> {
   return async (request) => {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
+    const client = createRequestSupabase(request.headers.get("cookie") || "");
+    const { data, error } = await client.auth.getUser();
+    if (error || !data.user) {
       return null;
     }
 
     return {
       attributes: {
-        email: session.user.email,
-        name: session.user.name,
+        chatModel: resolveChatModel(request.headers.get(CHAT_MODEL_HEADER)),
+        reasoning: resolveReasoning(request.headers.get(REASONING_HEADER)),
+        email: data.user.email ?? "",
+        name: typeof data.user.user_metadata?.name === "string" ? data.user.user_metadata.name : "",
       },
       authenticator: "app",
       issuer: "app",
-      principalId: session.user.id,
+      principalId: data.user.id,
       principalType: "user",
     };
   };

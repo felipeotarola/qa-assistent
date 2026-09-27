@@ -13,7 +13,8 @@ const mode = ref<"sign-in" | "sign-up">("sign-in");
 const email = ref("");
 const password = ref("");
 const name = ref("");
-const error = ref("");
+const error = ref(route.query.confirmation === "failed" ? "Confirmation link expired or invalid. Please sign in or request a new link." : "");
+const notice = ref("");
 const loading = ref(false);
 
 const highlights = [
@@ -26,11 +27,12 @@ const highlights = [
 
 const redirectTo = computed(() => {
   const value = route.query.redirect;
-  return typeof value === "string" && value.startsWith("/") ? value : "/";
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") && !value.includes("\\") ? value : "/";
 });
 
 async function handleSubmit() {
   error.value = "";
+  notice.value = "";
   loading.value = true;
 
   try {
@@ -43,6 +45,10 @@ async function handleSubmit() {
 
       if (result.error) {
         error.value = result.error.message ?? "Sign up failed.";
+        return;
+      }
+      if (!result.data.session) {
+        notice.value = "Check your email to confirm your account, then sign in.";
         return;
       }
     }
@@ -58,7 +64,11 @@ async function handleSubmit() {
       }
     }
 
+    await authClient.getSession();
     await navigateTo(redirectTo.value);
+  }
+  catch {
+    error.value = "Could not sign in. Please try again.";
   }
   finally {
     loading.value = false;
@@ -111,7 +121,7 @@ async function handleSubmit() {
                 type="password"
                 autocomplete="current-password"
                 required
-                minlength="8"
+                minlength="6"
                 placeholder="••••••••"
               />
             </UFormField>
@@ -121,6 +131,10 @@ async function handleSubmit() {
               class="text-sm text-error"
             >
               {{ error }}
+            </p>
+
+            <p v-if="notice" class="text-sm text-muted" role="status">
+              {{ notice }}
             </p>
 
             <UButton

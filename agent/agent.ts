@@ -1,14 +1,15 @@
-import { defineAgent } from "eve";
+import { defineAgent, defineDynamic } from "eve";
+import { grundenModelSelection } from "./lib/grunden";
 
 export default defineAgent({
-  model: "anthropic/claude-sonnet-5",
-  modelOptions: {
-    providerOptions: {
-      anthropic: {
-        // Claude 5 thinks adaptively on its own but omits the reasoning text
-        // by default, which would render as an empty "Thinking…" block.
-        thinking: { type: "adaptive", display: "summarized" },
-      },
+  model: defineDynamic({
+    events: {
+      // Direct provider objects are supported at step scope. The authenticated
+      // turn carries the choice, so all tool steps use that turn's model.
+      "step.started": (_event, ctx) => grundenModelSelection(
+        ctx.session.auth.current?.attributes.chatModel,
+        ctx.session.auth.current?.attributes.reasoning,
+      ),
     },
-  },
+  }),
 });

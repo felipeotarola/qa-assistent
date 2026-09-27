@@ -76,18 +76,20 @@ export default defineNuxtConfig({
   },
 
   hub: {
-    // Pinned rather than auto-detected: without a URL the module falls back to
-    // pglite, whose WASM payload does not survive eve's agent bundling. Pinning
-    // turns that into a build-time error naming the missing DATABASE_URL.
+    // Pin PostgreSQL: pglite's WASM payload cannot survive Eve's bundling.
+    // The migration script validates DATABASE_URL before starting or building.
     db: {
       dialect: "postgresql",
       driver: "postgres-js",
+      // Use our prefixed migration ledger in the shared Supabase database.
+      applyMigrationsDuringDev: false,
+      applyMigrationsDuringBuild: false,
     },
   },
   runtimeConfig: {
-    betterAuthSecret: process.env.BETTER_AUTH_SECRET,
-    betterAuthUrl: process.env.BETTER_AUTH_URL,
     public: {
+      supabaseUrl: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+      supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "",
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || "",
     },
   },

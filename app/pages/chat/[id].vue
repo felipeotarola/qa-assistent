@@ -25,6 +25,8 @@ if (error.value || !data.value?.thread) {
 const thread = computed(() => data.value!.thread);
 
 const {
+  selectedModel,
+  selectedReasoning,
   messages,
   status,
   error: chatError,
@@ -81,16 +83,6 @@ function handleInputResponses(responses: Parameters<typeof respond>[0]) {
     class="relative min-h-0"
     :ui="{ body: 'p-0 sm:p-0 overscroll-none' }"
   >
-    <template #header>
-      <AppNavbar>
-        <template #title>
-          <p class="truncate text-sm font-medium text-highlighted">
-            {{ thread.title }}
-          </p>
-        </template>
-      </AppNavbar>
-    </template>
-
     <template #body>
       <div
         v-if="resumePending"
@@ -101,16 +93,16 @@ function handleInputResponses(responses: Parameters<typeof respond>[0]) {
 
       <div
         v-else
-        class="flex flex-1"
+        class="flex min-w-0 flex-1"
       >
-        <UContainer class="flex flex-1 flex-col gap-4 sm:gap-6">
+        <UContainer class="flex min-w-0 flex-1 flex-col gap-4 px-4 sm:gap-6 sm:px-5">
           <UChatMessages
             should-auto-scroll
             :messages="messages"
             :status="status"
             :spacing-offset="160"
             :assistant="{ side: 'left', variant: 'naked', ui: { container: 'relative flex w-full min-w-0 items-start' } }"
-            class="pt-(--ui-header-height) pb-4 sm:pb-6"
+            class="py-4 sm:py-6"
           >
             <template #indicator>
               <ChatActivityIndicator />
@@ -148,10 +140,14 @@ function handleInputResponses(responses: Parameters<typeof respond>[0]) {
             :error="chatError"
             variant="subtle"
             class="sticky bottom-0 z-10 [view-transition-name:chat-prompt] rounded-b-none"
-            :ui="{ base: 'px-1.5' }"
+            :ui="{ base: 'px-1.5', footer: 'flex-wrap gap-2' }"
             @submit="handleSubmit"
           >
             <template #footer>
+              <div class="flex flex-wrap items-center gap-2">
+                <ChatModelToggle v-model="selectedModel" :disabled="isBusy" />
+                <ChatReasoningSelect v-model="selectedReasoning" :disabled="isBusy" />
+              </div>
               <ChatStreamInspector :status="status" />
 
               <UChatPromptSubmit

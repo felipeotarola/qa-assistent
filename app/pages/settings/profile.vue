@@ -44,7 +44,7 @@ async function handleSave() {
       locale: form.locale,
       bio: form.bio,
     });
-    await authClient.getSession({ query: { disableCookieCache: true } });
+    await authClient.getSession();
     toast.add({ title: "Profile saved", color: "success" });
   }
   catch {

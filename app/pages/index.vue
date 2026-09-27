@@ -2,6 +2,8 @@
 import { startChat } from "~/composables/chat/navigation";
 
 const input = ref("");
+const selectedModel = useChatModel();
+const selectedReasoning = useChatReasoning();
 
 const greeting = computed(() => {
   const hour = new Date().getHours();
@@ -62,10 +64,6 @@ const quickChats = [
     class="min-h-0"
     :ui="{ body: 'p-0 sm:p-0' }"
   >
-    <template #header>
-      <AppNavbar />
-    </template>
-
     <template #body>
       <div class="hero-glow flex flex-1">
         <UContainer class="flex flex-1 flex-col justify-center gap-4 py-8 sm:gap-6">
@@ -82,10 +80,14 @@ const quickChats = [
             v-model="input"
             class="[view-transition-name:chat-prompt]"
             variant="subtle"
-            :ui="{ base: 'px-1.5' }"
+            :ui="{ base: 'px-1.5', footer: 'flex-wrap gap-2' }"
             @submit="onSubmit"
           >
             <template #footer>
+              <div class="flex flex-wrap items-center gap-2">
+                <ChatModelToggle v-model="selectedModel" />
+                <ChatReasoningSelect v-model="selectedReasoning" />
+              </div>
               <UChatPromptSubmit
                 class="ms-auto shrink-0"
                 color="neutral"

@@ -4,8 +4,8 @@
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.account": {
-      "name": "account",
+    "public.pat_account": {
+      "name": "pat_account",
       "schema": "",
       "columns": {
         "id": {
@@ -95,8 +95,8 @@
         }
       },
       "indexes": {
-        "account_issuer_accountId_uidx": {
-          "name": "account_issuer_accountId_uidx",
+        "pat_account_issuer_accountId_uidx": {
+          "name": "pat_account_issuer_accountId_uidx",
           "columns": [
             {
               "expression": "issuer",
@@ -116,8 +116,8 @@
           "method": "btree",
           "with": {}
         },
-        "account_userId_idx": {
-          "name": "account_userId_idx",
+        "pat_account_userId_idx": {
+          "name": "pat_account_userId_idx",
           "columns": [
             {
               "expression": "user_id",
@@ -133,10 +133,10 @@
         }
       },
       "foreignKeys": {
-        "account_user_id_user_id_fk": {
-          "name": "account_user_id_user_id_fk",
-          "tableFrom": "account",
-          "tableTo": "user",
+        "pat_account_user_id_user_id_fk": {
+          "name": "pat_account_user_id_user_id_fk",
+          "tableFrom": "pat_account",
+          "tableTo": "pat_user",
           "columnsFrom": [
             "user_id"
           ],
@@ -151,10 +151,10 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
-    "public.phone_links": {
-      "name": "phone_links",
+    "public.pat_phone_links": {
+      "name": "pat_phone_links",
       "schema": "",
       "columns": {
         "app_user_id": {
@@ -178,8 +178,8 @@
         }
       },
       "indexes": {
-        "phone_links_app_user_idx": {
-          "name": "phone_links_app_user_idx",
+        "pat_phone_links_app_user_idx": {
+          "name": "pat_phone_links_app_user_idx",
           "columns": [
             {
               "expression": "app_user_id",
@@ -196,8 +196,8 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "phone_links_phone_number_pk": {
-          "name": "phone_links_phone_number_pk",
+        "pat_phone_links_phone_number_pk": {
+          "name": "pat_phone_links_phone_number_pk",
           "columns": [
             "phone_number"
           ]
@@ -206,10 +206,10 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
-    "public.session": {
-      "name": "session",
+    "public.pat_session": {
+      "name": "pat_session",
       "schema": "",
       "columns": {
         "id": {
@@ -263,8 +263,8 @@
         }
       },
       "indexes": {
-        "session_userId_idx": {
-          "name": "session_userId_idx",
+        "pat_session_userId_idx": {
+          "name": "pat_session_userId_idx",
           "columns": [
             {
               "expression": "user_id",
@@ -280,10 +280,10 @@
         }
       },
       "foreignKeys": {
-        "session_user_id_user_id_fk": {
-          "name": "session_user_id_user_id_fk",
-          "tableFrom": "session",
-          "tableTo": "user",
+        "pat_session_user_id_user_id_fk": {
+          "name": "pat_session_user_id_user_id_fk",
+          "tableFrom": "pat_session",
+          "tableTo": "pat_user",
           "columnsFrom": [
             "user_id"
           ],
@@ -296,8 +296,8 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "session_token_unique": {
-          "name": "session_token_unique",
+        "pat_session_token_unique": {
+          "name": "pat_session_token_unique",
           "nullsNotDistinct": false,
           "columns": [
             "token"
@@ -306,10 +306,10 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
-    "public.slack_link_codes": {
-      "name": "slack_link_codes",
+    "public.pat_slack_link_codes": {
+      "name": "pat_slack_link_codes",
       "schema": "",
       "columns": {
         "code": {
@@ -339,8 +339,8 @@
         }
       },
       "indexes": {
-        "slack_link_codes_app_user_idx": {
-          "name": "slack_link_codes_app_user_idx",
+        "pat_slack_link_codes_app_user_idx": {
+          "name": "pat_slack_link_codes_app_user_idx",
           "columns": [
             {
               "expression": "app_user_id",
@@ -360,10 +360,10 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
-    "public.slack_links": {
-      "name": "slack_links",
+    "public.pat_slack_links": {
+      "name": "pat_slack_links",
       "schema": "",
       "columns": {
         "app_user_id": {
@@ -411,8 +411,8 @@
         }
       },
       "indexes": {
-        "slack_links_app_user_idx": {
-          "name": "slack_links_app_user_idx",
+        "pat_slack_links_app_user_idx": {
+          "name": "pat_slack_links_app_user_idx",
           "columns": [
             {
               "expression": "app_user_id",
@@ -429,8 +429,8 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "slack_links_slack_team_id_slack_user_id_pk": {
-          "name": "slack_links_slack_team_id_slack_user_id_pk",
+        "pat_slack_links_slack_team_id_slack_user_id_pk": {
+          "name": "pat_slack_links_slack_team_id_slack_user_id_pk",
           "columns": [
             "slack_team_id",
             "slack_user_id"
@@ -440,10 +440,10 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
-    "public.threads": {
-      "name": "threads",
+    "public.pat_threads": {
+      "name": "pat_threads",
       "schema": "",
       "columns": {
         "id": {
@@ -486,8 +486,8 @@
         }
       },
       "indexes": {
-        "threads_user_updated_idx": {
-          "name": "threads_user_updated_idx",
+        "pat_threads_user_updated_idx": {
+          "name": "pat_threads_user_updated_idx",
           "columns": [
             {
               "expression": "user_id",
@@ -509,10 +509,10 @@
         }
       },
       "foreignKeys": {
-        "threads_user_id_user_id_fk": {
-          "name": "threads_user_id_user_id_fk",
-          "tableFrom": "threads",
-          "tableTo": "user",
+        "pat_threads_user_id_user_id_fk": {
+          "name": "pat_threads_user_id_user_id_fk",
+          "tableFrom": "pat_threads",
+          "tableTo": "pat_user",
           "columnsFrom": [
             "user_id"
           ],
@@ -527,10 +527,10 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
-    "public.user": {
-      "name": "user",
+    "public.pat_user": {
+      "name": "pat_user",
       "schema": "",
       "columns": {
         "id": {
@@ -583,8 +583,8 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "user_email_unique": {
-          "name": "user_email_unique",
+        "pat_user_email_unique": {
+          "name": "pat_user_email_unique",
           "nullsNotDistinct": false,
           "columns": [
             "email"
@@ -593,10 +593,10 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
-    "public.user_profiles": {
-      "name": "user_profiles",
+    "public.pat_user_profiles": {
+      "name": "pat_user_profiles",
       "schema": "",
       "columns": {
         "user_id": {
@@ -636,10 +636,10 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "user_profiles_user_id_user_id_fk": {
-          "name": "user_profiles_user_id_user_id_fk",
-          "tableFrom": "user_profiles",
-          "tableTo": "user",
+        "pat_user_profiles_user_id_user_id_fk": {
+          "name": "pat_user_profiles_user_id_user_id_fk",
+          "tableFrom": "pat_user_profiles",
+          "tableTo": "pat_user",
           "columnsFrom": [
             "user_id"
           ],
@@ -654,10 +654,10 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
-    "public.verification": {
-      "name": "verification",
+    "public.pat_verification": {
+      "name": "pat_verification",
       "schema": "",
       "columns": {
         "id": {
@@ -700,8 +700,8 @@
         }
       },
       "indexes": {
-        "verification_identifier_idx": {
-          "name": "verification_identifier_idx",
+        "pat_verification_identifier_idx": {
+          "name": "pat_verification_identifier_idx",
           "columns": [
             {
               "expression": "identifier",
@@ -721,7 +721,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     }
   },
   "enums": {},
