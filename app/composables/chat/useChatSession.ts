@@ -120,7 +120,9 @@ export function useChatSession(thread: ThreadRecord) {
     return failure ? new Error(failure) : undefined;
   });
 
-  const isBusy = computed(() => sending.value || agent.status.value === "resuming" || status.value === "submitted" || status.value === "streaming");
+  // A replay can accept one queued message through whenSendable. Blocking the
+  // composer here made that path unreachable after opening an existing chat.
+  const isBusy = computed(() => sending.value || status.value === "submitted" || status.value === "streaming");
 
   /** eve rejects sends while a session replays; wait rather than drop them. */
   async function whenSendable(text?: string) {

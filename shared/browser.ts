@@ -7,6 +7,7 @@ export const browserActionSchema = z.object({
   ref: z.string().regex(/^[a-z0-9-]+$/).optional(),
   text: z.string().max(10000).optional(),
   direction: z.enum(["up", "down"]).optional(),
+  runId: z.string().uuid().optional(),
 });
 export type BrowserAction = z.infer<typeof browserActionSchema>;
 export interface BrowserView {

@@ -80,6 +80,16 @@ inputs in the workspace editor are not yet fully standardized. When touching
 them, prefer Nuxt UI controls where they fit, preserving grid keyboard behavior
 and density. This document does not claim a complete UI migration has happened.
 
+## Workspace views
+
+`WorkspacePanel` owns the Overview / Testing / Material navigation. The selected
+view is addressable through `workspaceView=testing|material`; absence means
+Overview. `WorkspaceOverview` links to the same existing items, not copies.
+Test plans appear under Testing; other saved items appear under Material.
+The browser remains mounted across view changes and is available in both working
+views. Card controls and creation actions stay in their relevant view.
+Plan readiness describes the definition only, never a test execution outcome.
+
 ## Accessibility and verification
 
 Preserve keyboard navigation, visible focus, accessible names, Escape behavior,

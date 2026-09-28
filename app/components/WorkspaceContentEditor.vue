@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { EditableContent, WorkspaceItem } from "#shared/workspace";
+import WorkspaceTestPlanEditor from "./WorkspaceTestPlanEditor.vue";
 const props = defineProps<{ workspaceId: string }>();
 const model = defineModel<EditableContent>({ required: true });
 const { data } = useFetch<{ items: WorkspaceItem[] }>(() => `/api/workspaces/${props.workspaceId}/items`);
@@ -54,6 +55,7 @@ function move(index: number, delta: number) {
     </div>
     <p class="text-xs text-dimmed">Bilder återanvänds från workspace. Att ta bort ett bildblock raderar inte bildfilen.</p>
   </div>
+  <WorkspaceTestPlanEditor v-else-if="model.kind === 'test_plan'" :model-value="model" @update:model-value="model = $event" />
   <div v-else class="space-y-3 overflow-auto">
     <table class="w-full border-collapse">
       <thead><tr><th v-for="(_, c) in model.columns" :key="c" class="border border-default p-2"><UInput v-model="model.columns[c]" :aria-label="`Kolumn ${c + 1}`" /></th></tr></thead>

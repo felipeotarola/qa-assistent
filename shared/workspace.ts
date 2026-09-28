@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { testPlanSchema } from "./test-plan.ts";
 
 export const imageReferenceSchema = z.object({ kind: z.literal("image"), itemId: z.string().uuid(), caption: z.string().max(1000).default("") });
 export const tableBlockSchema = z.object({ kind: z.literal("table"), columns: z.array(z.string().max(200)).min(1).max(50), rows: z.array(z.array(z.union([z.string().max(5000), imageReferenceSchema])).max(50)).max(2000) }).refine(v => v.rows.every(r => r.length === v.columns.length), "Each row must match the columns");
@@ -11,6 +12,7 @@ export const documentBlockSchema = z.union([
   chartBlockSchema,
 ]);
 export const contentSchema = z.discriminatedUnion("kind", [
+  testPlanSchema,
   z.object({ kind: z.literal("text"), text: z.string().max(200000), blocks: z.array(documentBlockSchema).max(200).optional() }),
   tableBlockSchema,
 ]);

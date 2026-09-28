@@ -1,0 +1,1 @@
+ALTER TABLE "pat_test_requirements" ADD COLUMN "requested_issue_id" text;

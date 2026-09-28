@@ -38,7 +38,7 @@ export async function operationHistory(userId: string, workspaceId: string) {
   return db.select({ id: schema.externalOperations.id, provider: schema.externalOperations.provider, action: schema.externalOperations.action, state: schema.externalOperations.state, destination: schema.externalOperations.destination, result: schema.externalOperations.result, createdAt: schema.externalOperations.createdAt }).from(schema.externalOperations).where(eq(schema.externalOperations.workspaceId, workspaceId)).orderBy(desc(schema.externalOperations.createdAt)).limit(30);
 }
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
-export async function externalOperation(userId: string, workspaceId: string, callKey: string, input: ExternalInput, threadId?: string) {
+export async function externalOperation(userId: string, workspaceId: string, callKey: string, input: ExternalInput, threadId?: string, expectedItemVersions?: Record<string, number>) {
   const targets = await destinations(userId, workspaceId);
   if (input.action === "destinations") return { destinations: targets };
   if (input.action === "history") return { operations: await operationHistory(userId, workspaceId) };
@@ -46,6 +46,7 @@ export async function externalOperation(userId: string, workspaceId: string, cal
   if (!target) throw createError({ statusCode: 400, statusMessage: "Choose a provider and configure its destination in this workspace first. Do not guess a destination." });
   const writing = ["create", "update", "comment"].includes(input.action);
   const evidenceItems = writing ? await Promise.all([...new Set(input.evidenceItemIds ?? [])].map(id => ownedItem(userId, workspaceId, id))) : [];
+  if (expectedItemVersions && evidenceItems.some(item => expectedItemVersions[item.id] !== item.version)) throw createError({ statusCode: 409, statusMessage: "Supporting item changed. Read the latest version before publishing." });
   if (["read", "update", "comment"].includes(input.action) && !input.issueId) throw createError({ statusCode: 400, statusMessage: "issueId required" });
   if (input.action === "create" && !input.title) throw createError({ statusCode: 400, statusMessage: "title required" });
   if (input.action === "comment" && !input.body?.trim()) throw createError({ statusCode: 400, statusMessage: "comment body required" });

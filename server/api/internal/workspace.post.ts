@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "@nuxthub/db";
 import { contentSchema } from "../../../shared/workspace";
 import { evidenceInputSchema } from "../../../shared/evidence";
 import { addEvidence, evidenceForItem } from "../../utils/evidence";
@@ -10,6 +12,7 @@ import { captureWorkspaceBrowser } from "../../utils/browser";
 const inputSchema = z.object({
   action: z.enum(["list", "read", "create", "update", "save_file", "screenshot", "link", "evidence"]),
   evidence: evidenceInputSchema.optional(),
+  version: z.number().int().positive().optional(),
   itemId: z.string().uuid().optional(), title: z.string().min(1).max(200).optional(),
   content: contentSchema.optional(), expectedVersion: z.number().int().positive().optional(),
   filename: z.string().max(150).optional(), text: z.string().max(200000).optional(),
@@ -28,7 +31,13 @@ export default defineEventHandler(async (event) => {
       return addEvidence(userId, workspaceId, input.itemId, input.evidence, threadId, false, input.expectedVersion);
     }
     case "list": return { workspace: { id: workspace.id, name: workspace.name }, items: (await listItems(userId, workspaceId)).map(({ id, title, content, version }) => ({ id, title, kind: content.kind, version })) };
-    case "read": return { item: publicItem(await ownedItem(userId, workspaceId, input.itemId ?? "")) };
+    case "read": {
+      const item = publicItem(await ownedItem(userId, workspaceId, input.itemId ?? ""));
+      if (input.version === undefined) return { item };
+      const [snapshot] = await db.select().from(schema.workspaceItemVersions).where(and(eq(schema.workspaceItemVersions.itemId, item.id), eq(schema.workspaceItemVersions.version, input.version)));
+      if (!snapshot) throw createError({ statusCode: 404, statusMessage: "Source version not found" });
+      return { item: { ...item, title: snapshot.title, content: snapshot.content, version: snapshot.version }, historical: true };
+    }
     case "create":
     case "update": {
       if (!input.content || (input.action === "create" && !input.title) || (input.action === "update" && (!input.itemId || !input.expectedVersion))) throw createError({ statusCode: 400, statusMessage: "Create requires title/content. Update requires itemId/content/expectedVersion; title is optional." });

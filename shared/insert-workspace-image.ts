@@ -11,7 +11,7 @@ export function insertWorkspaceImage(content: EditableContent, image: ImageRefer
     copy.blocks.splice(placement.index, 0, image);
     return copy;
   }
-  const table = copy.kind === "table" ? copy : copy.blocks?.[placement.blockIndex ?? -1];
+  const table = copy.kind === "table" ? copy : copy.kind === "text" ? copy.blocks?.[placement.blockIndex ?? -1] : undefined;
   if (table?.kind !== "table" || !Number.isInteger(placement.row) || !Number.isInteger(placement.column) || placement.row < 0 || placement.column < 0 || !table.rows[placement.row] || placement.column >= table.columns.length) throw new Error("Choose an existing cell");
   const current = table.rows[placement.row]![placement.column];
   if (current !== "" && !replace) throw new Error("Cell is occupied");
