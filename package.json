@@ -43,6 +43,7 @@
   "dependencies": {
     "@ai-sdk/mcp": "^2.0.41",
     "@ai-sdk/openai-compatible": "^3.0.41",
+    "@browserbasehq/sdk": "^2.21.0",
     "@comark/nuxt": "^0.6.2",
     "@github-tools/eve-extension": "^0.7.0",
     "@github-tools/sdk": "^1.16.0",
@@ -59,6 +60,7 @@
     "eve": "^0.47.3",
     "maska": "^3.2.0",
     "nuxt": "^4.5.2",
+    "playwright-core": "^1.63.0",
     "postgres": "^3.4.9",
     "shiki": "^4.4.3",
     "tailwindcss": "^4.3.3",

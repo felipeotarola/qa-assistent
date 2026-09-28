@@ -1,6 +1,12 @@
+<script setup lang="ts">
+const route = useRoute();
+const browserThreadId = computed(() => typeof route.params.id === "string" && route.path.startsWith("/chat/") ? route.params.id : null);
+</script>
+
 <template>
   <aside class="workspace-panel flex h-full min-h-0 flex-col" aria-label="Workspace">
-    <div class="workspace-canvas relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-8">
+    <BrowserWorkspace v-if="browserThreadId" :key="browserThreadId" :thread-id="browserThreadId" class="min-h-0 flex-1" />
+    <div v-else class="workspace-canvas relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-8">
       <div class="relative flex max-w-xs flex-col items-center text-center">
         <div class="relative mb-9 h-28 w-36" aria-hidden="true">
           <div class="absolute inset-x-4 inset-y-2 -rotate-12 rounded-xl border border-default bg-muted shadow-sm" />
@@ -29,7 +35,7 @@
       </div>
     </div>
 
-    <footer class="flex h-10 shrink-0 items-center justify-between border-t border-default/60 px-5 text-[10px] text-dimmed lg:px-6">
+    <footer v-if="!browserThreadId" class="flex h-10 shrink-0 items-center justify-between border-t border-default/60 px-5 text-[10px] text-dimmed lg:px-6">
       <span class="flex items-center gap-1.5"><UIcon name="i-lucide-layout-panel-left" class="size-3" /> Your workspace</span>
       <span>A fresh canvas</span>
     </footer>

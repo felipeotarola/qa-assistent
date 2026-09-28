@@ -7,6 +7,7 @@ import { persistThreadSession, resumeOptionsFromThread } from "~/composables/cha
 import { recordStreamEvent } from "~/composables/chat/stream-log";
 import { clearTurnFailure, recordTurnFailure, turnFailure } from "~/composables/chat/turn-errors";
 import { CHAT_MODEL_HEADER, REASONING_HEADER } from "#shared/chat-models";
+import { BROWSER_THREAD_HEADER } from "#shared/browser";
 
 /** The four statuses the Nuxt UI chat components understand. */
 export type ChatStatus = "ready" | "submitted" | "streaming" | "error";
@@ -42,6 +43,7 @@ export function useChatSession(thread: ThreadRecord) {
   const agent = useEveAgent({
     ...initial,
     headers: () => ({
+      [BROWSER_THREAD_HEADER]: chatId,
       [CHAT_MODEL_HEADER]: selectedModel.value,
       [REASONING_HEADER]: selectedReasoning.value,
     }),
@@ -138,6 +140,13 @@ export function useChatSession(thread: ThreadRecord) {
     await whenSendable(text);
     await agent.send(text);
   }
+
+  const browserResume = useState<string | null>("browser-resume", () => null);
+  watch([browserResume, status], ([threadId, currentStatus]) => {
+    if (threadId !== chatId || !["ready", "error"].includes(currentStatus)) return;
+    browserResume.value = null;
+    void send("Jag har lämnat tillbaka kontrollen över webbläsaren. Läs av sidan igen och fortsätt med uppgiften.");
+  });
 
   return {
     selectedModel,
