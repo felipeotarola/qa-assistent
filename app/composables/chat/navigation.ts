@@ -1,5 +1,5 @@
 import type { MaybeRefOrGetter } from "vue";
-import { nextTick, toValue } from "vue";
+import { toValue } from "vue";
 import type { ThreadRecord, ThreadSummary } from "#shared/types/thread";
 import { resetStreamLog } from "~/composables/chat/stream-log";
 import { truncateThreadTitle } from "#shared/types/thread";
@@ -11,30 +11,6 @@ type PendingMessage = {
 };
 
 let pendingMessage: PendingMessage | null = null;
-
-const CHAT_PATH = /^\/chat\/[^/]+$/;
-
-function isHomeChatTransition(from: string, to: string) {
-  return (from === "/" && CHAT_PATH.test(to)) || (CHAT_PATH.test(from) && to === "/");
-}
-
-async function navigateWithChatPromptTransition(to: string) {
-  if (!import.meta.client || !document.startViewTransition) {
-    return navigateTo(to);
-  }
-
-  const route = useRoute();
-  if (!isHomeChatTransition(route.path, to)) {
-    return navigateTo(to);
-  }
-
-  const transition = document.startViewTransition(async () => {
-    await navigateTo(to);
-    await nextTick();
-  });
-
-  await transition.finished;
-}
 
 export const THREAD_LIST_KEY = "thread-list";
 
@@ -77,7 +53,9 @@ export async function startChat(message: string, chatId = crypto.randomUUID()) {
   upsertThreadInListCache(thread);
   pendingMessage = { chatId, text };
   await refreshThreadList();
-  await navigateWithChatPromptTransition(`/chat/${chatId}`);
+  // Nuxt owns the view transition. Starting another here cancels it and can
+  // reject navigation even though the new chat has already been created.
+  await navigateTo(`/chat/${chatId}`);
 }
 
 export function consumePendingMessage(chatId: string) {
@@ -91,7 +69,7 @@ export function consumePendingMessage(chatId: string) {
 export async function startNewChat() {
   pendingMessage = null;
   resetStreamLog();
-  await navigateWithChatPromptTransition("/");
+  await navigateTo("/");
 }
 
 export function useChatNavigation(chatId: MaybeRefOrGetter<string>) {
