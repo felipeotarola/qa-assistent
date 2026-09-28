@@ -1,8 +1,31 @@
 <script setup lang="ts">
 import type { WorkspaceItem, ItemContent, EditableContent } from "#shared/workspace";
 import { imageReferences } from "#shared/workspace";
+import { WORKSPACE_IMAGE_MIME } from "#shared/insert-workspace-image";
 const props = defineProps<{ item: WorkspaceItem }>();
-const emit = defineEmits<{ saved: [] }>();
+const emit = defineEmits<{ saved: []; insertImage: [imageId: string, targetId?: string] }>();
+const imageOver = ref(false);
+function imageDrag(event: DragEvent) {
+  if (!event.dataTransfer) return;
+  event.stopPropagation();
+  event.dataTransfer.effectAllowed = "link";
+  event.dataTransfer.setData(WORKSPACE_IMAGE_MIME, JSON.stringify({ itemId: props.item.id, workspaceId: props.item.workspaceId }));
+}
+function imageDragOver(event: DragEvent) {
+  if (!isEditable.value || editing.value || !event.dataTransfer?.types.includes(WORKSPACE_IMAGE_MIME)) return;
+  event.preventDefault(); event.stopPropagation(); imageOver.value = true;
+  event.dataTransfer.dropEffect = "link";
+}
+function imageDrop(event: DragEvent) {
+  imageOver.value = false;
+  if (!event.dataTransfer?.types.includes(WORKSPACE_IMAGE_MIME)) return;
+  event.preventDefault(); event.stopPropagation();
+  if (!isEditable.value || editing.value) return;
+  try {
+    const data = JSON.parse(event.dataTransfer.getData(WORKSPACE_IMAGE_MIME));
+    if (data.workspaceId === props.item.workspaceId && typeof data.itemId === "string") emit("insertImage", data.itemId, props.item.id);
+  } catch { /* Ignore unrelated drag payloads. */ }
+}
 const expanded = ref(false);
 const editing = ref(false);
 const busy = ref(false);
@@ -51,9 +74,10 @@ async function history() {
 }
 </script>
 <template>
-  <WorkspaceCard v-model:expanded="expanded" :title="item.title" :subtitle="`${item.content.kind === 'text' ? 'Dokument' : item.content.kind === 'table' ? 'Tabell' : item.content.kind === 'image' ? 'Bild' : 'Fil'} · version ${item.version}`" :icon="item.content.kind === 'table' ? 'i-lucide-table-2' : item.content.kind === 'image' ? 'i-lucide-image' : 'i-lucide-file-text'">
+  <WorkspaceCard v-model:expanded="expanded" :draggable="item.content.kind === 'image'" :class="imageOver ? 'ring-2 ring-primary' : ''" :title="item.title" :subtitle="`${item.content.kind === 'text' ? 'Dokument' : item.content.kind === 'table' ? 'Tabell' : item.content.kind === 'image' ? 'Bild' : 'Fil'} · version ${item.version}`" :icon="item.content.kind === 'table' ? 'i-lucide-table-2' : item.content.kind === 'image' ? 'i-lucide-image' : 'i-lucide-file-text'" @dragstart="item.content.kind === 'image' && imageDrag($event)" @dragover="imageDragOver" @dragleave="imageOver = false" @drop="imageDrop">
     <template #actions>
-      <UDropdownMenu :items="[{ label: 'Ta bort', icon: 'i-lucide-trash-2', color: 'error', disabled: busy || editing, onSelect: remove }]">
+      <UButton v-if="item.content.kind === 'image'" icon="i-lucide-image-plus" color="neutral" variant="ghost" aria-label="Infoga bilden i dokument eller tabell" title="Dra till ett dokument eller en tabell, eller klicka för att välja" draggable="true" @dragstart="imageDrag" @click="emit('insertImage', item.id)" />
+      <UDropdownMenu :items="[...(item.content.kind === 'image' ? [{ label: 'Infoga i…', icon: 'i-lucide-image-plus', onSelect: () => emit('insertImage', item.id) }] : []), { label: 'Ta bort', icon: 'i-lucide-trash-2', color: 'error', disabled: busy || editing, onSelect: remove }]">
         <UButton icon="i-lucide-ellipsis" :aria-label="`Åtgärder för ${item.title}`" color="neutral" variant="ghost" :disabled="busy" />
       </UDropdownMenu>
     </template>

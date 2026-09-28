@@ -23,6 +23,16 @@ saved content appears via the workspace's normal refresh.
 
 ## Rich documents
 
+Images can be dragged onto document/table cards or inserted through their
+"Infoga i…" menu. `WorkspaceInsertImage` lets users select the document block
+position or a row/column in standalone or embedded tables. Occupied cells
+require an explicit replacement checkbox. Saves use the existing authenticated
+item PATCH endpoint and expectedVersion, preserving version history. No Blob
+copy or deletion occurs: the existing image is referenced and hidden by the
+normal used-images filter. Card grips still reorder cards; dragging the image
+card itself inserts it. Conflicts retain the dialog and require choosing again
+against a refreshed version, without automatically retrying the write.
+
 Document text is rendered with the same Markdown component as chat, supporting
 headings, lists, emphasis and Markdown tables. Consistent legacy pipe-separated
 tables with at least a header and two rows get a separator for display only;

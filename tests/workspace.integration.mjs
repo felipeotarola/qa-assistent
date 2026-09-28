@@ -6,6 +6,7 @@ import { del } from "@vercel/blob";
 import postgres from "postgres";
 import { Client } from "eve/client";
 import { cardTaskPrompt } from "../shared/card-task.ts";
+import { insertWorkspaceImage } from "../shared/insert-workspace-image.ts";
 
 if (process.env.RUN_WORKSPACE_TESTS !== "1") throw new Error("Set RUN_WORKSPACE_TESTS=1 to create temporary integration fixtures.");
 const origin = "http://localhost:3000";
@@ -136,6 +137,16 @@ try {
   assert.equal((await api(`/api/workspaces/${a}/items/${uploaded.id}`, "DELETE")).status, 409);
   const imageTable = (await tool(t2, { action: "create", title: "Bildtabell", content: { kind: "table", columns: ["Sida", "Bild"], rows: [["Startsida", imageRef]] } })).data.item;
   assert.equal(imageTable.content.rows[0][1].itemId, uploaded.id);
+  const insertedContent = insertWorkspaceImage(richRead.content, imageRef, { kind: 'cell', blockIndex: 1, row: 0, column: 1 }, true);
+  const richCurrent = (await tool(t2, { action: 'read', itemId: richRead.id })).data.item;
+  const insertBody = { title: richCurrent.title, content: insertedContent, expectedVersion: richCurrent.version };
+  assert.equal((await api(`/api/workspaces/${a}/items/${richRead.id}`, 'PATCH', insertBody)).status, 200);
+  assert.equal((await api(`/api/workspaces/${a}/items/${richRead.id}`, 'PATCH', insertBody)).status, 409);
+  assert.equal((await api(`/api/workspaces/${b}/items/${richRead.id}`, 'PATCH', insertBody)).status, 400, 'Image from another workspace must be rejected');
+  const badImage = insertWorkspaceImage(richRead.content, { ...imageRef, itemId: randomUUID() }, { kind: 'document', index: 0 });
+  assert.equal((await tool(t2, { action: 'create', title: 'Invalid image reference', content: badImage })).status, 400);
+  await api(`/api/workspaces/${a}/items/${richRead.id}`, 'DELETE');
+  console.log('PASS image insertion save, nested table references, stale version and ownership validation');
   await tool(t1, { action: "update", itemId: document.id, expectedVersion: 1, title: document.title, content: { kind: "text", text: "Utan bild" } });
   assert.equal((await tool(t1, { action: "link", itemId: document.id, expectedVersion: 1, evidence: source })).status, 409, "Stale document versions cannot acquire new evidence");
   assert.ok((await tool(t2, { action: "evidence", itemId: document.id })).data.links.some(link => link.kind === "source" && link.itemVersion === 1));

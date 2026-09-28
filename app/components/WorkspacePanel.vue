@@ -7,6 +7,12 @@ const route = useRoute();
 const { threads } = useThreadList();
 const threadId = computed(() => typeof route.params.id === "string" ? route.params.id : threads.value.find(t => t.workspaceId === activeId.value)?.id ?? null);
 const items = ref<WorkspaceItem[]>([]);
+const imageInsertion = ref<{ image: WorkspaceItem; targetId?: string }>();
+function insertImage(imageId: string, targetId?: string) {
+  const image = items.value.find(item => item.id === imageId && item.content.kind === "image");
+  if (image) imageInsertion.value = { image, targetId };
+}
+watch(activeId, () => { imageInsertion.value = undefined; });
 const order = ref<string[]>([]);
 const ordering = ref(false);
 let layoutRevision = 0;
@@ -147,7 +153,7 @@ icon="i-lucide-grip-vertical" color="neutral" variant="ghost" size="xs" class="c
             <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" size="xs" aria-label="Flytta tidigare" title="Flytta tidigare" :disabled="ordering || !neighbor(card.id, -1)" @click="stepCard(card.id, -1)" />
             <UButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="xs" aria-label="Flytta senare" title="Flytta senare" :disabled="ordering || !neighbor(card.id, 1)" @click="stepCard(card.id, 1)" />
           </div>
-          <WorkspaceItemCard v-if="card.item" :item="card.item" @saved="refresh" />
+          <WorkspaceItemCard v-if="card.item" :item="card.item" @saved="refresh" @insert-image="insertImage" />
           <BrowserWorkspace v-else-if="threadId && activeId" :key="activeId" :thread-id="threadId" embedded @presence="browserPresent = $event" />
         </div>
       </TransitionGroup>
@@ -157,6 +163,7 @@ icon="i-lucide-grip-vertical" color="neutral" variant="ghost" size="xs" class="c
         <p class="mt-2 text-xs">Be agenten spara en text, tabell eller skärmbild — eller ladda upp dina egna filer. Innehållet följer med mellan chattarna.</p>
       </div>
     </div>
+    <WorkspaceInsertImage v-if="imageInsertion" :image="imageInsertion.image" :items="items" :initial-target-id="imageInsertion.targetId" @close="imageInsertion = undefined" @saved="refresh" />
   </aside>
 </template>
 <style scoped>

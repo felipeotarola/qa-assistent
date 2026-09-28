@@ -7,7 +7,7 @@ provideWorkspaceAgent();
 const searchOpen = ref(false);
 const { container: splitContainer, width: chatWidth, dragging, start, move, finish, reset, keydown, min, max } = useWorkspaceResize();
 const route = useRoute();
-const hasWorkspace = computed(() => route.path === "/" || route.path.startsWith("/chat/"));
+const hasWorkspace = computed(() => !!activeId.value && (route.path === "/" || route.path.startsWith("/chat/")));
 const mobilePane = ref<"chat" | "workspace">("chat");
 watch(() => route.path, () => { mobilePane.value = "chat"; });
 
@@ -66,7 +66,7 @@ defineShortcuts({
     >
       <template #header="{ collapsed }">
         <NuxtLink
-          to="/"
+          to="/?view=workspaces"
           class="flex items-center min-w-0"
           :class="collapsed ? 'mx-auto' : 'px-2.5'"
         >
