@@ -157,6 +157,22 @@ Supabase Auth handles email/password authentication. Browser cookies use @supaba
 
 Global middleware: [`app/middleware/auth.global.ts`](../app/middleware/auth.global.ts).
 
+## Build performance
+
+The login page uses SSR with private/no-store responses. Prerendering this one
+page requires an extra Nitro server compilation, so do not add it back to the
+prerender routes without measuring the cost. Login redirects and confirmation
+messages are still evaluated from the current request.
+
+On Vercel (`VERCEL=1`), asset precompression is disabled because the
+[CDN compresses responses](https://vercel.com/docs/how-vercel-cdn-works/compression).
+Self-hosted builds retain precompressed assets. Database migrations still run
+before every production build.
+
+Nitro inlines `eve/client` and resolves its package-private `#shared` imports
+within Eve. Externalizing it can produce a bundle missing those dependencies;
+check that the built server starts, not only that compilation succeeds.
+
 ## Eve docs
 
 For channels, tools, connections, and deployment details, read Eve guides in `node_modules/eve/dist/docs/public/`.

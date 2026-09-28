@@ -5,6 +5,7 @@ import { createServerClient } from "@supabase/ssr";
 import { del } from "@vercel/blob";
 import postgres from "postgres";
 import { Client } from "eve/client";
+import { cardTaskPrompt } from "../shared/card-task.ts";
 
 if (process.env.RUN_WORKSPACE_TESTS !== "1") throw new Error("Set RUN_WORKSPACE_TESTS=1 to create temporary integration fixtures.");
 const origin = "http://localhost:3000";
@@ -49,6 +50,51 @@ try {
   assert.equal(versions[1].content.rows[0][1], "Todo");
   assert.equal((await api(`/api/workspaces/${a}/items/${item.id}`, "PATCH", { title: versions[1].title, content: versions[1].content, expectedVersion: 2 })).data.item.version, 3);
   console.log("PASS updates, immutable history, restore and conflict protection");
+  const rich = { kind: 'text', text: '', blocks: [{ kind: 'heading', text: 'Report' }, { kind: 'table', columns: ['Case', 'Result'], rows: [['Login', 'Pass']] }, { kind: 'chart', chartType: 'bar', title: 'Results', data: [{ label: 'Passed', value: 1 }] }] };
+  const richResult = await api(`/api/workspaces/${a}/items`, 'POST', { title: 'Mixed report', content: rich });
+  assert.equal(richResult.status, 200);
+  const richRead = (await tool(t2, { action: 'read', itemId: richResult.data.item.id })).data.item;
+  assert.deepEqual(richRead.content.blocks, rich.blocks);
+  assert.match(richRead.content.text, /Login \| Pass/);
+  assert.match(richRead.content.text, /Passed: 1/);
+  assert.equal((await api(`/api/workspaces/${a}/items`, 'POST', { title: 'Invalid table', content: { kind: 'text', text: '', blocks: [{ kind: 'table', columns: ['One'], rows: [['too', 'many']] }] } })).status, 400);
+  console.log('PASS mixed document tables/charts roundtrip and invalid nested table rejected');
+  const updatedRich = structuredClone(rich);
+  updatedRich.blocks[1].columns.push('Testat');
+  updatedRich.blocks[1].rows[0].push('Ej testat');
+  const withoutTitle = await tool(t2, { action: 'update', itemId: richRead.id, expectedVersion: richRead.version, content: updatedRich });
+  assert.equal(withoutTitle.status, 200);
+  assert.equal(withoutTitle.data.item.title, richRead.title);
+  assert.deepEqual(withoutTitle.data.item.content.blocks, updatedRich.blocks);
+  assert.equal((await tool(t2, { action: 'update', itemId: richRead.id, expectedVersion: richRead.version, content: updatedRich })).status, 409);
+  assert.equal((await tool(other, { action: 'update', itemId: richRead.id, expectedVersion: withoutTitle.data.item.version, content: updatedRich })).status, 404);
+  assert.equal((await tool(t2, { action: 'create', content: rich })).status, 400);
+  console.log('PASS adding document table column without title, preserving title, version conflict and ownership checks');
+  const layout = `/api/workspaces/${a}/layout`;
+  assert.equal((await api(layout, "PUT", { order: [item.id, "browser"] })).status, 200);
+  assert.deepEqual((await api(layout)).data.order, [item.id, "browser"]);
+  assert.equal((await api(layout, "PUT", { order: [item.id, item.id] })).status, 400);
+  assert.equal((await api(`/api/workspaces/${b}/layout`, "PUT", { order: [item.id] })).status, 409);
+  assert.equal((await fetch(origin + layout)).status, 401);
+  assert.equal((await fetch(origin + layout, { method: "PUT", headers: { 'content-type': 'application/json' }, body: JSON.stringify({ order: [] }) })).status, 401);
+  assert.equal((await tool(t2, { action: "read", itemId: item.id })).data.item.version, 3, "Reorder must not create content versions");
+  console.log("PASS durable card order, validation and anonymous isolation");
+  if (process.env.TEST_CARD_TASKS === "1") {
+    const eve = new Client({ host: origin, headers: { cookie: cookie(), "x-pat-browser-thread": t2, "x-pat-chat-model": "glm-5.3-flash", "x-pat-reasoning": "low" } });
+    for (const content of [{ kind: "text", text: "Keep this original sentence." }, { kind: "table", columns: ["Name"], rows: [["Original"]] }]) {
+      const target = (await api(`/api/workspaces/${a}/items`, "POST", { title: `Card ${content.kind}`, content })).data.item;
+      const turn = await eve.sessions.create({ message: cardTaskPrompt(target, content.kind === 'text' ? 'Lägg till exakt meningen Added through card. Behåll originaltexten.' : 'Lägg till en rad med värdet Added through card. Behåll originalraden och kolumnen.') });
+      const result = await turn.response.result();
+      assert.notEqual(result.status, 'failed');
+      const saved = (await tool(t2, { action: "read", itemId: target.id })).data.item;
+      assert.ok(saved.version > target.version, JSON.stringify(result.events.filter(event => event.type === 'action.result' || event.type === 'message.created')).slice(-8000));
+      const text = JSON.stringify(saved.content);
+      assert.match(text, /Added through card/);
+      assert.match(text, content.kind === 'text' ? /Keep this original sentence/ : /Original/);
+      assert.equal((await tool(t2, { action: "read", itemId: item.id })).data.item.version, 3, 'Other cards are unchanged');
+    }
+    console.log('PASS real agent card tasks update selected document/table and preserve other cards');
+  }
   assert.equal((await api(`/api/workspaces/${b}/items/${item.id}`, "DELETE")).status, 404);
   assert.equal((await fetch(`${origin}/api/workspaces/${a}/items/${item.id}`, { method: "DELETE" })).status, 401);
   assert.equal((await api(`/api/workspaces/${a}/items/${item.id}`, "DELETE")).status, 200);

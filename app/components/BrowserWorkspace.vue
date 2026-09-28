@@ -4,6 +4,8 @@ import type { BrowserView } from "#shared/browser";
 const props = defineProps<{ threadId: string; embedded?: boolean }>();
 const route = useRoute();
 const browser = shallowRef<BrowserView | null>(null);
+const emit = defineEmits<{ presence: [visible: boolean] }>();
+watch(browser, value => emit("presence", !!value), { immediate: true });
 const error = ref("");
 const busy = ref(false);
 const loaded = ref(false);

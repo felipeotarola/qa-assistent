@@ -31,8 +31,9 @@ export default defineEventHandler(async (event) => {
     case "read": return { item: publicItem(await ownedItem(userId, workspaceId, input.itemId ?? "")) };
     case "create":
     case "update": {
-      if (!input.title || !input.content || (input.action === "update" && (!input.itemId || !input.expectedVersion))) throw createError({ statusCode: 400, statusMessage: "Title, content and (for updates) itemId/expectedVersion are required" });
-      return { item: await saveItem(userId, workspaceId, { title: input.title, content: input.content, threadId, ...(input.action === "update" ? { id: input.itemId, expectedVersion: input.expectedVersion } : {}) }) };
+      if (!input.content || (input.action === "create" && !input.title) || (input.action === "update" && (!input.itemId || !input.expectedVersion))) throw createError({ statusCode: 400, statusMessage: "Create requires title/content. Update requires itemId/content/expectedVersion; title is optional." });
+      const title = input.title ?? (await ownedItem(userId, workspaceId, input.itemId!)).title;
+      return { item: await saveItem(userId, workspaceId, { title, content: input.content, threadId, ...(input.action === "update" ? { id: input.itemId, expectedVersion: input.expectedVersion } : {}) }) };
     }
     case "save_file": {
       if (!input.filename || input.text === undefined) throw createError({ statusCode: 400, statusMessage: "Filename and text required" });

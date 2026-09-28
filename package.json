@@ -28,7 +28,7 @@
   },
   "scripts": {
     "postinstall": "nuxt prepare",
-    "dev": "pnpm db:migrate && nuxt prepare && nuxt dev",
+    "dev": "node scripts/check-dev-port.mjs && pnpm db:migrate && nuxt prepare && nuxt dev --port 3000",
     "build": "pnpm db:migrate && nuxt build",
     "start": "nuxt preview",
     "typecheck": "nuxt typecheck && tsc -p tsconfig.agent.json",
@@ -59,6 +59,7 @@
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "eve": "^0.47.3",
+    "h3": "1.15.11",
     "maska": "^3.2.0",
     "nuxt": "^4.5.2",
     "playwright-core": "^1.63.0",

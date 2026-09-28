@@ -62,6 +62,9 @@ importers:
       eve:
         specifier: ^0.47.3
         version: 0.47.3(@electric-sql/pglite@0.5.8)(@libsql/client@0.17.4)(@vercel/blob@2.8.0)(ai@7.0.85(zod@4.5.4))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260702.1)(@electric-sql/pglite@0.5.8)(@libsql/client@0.17.4)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(kysely@0.29.3)(postgres@3.4.9)(sql.js@1.14.2))(giget@3.3.0)(ioredis@5.11.1(supports-color@10.2.2))(jiti@2.7.0)(just-bash@3.4.2(supports-color@10.2.2))(lru-cache@11.5.1)(microsandbox@0.6.15)(rollup@4.62.2)(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.0)(yaml@2.9.0))
+      h3:
+        specifier: 1.15.11
+        version: 1.15.11
       maska:
         specifier: ^3.2.0
         version: 3.2.0

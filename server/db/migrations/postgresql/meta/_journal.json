@@ -57,6 +57,13 @@
       "when": 1790597854767,
       "tag": "0007_slimy_mister_fear",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790599693435,
+      "tag": "0008_cheerful_hercules",
+      "breakpoints": true
     }
   ]
 }

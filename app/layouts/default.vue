@@ -3,6 +3,7 @@ import { startNewChat } from "~/composables/chat/navigation";
 import { useThreadList } from "~/composables/chat/useThreads";
 
 const sidebarOpen = ref(false);
+provideWorkspaceAgent();
 const searchOpen = ref(false);
 const { container: splitContainer, width: chatWidth, dragging, start, move, finish, reset, keydown, min, max } = useWorkspaceResize();
 const route = useRoute();

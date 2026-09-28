@@ -2,7 +2,7 @@ import { and, eq, desc, sql, isNull, isNotNull } from "drizzle-orm";
 import { db, schema } from "@nuxthub/db";
 import { put, del } from "@vercel/blob";
 import type { ItemContent } from "../../shared/workspace";
-import { imageReferences } from "../../shared/workspace";
+import { imageReferences, documentText } from "../../shared/workspace";
 
 export function workspaceBlobToken() {
   const token = process.env.WORKSPACE_BLOB_READ_WRITE_TOKEN;
@@ -53,7 +53,7 @@ export async function saveItem(userId: string, workspaceId: string, input: { tit
       const [image] = await tx.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.id, ref.itemId), eq(schema.workspaceItems.workspaceId, workspaceId), isNull(schema.workspaceItems.deletedAt)));
       if (!image || image.content.kind !== "image") throw createError({ statusCode: 400, statusMessage: "Image must exist in the same workspace and not be in trash" });
     }
-    if (input.content.kind === "text" && input.content.blocks) input.content.text = input.content.blocks.filter(b => b.kind !== "image").map(b => b.text).join("\n\n");
+    if (input.content.kind === "text" && input.content.blocks) input.content.text = documentText(input.content.blocks);
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`item:${id}`}, 0))`);
     const [existing] = await tx.select().from(schema.workspaceItems).where(eq(schema.workspaceItems.id, id));
     if (input.id && (!existing || existing.deletedAt || existing.workspaceId !== workspaceId)) throw createError({ statusCode: 404, statusMessage: "Item not found" });

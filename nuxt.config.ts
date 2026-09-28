@@ -16,7 +16,8 @@ export default defineNuxtConfig({
     viewTransition: true,
   },
   routeRules: {
-    "/login": { prerender: true },
+    // A single static login page otherwise requires a separate Nitro build.
+    "/login": { ssr: true, headers: privateNoStore },
     "/": { ssr: true, headers: privateNoStore },
     "/chat/**": { ssr: true, headers: privateNoStore },
     "/settings/**": { ssr: true, headers: privateNoStore },
@@ -48,7 +49,8 @@ export default defineNuxtConfig({
   nitro: {
     // Eve's package-internal #shared imports must resolve inside Eve, not
     // against Nuxt's application #shared alias.
-    externals: { external: ["eve/client"] },
+    // Inline the client so Nitro doesn't omit its package-private dependencies.
+    externals: { inline: ["eve/client"] },
     rollupConfig: {
       plugins: [{
         name: "eve-package-shared-imports",
@@ -63,9 +65,10 @@ export default defineNuxtConfig({
         },
       }],
     },
-    compressPublicAssets: true,
+    // Vercel's CDN compresses assets; avoid maximum-quality Brotli work twice.
+    // Keep precompressed files available for self-hosted Node deployments.
+    compressPublicAssets: process.env.VERCEL !== "1",
     prerender: {
-      routes: ["/login"],
       crawlLinks: false,
     },
   },

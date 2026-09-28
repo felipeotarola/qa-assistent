@@ -1,0 +1,1 @@
+ALTER TABLE "pat_workspaces" ADD COLUMN "card_order" jsonb DEFAULT '[]'::jsonb NOT NULL;

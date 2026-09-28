@@ -22,7 +22,7 @@ function move(index: number, delta: number) {
   <div v-if="model.kind === 'text'" class="space-y-4">
     <div v-for="(block, index) in model.blocks" :key="index" class="space-y-2 rounded-lg border border-default p-3">
       <div class="flex items-center gap-1">
-        <span class="flex-1 text-xs text-muted">{{ block.kind === 'image' ? 'Bild' : block.kind === 'heading' ? 'Rubrik' : 'Text' }}</span>
+        <span class="flex-1 text-xs text-muted">{{ { image: 'Bild', heading: 'Rubrik', text: 'Text / Markdown', table: 'Tabell', chart: 'Stapeldiagram' }[block.kind] }}</span>
         <UButton icon="i-lucide-arrow-up" aria-label="Flytta upp block" variant="ghost" color="neutral" :disabled="index === 0" @click="move(index, -1)" />
         <UButton icon="i-lucide-arrow-down" aria-label="Flytta ner block" variant="ghost" color="neutral" :disabled="index === model.blocks!.length - 1" @click="move(index, 1)" />
         <UButton icon="i-lucide-x" aria-label="Ta bort block ur dokumentet" variant="ghost" color="neutral" @click="model.blocks!.splice(index, 1)" />
@@ -32,11 +32,23 @@ function move(index: number, delta: number) {
         <UInput v-model="block.caption" aria-label="Bildtext" placeholder="Bildtext" class="w-full" />
       </template>
       <UInput v-else-if="block.kind === 'heading'" v-model="block.text" aria-label="Rubrik" class="w-full" />
+      <WorkspaceContentEditor v-else-if="block.kind === 'table'" :model-value="block" :workspace-id="workspaceId" @update:model-value="value => { if (value.kind === 'table' && model.kind === 'text') model.blocks![index] = value; }" />
+      <div v-else-if="block.kind === 'chart'" class="space-y-2">
+        <UInput v-model="block.title" aria-label="Diagramrubrik" placeholder="Diagramrubrik" class="w-full" />
+        <div v-for="(point, p) in block.data" :key="p" class="flex gap-2">
+          <UInput v-model="point.label" :aria-label="`Etikett ${p + 1}`" class="min-w-0 flex-1" />
+          <UInput type="number" :model-value="point.value" :min="0" :max="1e12" :aria-label="`Värde ${p + 1}`" @update:model-value="point.value = Number($event)" />
+          <UButton icon="i-lucide-x" aria-label="Ta bort värde" variant="ghost" :disabled="block.data.length === 1" @click="block.data.splice(p, 1)" />
+        </div>
+        <UButton label="Lägg till värde" variant="soft" :disabled="block.data.length >= 100" @click="block.data.push({ label: '', value: 0 })" />
+      </div>
       <UTextarea v-else v-model="block.text" aria-label="Dokumenttext" autoresize :rows="4" class="w-full" />
     </div>
     <div class="flex flex-wrap gap-2">
       <UButton label="Text" icon="i-lucide-plus" variant="soft" color="neutral" @click="model.blocks!.push({ kind: 'text', text: '' })" />
       <UButton label="Rubrik" variant="soft" color="neutral" @click="model.blocks!.push({ kind: 'heading', text: '' })" />
+      <UButton label="Tabell" icon="i-lucide-table-2" variant="soft" color="neutral" @click="model.blocks!.push({ kind: 'table', columns: ['Namn', 'Beskrivning'], rows: [['', '']] })" />
+      <UButton label="Diagram" icon="i-lucide-chart-bar" variant="soft" color="neutral" @click="model.blocks!.push({ kind: 'chart', chartType: 'bar', title: 'Diagram', data: [{ label: 'Kategori', value: 0 }] })" />
       <USelect v-model="selected" :items="images" placeholder="Välj bild…" aria-label="Bild från workspace" />
       <UButton label="Infoga bild" variant="soft" color="neutral" :disabled="!selected" @click="insertImage" />
     </div>

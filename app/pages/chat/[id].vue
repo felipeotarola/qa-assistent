@@ -5,6 +5,7 @@ import { useAuthorizationChallenges } from "~/composables/chat/useAuthorizationC
 import { useStreamLog } from "~/composables/chat/stream-log";
 import { useChatSession } from "~/composables/chat/useChatSession";
 import { chatFailureMessage, draftKey } from "#shared/chat-recovery";
+import { cardTaskPrompt } from "#shared/card-task";
 
 const route = useRoute();
 const chatId = computed(() => route.params.id as string);
@@ -41,6 +42,17 @@ const {
   savedText,
   dismissSavedText,
 } = useChatSession(thread.value);
+
+const cardAgent = useWorkspaceAgent();
+const cardRunner = async (item: Parameters<typeof cardTaskPrompt>[0], text: string) => {
+  if (isBusy.value || savedText.value || item.workspaceId !== thread.value.workspaceId) return false;
+  await send(cardTaskPrompt(item, text));
+  return !savedText.value && !chatError.value;
+};
+watchEffect(() => {
+  cardAgent.value = { workspaceId: thread.value.workspaceId ?? "", available: !isBusy.value && !savedText.value, run: cardRunner };
+});
+onUnmounted(() => { if (cardAgent.value?.run === cardRunner) cardAgent.value = null; });
 
 const { consumePendingOnMount } = useChatNavigation(chatId);
 const { resetTurnEventCounts } = useStreamLog();
