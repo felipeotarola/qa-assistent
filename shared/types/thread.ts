@@ -1,6 +1,7 @@
 export interface ThreadSummary {
   id: string;
   title: string;
+  workspaceId: string | null;
   updatedAt: number;
   createdAt: number;
 }

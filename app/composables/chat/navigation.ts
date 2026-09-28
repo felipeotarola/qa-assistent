@@ -61,6 +61,7 @@ export async function refreshThreadList() {
 }
 
 export async function startChat(message: string, chatId = crypto.randomUUID()) {
+  const workspaceId = useCookie<string | null>("pat_workspace").value;
   const text = message.trim();
   if (!text) return;
 
@@ -69,6 +70,7 @@ export async function startChat(message: string, chatId = crypto.randomUUID()) {
     body: {
       id: chatId,
       title: truncateThreadTitle(text),
+      workspaceId: workspaceId || undefined,
     },
   });
 

@@ -32,7 +32,20 @@ personal-agent-template/
 - [Architecture](docs/ARCHITECTURE.md) — System design, request flows, internal API
 - [Environment](docs/ENVIRONMENT.md) — Environment variables
 - [Customization](docs/CUSTOMIZATION.md) — Rename agent, add tools, integrations
+- [Design system](docs/DESIGN_SYSTEM.md) — Shared UI components, theme, and layout conventions
 - [README](README.md) — Quick start and feature overview
+
+## UI and Layout Conventions
+
+Read [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) before adding or changing UI.
+
+- Use the existing **Nuxt UI 4 + Tailwind CSS 4 + Lucide** stack. Do not introduce a second component library or hand-build standard controls already supplied by Nuxt UI.
+- Reuse `USelect` for value selection, `USelectMenu` for searchable selection, and `UDropdownMenu` for action menus. These have different semantics; use the appropriate shared primitive instead of a page-specific dropdown implementation.
+- Put shared Nuxt UI styling/defaults in `app/app.config.ts`, and theme tokens/global styles in `app/assets/css/main.css`. Use semantic colors (`bg-default`, `text-muted`, `border-default`) so light/dark modes remain consistent.
+- Reuse `app/layouts/default.vue`, `AppNavbar`, `WorkspaceCard`, and the settings layout/components. Pages compose these pieces; they must not independently recreate the application shell, split panes, card expansion, or settings sections.
+- Before creating a component, search `app/components/`. Extract repeated product patterns into shared components; do not add pass-through wrappers around every Nuxt UI primitive. Keep business logic in feature components/composables.
+- Local classes may control placement, width, and intentional density. Shared control styling belongs in the theme or a named reusable variant, not copied `:ui` overrides across pages.
+- Preserve labels, keyboard navigation, focus handling, responsive layouts, and reduced-motion support. Verify changed shared components at their affected call sites in light/dark mode and narrow/wide layouts.
 
 ## Eve Framework
 

@@ -53,6 +53,7 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/blob": "^2.8.0",
     "@vercel/connect": "2.0.1",
     "ai": "^7.0.85",
     "drizzle-kit": "^0.31.10",

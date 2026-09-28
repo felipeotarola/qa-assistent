@@ -161,9 +161,13 @@ the caller's memory or integrations.
 
 ## 7. Theme the UI
 
+Follow the [shared design system conventions](./DESIGN_SYSTEM.md) when adding
+components or changing layouts. Use Nuxt UI primitives and the existing product
+components, and centralize shared styling in the files below.
+
 - Global styles: [`app/assets/css/main.css`](../app/assets/css/main.css)
 - Nuxt UI config: [`app/app.config.ts`](../app/app.config.ts)
-- Layout and navigation: [`app/layouts/default.vue`](../app/layouts/default.vue), [`app/components/Navbar.vue`](../app/components/Navbar.vue)
+- Layout and navigation: [`app/layouts/default.vue`](../app/layouts/default.vue), [`app/components/AppNavbar.vue`](../app/components/AppNavbar.vue)
 
 ## 8. Deploy your fork
 

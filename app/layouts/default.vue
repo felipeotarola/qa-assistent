@@ -11,6 +11,8 @@ const mobilePane = ref<"chat" | "workspace">("chat");
 watch(() => route.path, () => { mobilePane.value = "chat"; });
 
 const { threads, pending, refresh } = useThreadList();
+const { activeId } = useWorkspaces();
+const workspaceThreads = computed(() => threads.value.filter(t => t.workspaceId === activeId.value));
 const headerTitle = computed(() => route.path === "/"
   ? "New chat"
   : threads.value.find(thread => thread.id === route.params.id)?.title ?? "Chat");
@@ -77,6 +79,7 @@ defineShortcuts({
       </template>
 
       <template #default="{ collapsed }">
+        <WorkspaceSwitcher v-if="!collapsed" />
         <UNavigationMenu
           :items="[
             {
@@ -117,7 +120,7 @@ defineShortcuts({
         <ChatThreadList
           v-if="!collapsed"
           class="mt-4 min-h-0 flex-1"
-          :threads="threads"
+          :threads="workspaceThreads"
           :pending="pending"
           @refresh="refresh()"
         />

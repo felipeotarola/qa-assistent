@@ -51,6 +51,13 @@ try {
   const view = await api(`/api/threads/${threadId}/browser`);
   assert.ok(view.payload.browser.liveUrl.startsWith("https://"));
   assert.equal(view.payload.browser.connectUrl, undefined);
+  const second = (await api("/api/threads", { title: "Shared workspace", workspaceId: thread.payload.thread.workspaceId })).payload.thread.id;
+  const shared = (await api(`/api/threads/${second}/browser`)).payload.browser;
+  assert.equal(shared.liveUrl, view.payload.browser.liveUrl);
+  const separateWorkspace = (await api("/api/workspaces", { name: "Separate browser scope" })).payload.workspace.id;
+  const separate = (await api("/api/threads", { title: "Isolated", workspaceId: separateWorkspace })).payload.thread.id;
+  assert.equal((await api(`/api/threads/${separate}/browser`)).payload.browser, null);
+  console.log("PASS browser shared across workspace chats and isolated from other workspaces");
   console.log("PASS real Chromium navigation, page reading and live view");
   const taken = await api(`/api/threads/${threadId}/browser`, { control: "human" });
   assert.equal(taken.payload.browser.control, "human");
@@ -95,7 +102,7 @@ finally {
   // Only remove the randomly named user and its app data created by this test.
   const { default: postgres } = await import("postgres");
   const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 });
-  const [browserRow] = await sql`select context_id from pat_browser_sessions where user_id = ${userId}`;
+  const [browserRow] = await sql`select context_id from pat_workspace_browsers where user_id = ${userId}`;
   if (browserRow?.context_id) await new Browserbase({ apiKey: process.env.BROWSERBASE_API_KEY }).contexts.delete(browserRow.context_id);
   await sql`delete from pat_user where id = ${userId}`;
   await sql.end();

@@ -2,13 +2,13 @@ import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@nuxthub/db";
 import type { ThreadRecord, ThreadSummary } from "#shared/types/thread";
 import { truncateThreadTitle } from "#shared/types/thread";
-
-const LIST_LIMIT = 50;
+import { defaultWorkspace, requireWorkspace } from "./workspaces";
 
 function rowToSummary(row: typeof schema.threads.$inferSelect): ThreadSummary {
   return {
     id: row.id,
     title: row.title,
+    workspaceId: row.workspaceId,
     createdAt: row.createdAt.getTime(),
     updatedAt: row.updatedAt.getTime(),
   };
@@ -25,8 +25,7 @@ export async function listThreadsForUser(userId: string): Promise<ThreadSummary[
   const rows = await db.select()
     .from(schema.threads)
     .where(eq(schema.threads.userId, userId))
-    .orderBy(desc(schema.threads.updatedAt))
-    .limit(LIST_LIMIT);
+    .orderBy(desc(schema.threads.updatedAt));
 
   return rows.map(rowToSummary);
 }
@@ -45,14 +44,17 @@ export async function getThreadForUser(userId: string, id: string) {
 
 export async function createThreadForUser(
   userId: string,
-  input: { id?: string; title?: string },
+  input: { id?: string; title?: string; workspaceId?: string },
 ) {
   const id = input.id ?? crypto.randomUUID();
   const title = input.title?.trim() || "New chat";
+  const workspaceId = input.workspaceId ?? await defaultWorkspace(userId);
+  await requireWorkspace(userId, workspaceId);
 
   await db.insert(schema.threads).values({
     id,
     userId,
+    workspaceId,
     title: truncateThreadTitle(title),
   });
 

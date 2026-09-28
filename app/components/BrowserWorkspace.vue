@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { BrowserView } from "#shared/browser";
 
-const props = defineProps<{ threadId: string }>();
+const props = defineProps<{ threadId: string; embedded?: boolean }>();
+const route = useRoute();
 const browser = shallowRef<BrowserView | null>(null);
 const error = ref("");
 const busy = ref(false);
@@ -51,7 +52,10 @@ async function control(value: "human" | "agent" | "close") {
     const result = await $fetch<{ browser: BrowserView | null }>(`/api/threads/${props.threadId}/browser`, { method: "POST", body: { control: value } });
     if (disposed) return;
     browser.value = result.browser;
-    if (value === "agent" && result.browser) browserResume.value = props.threadId;
+    if (value === "agent" && result.browser) {
+      if (route.path === "/") await navigateTo(`/chat/${props.threadId}`);
+      browserResume.value = props.threadId;
+    }
   }
   catch { error.value = "Det gick inte att ändra kontrollen. Försök igen."; }
   finally { busy.value = false; }
@@ -89,12 +93,12 @@ const displayUrl = computed(() => {
 </script>
 
 <template>
-  <div class="workspace-surface relative flex h-full min-h-0 flex-col overflow-hidden">
-    <div class="flex h-12 shrink-0 items-center gap-2 px-5 text-xs text-muted">
+  <div :class="embedded ? (browser ? 'w-full max-w-80' : 'hidden') : 'workspace-surface relative flex h-full min-h-0 flex-col overflow-hidden'">
+    <div v-if="!embedded" class="flex h-12 shrink-0 items-center gap-2 px-5 text-xs text-muted">
       <UIcon name="i-lucide-layout-grid" class="size-3.5" /> Workspace
       <span v-if="browser" class="ml-auto text-[10px] text-dimmed">1 objekt</span>
     </div>
-    <div v-if="browser" class="min-h-0 flex-1 overflow-auto px-5 pb-5">
+    <div v-if="browser" :class="embedded ? '' : 'min-h-0 flex-1 overflow-auto px-5 pb-5'">
     <WorkspaceCard v-model:expanded="expanded" :title="browser.title || 'Webbläsare'" :subtitle="displayUrl" icon="i-lucide-globe-2">
       <template #toolbar>
       <div class="flex shrink-0 flex-wrap items-center gap-2 border-b border-default p-3">
@@ -144,7 +148,7 @@ const displayUrl = computed(() => {
       </template>
     </WorkspaceCard>
     </div>
-    <div v-else class="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+    <div v-else-if="!embedded" class="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
       <div class="flex size-16 items-center justify-center rounded-2xl border border-default bg-muted shadow-sm">
         <UIcon name="i-lucide-panels-top-left" class="size-7 text-muted" />
       </div>

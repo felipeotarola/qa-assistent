@@ -15,6 +15,13 @@
       "when": 1790578070060,
       "tag": "0001_outstanding_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790580807394,
+      "tag": "0002_tan_brood",
+      "breakpoints": true
     }
   ]
 }

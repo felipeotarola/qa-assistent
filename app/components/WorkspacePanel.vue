@@ -1,56 +1,85 @@
 <script setup lang="ts">
+import type { WorkspaceItem } from "#shared/workspace";
+import { useThreadList } from "~/composables/chat/useThreads";
+const { activeId, workspaces } = useWorkspaces();
 const route = useRoute();
-const browserThreadId = computed(() => typeof route.params.id === "string" && route.path.startsWith("/chat/") ? route.params.id : null);
+const { threads } = useThreadList();
+const threadId = computed(() => typeof route.params.id === "string" ? route.params.id : threads.value.find(t => t.workspaceId === activeId.value)?.id ?? null);
+const items = ref<WorkspaceItem[]>([]);
+const busy = ref(false);
+const error = ref("");
+const upload = useTemplateRef("upload");
+let timer: ReturnType<typeof setTimeout> | undefined;
+let disposed = false;
+let fetching = false;
+async function refresh() {
+  const id = activeId.value;
+  if (!id || fetching) return;
+  fetching = true;
+  try {
+    const result = await $fetch<{ items: WorkspaceItem[] }>(`/api/workspaces/${id}/items`);
+    if (!disposed && activeId.value === id) items.value = result.items;
+  }
+  catch { if (!disposed) error.value = "Kunde inte läsa workspace."; }
+  finally { fetching = false; }
+}
+watch(activeId, () => { items.value = []; error.value = ""; void refresh(); });
+async function poll() { await refresh(); if (!disposed) timer = setTimeout(poll, 3000); }
+onMounted(() => { void poll(); });
+onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
+async function create(kind: "text" | "table") {
+  if (!activeId.value) return;
+  busy.value = true; error.value = "";
+  try {
+    await $fetch(`/api/workspaces/${activeId.value}/items`, { method: "POST", body: { title: kind === "text" ? "Nytt dokument" : "Ny tabell", content: kind === "text" ? { kind, text: "" } : { kind, columns: ["Namn", "Beskrivning"], rows: [["", ""]] } } });
+    await refresh();
+  }
+  catch { error.value = "Kunde inte skapa objektet."; }
+  finally { busy.value = false; }
+}
+async function uploadFile(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file || !activeId.value) return;
+  if (file.size > 4 * 1024 * 1024) { error.value = "Filen får vara högst 4 MB."; input.value = ""; return; }
+  busy.value = true; error.value = "";
+  try {
+    const form = new FormData(); form.append("file", file);
+    await $fetch(`/api/workspaces/${activeId.value}/upload`, { method: "POST", body: form });
+    await refresh();
+  }
+  catch (cause) {
+    error.value = (cause as { statusCode?: number }).statusCode === 503
+      ? "Privat fillagring behöver konfigureras innan du kan ladda upp filer."
+      : "Uppladdningen misslyckades. Försök igen.";
+  }
+  finally { busy.value = false; input.value = ""; }
+}
 </script>
-
 <template>
-  <aside class="workspace-panel flex h-full min-h-0 flex-col" aria-label="Workspace">
-    <BrowserWorkspace v-if="browserThreadId" :key="browserThreadId" :thread-id="browserThreadId" class="min-h-0 flex-1" />
-    <div v-else class="workspace-canvas relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-8">
-      <div class="relative flex max-w-xs flex-col items-center text-center">
-        <div class="relative mb-9 h-28 w-36" aria-hidden="true">
-          <div class="absolute inset-x-4 inset-y-2 -rotate-12 rounded-xl border border-default bg-muted shadow-sm" />
-          <div class="absolute inset-x-3 inset-y-1 rotate-6 rounded-xl border border-default bg-elevated shadow-sm" />
-          <div class="absolute inset-0 flex flex-col gap-3 rounded-xl border border-default bg-default p-4 shadow-lg shadow-black/5">
-            <div class="flex items-center gap-1">
-              <span class="size-1 rounded-full bg-accented" />
-              <span class="size-1 rounded-full bg-accented" />
-              <span class="size-1 rounded-full bg-accented" />
-            </div>
-            <div class="flex flex-1 items-center justify-center rounded-md border border-dashed border-default">
-              <UIcon name="i-lucide-sparkles" class="size-5 text-dimmed" />
-            </div>
-          </div>
-        </div>
-        <p class="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-dimmed">A little room to create</p>
-        <h3 class="text-xl font-medium tracking-tight text-highlighted">Space for what comes next.</h3>
-        <p class="mt-3 max-w-60 text-sm leading-relaxed text-muted">
-          Your conversation on the left.<br>
-          A place to bring ideas to life, here.
-        </p>
-        <span class="mt-7 inline-flex items-center gap-2 rounded-full border border-default bg-default/80 px-3 py-1.5 text-xs text-dimmed">
-          <span class="size-1.5 rounded-full bg-accented" />
-          Nothing here yet
-        </span>
+  <aside class="workspace-surface relative flex h-full min-h-0 flex-col overflow-hidden bg-default" aria-label="Workspace">
+    <header class="flex shrink-0 flex-wrap items-center gap-2 border-b border-default/60 px-4 py-3">
+      <UIcon name="i-lucide-layout-grid" class="size-4 text-dimmed" />
+      <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ workspaces.find(w => w.id === activeId)?.name || 'Workspace' }}</span>
+      <UButton icon="i-lucide-file-plus" aria-label="Nytt dokument" title="Nytt dokument" color="neutral" variant="ghost" size="sm" :disabled="busy || !activeId" @click="create('text')" />
+      <UButton icon="i-lucide-table-2" aria-label="Ny tabell" title="Ny tabell" color="neutral" variant="ghost" size="sm" :disabled="busy || !activeId" @click="create('table')" />
+      <UButton icon="i-lucide-upload" label="Ladda upp" color="neutral" variant="soft" size="sm" :loading="busy" :disabled="!activeId" @click="upload?.click()" />
+      <input ref="upload" type="file" class="hidden" aria-label="Ladda upp fil" @change="uploadFile">
+    </header>
+    <p v-if="error" role="alert" class="px-4 py-2 text-xs text-error">{{ error }}</p>
+    <div class="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
+      <div class="flex flex-wrap items-start gap-4">
+        <BrowserWorkspace v-if="threadId && activeId" :key="activeId" :thread-id="threadId" embedded />
+        <WorkspaceItemCard v-for="item in items" :key="item.id" :item="item" @saved="refresh" />
+      </div>
+      <div v-if="!items.length" class="mx-auto mt-12 max-w-64 text-center text-sm leading-relaxed text-dimmed">
+        <UIcon name="i-lucide-sparkles" class="mb-3 size-6" />
+        <p>Plats för det ni skapar tillsammans.</p>
+        <p class="mt-2 text-xs">Be agenten spara en text, tabell eller skärmbild — eller ladda upp dina egna filer. Innehållet följer med mellan chattarna.</p>
       </div>
     </div>
-
-    <footer v-if="!browserThreadId" class="flex h-10 shrink-0 items-center justify-between border-t border-default/60 px-5 text-[10px] text-dimmed lg:px-6">
-      <span class="flex items-center gap-1.5"><UIcon name="i-lucide-layout-panel-left" class="size-3" /> Your workspace</span>
-      <span>A fresh canvas</span>
-    </footer>
   </aside>
 </template>
-
 <style scoped>
-.workspace-panel {
-  background: var(--ui-bg);
-}
-
-.workspace-canvas {
-  background-image:
-    radial-gradient(ellipse at center, var(--ui-bg) 15%, transparent 75%),
-    radial-gradient(color-mix(in oklab, var(--ui-text-dimmed) 20%, transparent) 0.7px, transparent 0.7px);
-  background-size: 100% 100%, 20px 20px;
-}
+.workspace-surface { background-image: radial-gradient(color-mix(in oklab, var(--ui-text-dimmed) 16%, transparent) 0.7px, transparent 0.7px); background-size: 20px 20px; }
 </style>

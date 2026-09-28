@@ -15,9 +15,9 @@ continuation to the chat; the agent reads the current page before continuing.
 The close button releases Chromium while retaining its Browserbase Context for
 later visits. Website session expiry and MFA may still require another login.
 
-The browser currently belongs to one user and one chat. It is not shared across
-chats; a future workspace entity can become its scope. There is one active
-Browserbase session per chat, potentially with multiple browser tabs.
+The browser belongs to a workspace and is shared across its chats. There is one
+active Browserbase session per workspace, potentially with multiple browser tabs.
+It appears as an expandable card alongside documents, tables and files.
 
 ## Implementation
 
@@ -28,7 +28,7 @@ Browserbase session per chat, potentially with multiple browser tabs.
 - `server/utils/browser.ts`: Browserbase, Playwright CDP, fresh element refs,
   session lifecycle, and PostgreSQL advisory locks for serialized actions.
 - `app/components/BrowserWorkspace.vue`: interactive live view and control UI.
-- `pat_browser_sessions`: RLS-enabled server-owned state in Supabase. Connection
+- `pat_workspace_browsers`: RLS-enabled server-owned state in Supabase. Connection
   and live-view URLs are sensitive capabilities. The connection URL never goes
   to the frontend or model; only the authenticated owner receives the live URL.
 
@@ -41,7 +41,7 @@ focused the live iframe in a visible app tab, a heartbeat renews the idle lease.
 Every session also has a provider-enforced thirty-minute maximum. Local Nitro
 cleans idle sessions every minute; polling also enforces expiry. On a serverless
 host without a continuously running process, the provider maximum remains the
-backstop. Deleting a chat releases its session and removes its saved Context.
+backstop. Deleting a chat leaves the shared workspace browser available.
 
 This is browser interaction, not generated Playwright test files. The initial
 tool supports page reading, navigation, click, fill, press, select, and scrolling.

@@ -5,9 +5,10 @@ import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
 import { db, schema } from "@nuxthub/db";
 import type { BrowserAction, BrowserView } from "../../shared/browser";
 import { getThreadForUser } from "./threads";
+import { requireWorkspace } from "./workspaces";
 
 const IDLE_MS = 10 * 60 * 1000;
-type Row = typeof schema.browserSessions.$inferSelect;
+type Row = typeof schema.workspaceBrowsers.$inferSelect;
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const connections = new Map<string, Browser>();
 
@@ -36,12 +37,18 @@ export async function requireBrowserThread(userId: string, threadId: string) {
 }
 
 async function locked<T>(userId: string, threadId: string, fn: (tx: Tx, row: Row) => Promise<T>) {
-  await requireBrowserThread(userId, threadId);
+  const thread = await getThreadForUser(userId, threadId);
+  if (!thread?.workspaceId) throw createError({ statusCode: 404, statusMessage: "Workspace not found" });
+  return lockedWorkspace(userId, thread.workspaceId, fn);
+}
+
+async function lockedWorkspace<T>(userId: string, workspaceId: string, fn: (tx: Tx, row: Row) => Promise<T>) {
+  await requireWorkspace(userId, workspaceId);
   return db.transaction(async (tx) => {
     // Cross-process serialization: a takeover waits for an in-flight browser action.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`browser:${threadId}`}, 0))`);
-    await tx.insert(schema.browserSessions).values({ userId, threadId }).onConflictDoNothing();
-    const [row] = await tx.select().from(schema.browserSessions).where(and(eq(schema.browserSessions.threadId, threadId), eq(schema.browserSessions.userId, userId)));
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`browser:${workspaceId}`}, 0))`);
+    await tx.insert(schema.workspaceBrowsers).values({ userId, workspaceId }).onConflictDoNothing();
+    const [row] = await tx.select().from(schema.workspaceBrowsers).where(and(eq(schema.workspaceBrowsers.workspaceId, workspaceId), eq(schema.workspaceBrowsers.userId, userId)));
     if (!row) throw createError({ statusCode: 404, statusMessage: "Browser not found" });
     return fn(tx, row);
   });
@@ -53,7 +60,7 @@ function view(row: Row): BrowserView | null {
 }
 
 async function patch(tx: Tx, row: Row, changes: Partial<Row>) {
-  await tx.update(schema.browserSessions).set(changes).where(eq(schema.browserSessions.threadId, row.threadId));
+  await tx.update(schema.workspaceBrowsers).set(changes).where(eq(schema.workspaceBrowsers.workspaceId, row.workspaceId));
   Object.assign(row, changes);
 }
 
@@ -73,8 +80,9 @@ async function release(tx: Tx, row: Row) {
 }
 
 export async function getBrowserView(userId: string, threadId: string) {
-  await requireBrowserThread(userId, threadId);
-  const [row] = await db.select().from(schema.browserSessions).where(and(eq(schema.browserSessions.threadId, threadId), eq(schema.browserSessions.userId, userId)));
+  const thread = await getThreadForUser(userId, threadId);
+  if (!thread?.workspaceId) throw createError({ statusCode: 404, statusMessage: "Workspace not found" });
+  const [row] = await db.select().from(schema.workspaceBrowsers).where(and(eq(schema.workspaceBrowsers.workspaceId, thread.workspaceId), eq(schema.workspaceBrowsers.userId, userId)));
   if (!row || !row.sessionId) return null;
   if (row.activeAt.getTime() < Date.now() - IDLE_MS || (row.expiresAt?.getTime() ?? 0) <= Date.now()) {
     return locked(userId, threadId, async (tx, current) => {
@@ -97,11 +105,15 @@ export async function controlBrowser(userId: string, threadId: string, control: 
   });
 }
 
-export async function deleteBrowserForThread(userId: string, threadId: string) {
-  await locked(userId, threadId, async (tx, row) => {
-    await release(tx, row);
-    if (row.contextId) await provider().contexts.delete(row.contextId);
-    await tx.delete(schema.browserSessions).where(eq(schema.browserSessions.threadId, threadId));
+export async function captureWorkspaceBrowser(userId: string, threadId: string) {
+  return locked(userId, threadId, async (tx, row) => {
+    if (row.control === "human" || !view(row)) throw createError({ statusCode: 409, statusMessage: "Return browser control before capturing" });
+    const browser = await connect(row);
+    const page = await foregroundPage(browser.contexts()[0]!.pages());
+    if (!page) throw createError({ statusCode: 409, statusMessage: "Open a page first" });
+    const bytes = await page.screenshot({ type: "png", timeout: 15000 });
+    await patch(tx, row, { activeAt: new Date() });
+    return bytes;
   });
 }
 
@@ -212,10 +224,11 @@ export async function browserAction(userId: string, threadId: string, input: Bro
 }
 
 export async function closeIdleBrowsers() {
-  const rows = await db.select({ userId: schema.browserSessions.userId, threadId: schema.browserSessions.threadId }).from(schema.browserSessions).where(and(isNotNull(schema.browserSessions.sessionId), lt(schema.browserSessions.activeAt, new Date(Date.now() - IDLE_MS))));
+  const rows = await db.select({ userId: schema.workspaceBrowsers.userId, workspaceId: schema.workspaceBrowsers.workspaceId }).from(schema.workspaceBrowsers).where(and(isNotNull(schema.workspaceBrowsers.sessionId), lt(schema.workspaceBrowsers.activeAt, new Date(Date.now() - IDLE_MS))));
   for (const row of rows) {
-    await locked(row.userId, row.threadId, async (tx, current) => {
+    await lockedWorkspace(row.userId, row.workspaceId, async (tx, current) => {
       if (current.sessionId && current.activeAt.getTime() < Date.now() - IDLE_MS) await release(tx, current);
     }).catch(() => {});
   }
 }
+

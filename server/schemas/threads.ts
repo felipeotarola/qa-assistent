@@ -5,6 +5,7 @@ export const threadIdParamsSchema = z.object({
 });
 
 export const createThreadBodySchema = z.object({
+  workspaceId: z.string().uuid().optional(),
   id: z.string().trim().uuid().optional(),
   title: z.string().trim().min(1).max(200).optional(),
 });

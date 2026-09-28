@@ -23,6 +23,8 @@ if (error.value || !data.value?.thread) {
 }
 
 const thread = computed(() => data.value!.thread);
+const workspaceBindings = useState<Record<string, string>>("thread-workspaces", () => ({}));
+if (thread.value.workspaceId) workspaceBindings.value[chatId.value] = thread.value.workspaceId;
 
 const {
   selectedModel,
