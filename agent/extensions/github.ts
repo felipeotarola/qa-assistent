@@ -1,11 +1,12 @@
 import githubExtension from "@github-tools/eve-extension";
-import { CONNECT_USER_ISSUER, GITHUB_CONNECTOR, GITHUB_PRESET } from "../../shared/connect.js";
+import { CONNECT_USER_ISSUER, GITHUB_CONNECTOR } from "../../shared/connect.js";
 
 // The mount namespace comes from this filename, so tools reach the model as
 // `github__listPullRequests`, `github__createIssue`, and so on.
 export default githubExtension({
   connector: GITHUB_CONNECTOR,
-  preset: GITHUB_PRESET,
+  // Writes go through the workspace-aware external tool and its durable receipts.
+  include: ["getRepository", "searchRepositories", "listPullRequests", "getPullRequest", "listIssues", "getIssue", "getFileContent"],
   connect: {
     // Each caller reaches GitHub through their own Connect grant. Without this
     // the extension mints `{ type: "app" }` — the project's installation —

@@ -47,7 +47,7 @@ export const connectors: ConnectorDef[] = [
     id: "linear",
     name: "Linear",
     description: "Issues, projects, cycles, and comments in your Linear workspace.",
-    connector: "mcp.linear.app/linear",
+    connector: "linear/oauth",
     connectionName: "linear",
     icon: "i-simple-icons-linear",
     scopes: [],

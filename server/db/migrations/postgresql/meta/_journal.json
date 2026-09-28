@@ -29,6 +29,27 @@
       "when": 1790582618594,
       "tag": "0003_workspace_trash",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790588805673,
+      "tag": "0004_brave_kabuki",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790589891004,
+      "tag": "0005_steady_zodiak",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790592776089,
+      "tag": "0006_giant_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

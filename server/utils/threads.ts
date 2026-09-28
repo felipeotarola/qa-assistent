@@ -3,6 +3,7 @@ import { db, schema } from "@nuxthub/db";
 import type { ThreadRecord, ThreadSummary } from "#shared/types/thread";
 import { truncateThreadTitle } from "#shared/types/thread";
 import { defaultWorkspace, requireWorkspace } from "./workspaces";
+import { runtimeScope } from "../../shared/runtime-scope";
 
 function rowToSummary(row: typeof schema.threads.$inferSelect): ThreadSummary {
   return {
@@ -14,10 +15,11 @@ function rowToSummary(row: typeof schema.threads.$inferSelect): ThreadSummary {
   };
 }
 
-function rowToRecord(row: typeof schema.threads.$inferSelect): ThreadRecord {
+async function rowToRecord(row: typeof schema.threads.$inferSelect): Promise<ThreadRecord> {
+  const [binding] = await db.select().from(schema.chatRuntimes).where(and(eq(schema.chatRuntimes.threadId, row.id), eq(schema.chatRuntimes.runtime, runtimeScope())));
   return {
     ...rowToSummary(row),
-    sessionId: row.sessionId,
+    sessionId: binding?.sessionId ?? null,
   };
 }
 
@@ -81,12 +83,14 @@ export async function updateThreadForUser(
   if (!existing) {
     return undefined;
   }
+  if (patch.sessionId !== undefined && patch.sessionId !== existing.sessionId) {
+    throw createError({ statusCode: 409, statusMessage: "Session is not registered to this chat in this environment. Reload the chat." });
+  }
 
   await db.update(schema.threads)
     .set({
       updatedAt: new Date(),
       ...(patch.title !== undefined ? { title: truncateThreadTitle(patch.title) } : {}),
-      ...(patch.sessionId !== undefined ? { sessionId: patch.sessionId } : {}),
     })
     .where(and(
       eq(schema.threads.id, id),

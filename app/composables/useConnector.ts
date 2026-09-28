@@ -22,7 +22,7 @@ export function useConnector(
 
   const canConnect = computed(() => {
     const state = connector().status.state;
-    return state === "not_connected" || state === "installation_required";
+    return state === "not_connected" || state === "installation_required" || (id.value === "linear" && state === "error");
   });
 
   const isConnected = computed(() => connector().status.state === "connected");

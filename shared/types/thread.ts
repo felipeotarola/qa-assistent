@@ -9,6 +9,7 @@ export interface ThreadSummary {
 export interface ThreadRecord extends ThreadSummary {
   /** The eve session backing this thread, or `null` before its first message. */
   sessionId: string | null;
+  history?: import("../chat-history").ArchivedMessage[];
 }
 
 export function truncateThreadTitle(text: string, maxLength = 60): string {

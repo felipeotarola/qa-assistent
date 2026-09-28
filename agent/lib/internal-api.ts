@@ -1,15 +1,15 @@
 export function appOrigin() {
-  const configured = (process.env.APP_URL || process.env.BETTER_AUTH_URL)?.trim().replace(/\/$/, "");
+  const configured = process.env.APP_URL?.trim().replace(/\/$/, "");
   if (configured) {
     return configured;
   }
 
-  const vercelUrl = process.env.VERCEL_URL?.trim();
+  const vercelUrl = (process.env.VERCEL_ENV === "production" ? process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL : process.env.VERCEL_URL)?.trim();
   if (vercelUrl) {
     return `https://${vercelUrl}`;
   }
 
-  return "http://localhost:3000";
+  return process.env.BETTER_AUTH_URL?.trim().replace(/\/$/, "") || "http://localhost:3000";
 }
 
 export function internalHeaders() {

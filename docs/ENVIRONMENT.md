@@ -114,9 +114,9 @@ Used for:
 ## Vercel Blob (memory)
 
 Eve's `fileMemory()` provider stores one private Blob document per user at
-`eve/memory/file/<scope>/MEMORY.md`. Attach a Blob store to the project and
-`BLOB_READ_WRITE_TOKEN` is provided automatically; without one the agent fails
-on its first memory recall.
+`eve/memory/file/<scope>/MEMORY.md`. Configure `WORKSPACE_BLOB_READ_WRITE_TOKEN`
+for the same private Blob store locally and in production. The memory provider
+explicitly uses this token; a public Blob store cannot serve private memory.
 
 ## AI provider — Grunden
 

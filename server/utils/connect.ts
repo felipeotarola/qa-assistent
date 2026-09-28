@@ -1,4 +1,5 @@
 import type { ConnectorDef, ConnectorStatus } from "#shared/types/connector";
+import { linearStatus, linearToken, revokeLinear } from "./linear-oauth";
 import { CONNECT_USER_ISSUER } from "#shared/connect";
 import type { ConnectTokenSubject } from "@vercel/connect";
 import {
@@ -115,6 +116,7 @@ function userTokenResponse(
 }
 
 export async function probeStatus(def: ConnectorDef, userId: string): Promise<ConnectorStatus> {
+  if (def.id === "linear") return linearStatus(userId);
   try {
     const response = await userTokenResponse(def, userId);
 
@@ -134,6 +136,7 @@ export async function mintUserToken(
   userId: string,
   installationId?: string,
 ): Promise<string> {
+  if (def.id === "linear") return linearToken(userId);
   const response = await userTokenResponse(def, userId, installationId);
   return response.token;
 }
@@ -171,6 +174,7 @@ export async function revokeConnection(
   userId: string,
   installationId?: string,
 ): Promise<void> {
+  if (def.id === "linear") return revokeLinear(userId);
   try {
     await revokeToken(def.connector, {
       subject: userSubject(userId),

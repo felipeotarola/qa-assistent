@@ -3,11 +3,13 @@ import type { UIMessage } from "ai";
 import type { ThreadRecord } from "#shared/types/thread";
 import type { AgentInputResponse } from "~/components/AgentInputRequest.vue";
 import { recordAuthorizationEvent } from "~/composables/chat/useAuthorizationChallenges";
-import { persistThreadSession, resumeOptionsFromThread } from "~/composables/chat/thread-session";
+import { resumeOptionsFromThread } from "~/composables/chat/thread-session";
+import { refreshThreadList } from "~/composables/chat/navigation";
 import { recordStreamEvent } from "~/composables/chat/stream-log";
 import { clearTurnFailure, recordTurnFailure, turnFailure } from "~/composables/chat/turn-errors";
 import { CHAT_MODEL_HEADER, REASONING_HEADER } from "#shared/chat-models";
 import { BROWSER_THREAD_HEADER } from "#shared/browser";
+import type { ArchivedMessage } from "#shared/chat-history";
 
 /** The four statuses the Nuxt UI chat components understand. */
 export type ChatStatus = "ready" | "submitted" | "streaming" | "error";
@@ -39,6 +41,9 @@ export function useChatSession(thread: ThreadRecord) {
   const initial = resumeOptionsFromThread(thread);
   const selectedModel = useChatModel();
   const selectedReasoning = useChatReasoning();
+  const archived = ref<ArchivedMessage[]>(thread.history ?? []);
+  const persistenceError = ref<Error>();
+  let boundSession = thread.sessionId;
 
   const agent = useEveAgent({
     ...initial,
@@ -48,9 +53,10 @@ export function useChatSession(thread: ThreadRecord) {
       [REASONING_HEADER]: selectedReasoning.value,
     }),
     onSessionChange: (session) => {
-      // eve mints the session on the first message; bind it once.
-      if (session && session.sessionId !== thread.sessionId) {
-        void persistThreadSession(chatId, session.sessionId);
+      // The server hook binds the runtime, even if this browser disconnects.
+      if (session && session.sessionId !== boundSession) {
+        boundSession = session.sessionId;
+        void refreshThreadList();
       }
     },
     onEvent: (event) => {
@@ -71,8 +77,33 @@ export function useChatSession(thread: ThreadRecord) {
   // in the transcript, where a sent message belongs.
   const queued = ref<string>();
 
+  let disposed = false;
+  let historyTimer: ReturnType<typeof setTimeout> | undefined;
+  async function refreshHistory() {
+    try {
+      const data = await $fetch<{ messages: ArchivedMessage[] }>(`/api/threads/${chatId}/history`);
+      if (!disposed) {
+        archived.value = data.messages;
+        if (persistenceError.value?.message === "Kunde inte uppdatera den gemensamma chatthistoriken.") persistenceError.value = undefined;
+      }
+    }
+    catch { if (!disposed) persistenceError.value = new Error("Kunde inte uppdatera den gemensamma chatthistoriken."); }
+  }
+  async function pollHistory() { await refreshHistory(); if (!disposed) historyTimer = setTimeout(pollHistory, 5000); }
+  onMounted(() => { void pollHistory(); });
+  onBeforeUnmount(() => { disposed = true; clearTimeout(historyTimer); });
+  const liveTimes = new Map<string, string>();
+
   const messages = computed(() => {
-    const sent = [...agent.data.value.messages] as UIMessage[];
+    const merged = new Map(archived.value.map(row => [`${row.sessionId}:${row.message.id}`, row]));
+    const sessionId = agent.session.value?.sessionId ?? thread.sessionId ?? "pending";
+    for (const message of agent.data.value.messages) {
+      const key = `${sessionId}:${message.id}`;
+      const at = merged.get(key)?.at ?? liveTimes.get(message.metadata?.turnId ?? key) ?? new Date().toISOString();
+      liveTimes.set(message.metadata?.turnId ?? key, at);
+      merged.set(key, { sessionId, at, message });
+    }
+    const sent = [...merged.entries()].sort(([, a], [, b]) => a.at.localeCompare(b.at) || (a.message.role === b.message.role ? 0 : a.message.role === "user" ? -1 : 1)).map(([id, row]) => ({ ...row.message, id })) as UIMessage[];
     if (!queued.value) return sent;
 
     return [...sent, {
@@ -89,6 +120,7 @@ export function useChatSession(thread: ThreadRecord) {
   });
 
   const error = computed(() => {
+    if (persistenceError.value) return persistenceError.value;
     if (agent.error.value) return agent.error.value;
     const failure = turnFailure(chatId);
     return failure ? new Error(failure) : undefined;
@@ -120,6 +152,7 @@ export function useChatSession(thread: ThreadRecord) {
     if (!trimmed) return;
 
     clearTurnFailure(chatId);
+    if (persistenceError.value) throw persistenceError.value;
     await whenSendable(trimmed);
     await agent.send(trimmed);
   }

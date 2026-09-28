@@ -17,6 +17,11 @@ export function useConnectors() {
   const isInitialLoad = computed(() => pending.value && !connectors.value);
 
   async function handleOAuthReturn() {
+    if (route.query.linear === "cancelled") {
+      toast.add({ title: "Linear connection cancelled", description: "Your existing connection was not changed.", color: "neutral" });
+      await router.replace({ query: {} });
+      return;
+    }
     const connectedId = route.query.connected;
     if (!connectedId || typeof connectedId !== "string") {
       return;

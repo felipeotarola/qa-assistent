@@ -25,7 +25,7 @@ export interface ConnectorDef {
   id: string;
   name: string;
   description: string;
-  /** Vercel Connect connector UID — must match `agent/connections/<id>.ts`. */
+  /** Provider identifier: a Vercel Connect UID, or linear/oauth for direct OAuth. */
   connector: string;
   /** Eve connection name from `agent/connections/<connectionName>.ts`. */
   connectionName: string;

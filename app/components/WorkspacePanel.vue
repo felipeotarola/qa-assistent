@@ -74,6 +74,7 @@ async function uploadFile(event: Event) {
     <header class="flex shrink-0 flex-wrap items-center gap-2 border-b border-default/60 px-4 py-3">
       <UIcon name="i-lucide-layout-grid" class="size-4 text-dimmed" />
       <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ workspaces.find(w => w.id === activeId)?.name || 'Workspace' }}</span>
+      <WorkspaceDestinations v-if="activeId" :key="activeId" :workspace-id="activeId" />
       <UButton icon="i-lucide-trash-2" :label="trash ? 'Tillbaka' : undefined" aria-label="Papperskorg" title="Papperskorg" :aria-pressed="trash" color="neutral" :variant="trash ? 'soft' : 'ghost'" @click="trash = !trash" />
       <template v-if="!trash">
       <UButton icon="i-lucide-images" aria-label="Visa även använda bilder" title="Visa även använda bilder" :aria-pressed="showLibrary" color="neutral" :variant="showLibrary ? 'soft' : 'ghost'" @click="showLibrary = !showLibrary" />

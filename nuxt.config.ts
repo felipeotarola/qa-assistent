@@ -1,5 +1,10 @@
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
+const eveSharedDirectory = resolve(dirname(createRequire(import.meta.url).resolve("eve/client")), "../shared");
 const privateNoStore = { "cache-control": "private, no-store" } as const;
 const noStore = { "cache-control": "no-store" } as const;
+const databaseUrl = process.env.POSTGRES_URL || process.env.POSTGRESQL_URL || process.env.DATABASE_URL;
+const supabasePooler = databaseUrl ? new URL(databaseUrl).hostname.endsWith(".pooler.supabase.com") : false;
 
 export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@nuxt/eslint", "@comark/nuxt", "eve/nuxt", "@nuxthub/core", "@vercel/analytics"],
@@ -41,6 +46,23 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
+    // Eve's package-internal #shared imports must resolve inside Eve, not
+    // against Nuxt's application #shared alias.
+    externals: { external: ["eve/client"] },
+    rollupConfig: {
+      plugins: [{
+        name: "eve-package-shared-imports",
+        resolveId: {
+          order: "pre",
+          handler(source, importer) {
+            // The prerender build inlines packages even when the production
+            // server externalizes them. Respect Eve's package import scope.
+            if (source.startsWith("#shared/") && importer?.replaceAll("\\", "/").includes("/eve/dist/src/")) return resolve(eveSharedDirectory, source.slice("#shared/".length));
+            return null;
+          },
+        },
+      }],
+    },
     compressPublicAssets: true,
     prerender: {
       routes: ["/login"],
@@ -83,6 +105,8 @@ export default defineNuxtConfig({
     db: {
       dialect: "postgresql",
       driver: "postgres-js",
+      // Local development and serverless instances share a small Supabase pool.
+      connection: { max: 2, idle_timeout: 10, connect_timeout: 15, prepare: false, ...(supabasePooler ? { port: 6543 } : {}) },
       // Use our prefixed migration ledger in the shared Supabase database.
       applyMigrationsDuringDev: false,
       applyMigrationsDuringBuild: false,

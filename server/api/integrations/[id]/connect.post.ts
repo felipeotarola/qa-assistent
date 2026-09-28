@@ -4,6 +4,7 @@ import { isValidEveResumeUrl, startConnectFlow } from "~~/server/utils/connect";
 import { throwConnectError } from "~~/server/utils/errors";
 import { getRequestOrigin } from "~~/server/utils/h3-node";
 import { requireSessionUserId } from "~~/server/utils/session";
+import { startLinearOAuth } from "~~/server/utils/linear-oauth";
 
 export default defineEventHandler(async (event) => {
   const { id } = await getValidatedRouterParams(event, connectorIdParamsSchema.parse);
@@ -17,6 +18,7 @@ export default defineEventHandler(async (event) => {
     ? resumeUrl
     : `${origin}/settings/integrations?connected=${connector.id}`;
 
+  if (id === "linear") return startLinearOAuth(event, userId, `${origin}/settings/integrations?connected=linear`);
   try {
     const { url } = await startConnectFlow(connector, userId, callbackUrl);
     return { url };
