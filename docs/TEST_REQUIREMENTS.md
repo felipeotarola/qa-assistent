@@ -63,12 +63,12 @@ The provider simulation does not edit real Linear tickets.
 
 ## Material quick edits and browser evidence
 
-Document/table quick tasks use a separate, stateless Flash/low call with only
-the selected object's content. They return a validated preview, not a write.
-The user applies it through the ordinary version-checked item endpoint. A stale
-preview cannot overwrite concurrent edits. Test-plan tasks still use the main
-agent because they need requirements and execution context. Large objects and
-external research stay in the chat. No separate provider credential is needed.
+Quick tasks on documents, tables and test plans use the main agent in the active
+workspace chat, with its selected model and reasoning. The task includes the
+selected object's identity and asks the agent to read its current content before
+making a version-checked update. Responses and any clarification appear in the
+chat. An available chat in the same workspace is required; unsent drafts remain
+on the card when the chat cannot accept the task.
 
 While a browser test run is active in the same workspace and chat, successful
 navigation/inspection/interactions automatically save private full-page PNGs
@@ -81,8 +81,7 @@ Call `inspect` after asynchronous UI changes settle to capture the resulting
 state. Existing runs do not gain retrospective screenshots.
 
 Run-linked images are shown in the run gallery, retained against deletion, and
-hidden from the default loose-material list. `TEST_QUICK_EDIT=1` verifies a real
-model preview/apply; `TEST_CAPTURES=1` exercises Browserbase, private Blob storage,
+hidden from the default loose-material list. `TEST_CAPTURES=1` exercises Browserbase, private Blob storage,
 run association, authentication and cleanup using temporary fixtures.
 
 Incomplete requirement proposals explicitly list the missing answer/expected

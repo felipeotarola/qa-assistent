@@ -95,21 +95,6 @@ try {
   assert.equal(audited.reviews.length,1);
   assert.equal((await api('/api/internal/workspace','POST',{userId,threadId:t,input:{action:'read',itemId:item.id}},true)).data.item.version,1,'Proposals and reviews do not edit requirements');
   console.log('PASS: requirement drafts, ownership, stale versions, agent publish denied, explicit review with immutable original and idempotent audit');
-  if (process.env.TEST_QUICK_EDIT === '1') {
-    const table={kind:'table',columns:['URL','Title'],rows:[['https://example.com','Example'],['https://example.org','Other']]};
-    const material=(await api('/api/internal/workspace','POST',{userId,threadId:t,input:{action:'create',title:'Quick edit fixture',content:table}},true)).data.item;
-    const path=`/api/workspaces/${a}/items/${material.id}`;
-    assert.equal((await api(`${path}/quick-edit`,'POST',{text:'Add SKU',expectedVersion:99})).status,409);
-    const response=await api(`${path}/quick-edit`,'POST',{text:'Add a first column SKU with SKU-001 and SKU-002. Preserve all existing cells exactly.',expectedVersion:1});
-    assert.equal(response.status,200,JSON.stringify(response.data));
-    assert.equal(response.data.question,'');
-    assert.equal(response.data.content.columns[0],'SKU');
-    assert.deepEqual(response.data.content.rows.map(r=>r.slice(1)),table.rows);
-    assert.equal((await api('/api/internal/workspace','POST',{userId,threadId:t,input:{action:'read',itemId:material.id}},true)).data.item.version,1,'Preview does not save');
-    assert.equal((await api(path,'PATCH',{title:material.title,content:response.data.content,expectedVersion:1})).status,200);
-    assert.equal((await api(path,'PATCH',{title:material.title,content:response.data.content,expectedVersion:1})).status,409);
-    console.log('PASS real Flash low quick edit preserves cells, previews before save and rejects stale apply');
-  }
   if (process.env.TEST_CAPTURES === '1') {
     const browserCase=randomUUID();
     const browserPlan=(await api('/api/internal/workspace','POST',{userId,threadId:t,input:{action:'create',title:'Screenshot fixture',content:{kind:'test_plan',summary:'Temporary screenshot test',sources:[],cases:[{id:browserCase,title:'Example Domain page',type:'browser',preconditions:'',steps:'Open example.com',expected:'Example Domain visible'}]}}},true)).data.item;
