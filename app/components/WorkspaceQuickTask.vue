@@ -25,7 +25,7 @@ async function submit() {
   <form class="border-b border-default/70 p-3" @submit.prevent="submit">
     <label :for="`task-${item.id}`" class="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted"><UIcon name="i-lucide-sparkles" class="size-3.5" /> Be agenten ändra</label>
     <div class="flex items-center gap-2">
-      <UInput :id="`task-${item.id}`" v-model="text" class="min-w-0 flex-1" :maxlength="4000" :placeholder="item.content.kind === 'table' ? 'Lägg till i tabellen…' : 'Lägg till i dokumentet…'" :disabled="sending || disabled" />
+      <UInput :id="`task-${item.id}`" v-model="text" class="min-w-0 flex-1" :maxlength="4000" :placeholder="item.content.kind === 'test_plan' ? 'Ändra testplanen…' : item.content.kind === 'table' ? 'Lägg till i tabellen…' : 'Lägg till i dokumentet…'" :disabled="sending || disabled" />
       <UButton type="submit" icon="i-lucide-arrow-up" aria-label="Skicka uppgift till agenten" :loading="sending" :disabled="!available || !text.trim() || sending" />
     </div>
     <p class="mt-2 text-[11px] text-muted" aria-live="polite">{{ notice || (disabled ? 'Spara eller avbryt redigeringen först.' : !agent ? 'Öppna en chatt i detta workspace för att skicka.' : !available ? 'Vänta tills chatten är redo.' : 'Använder chatten och vald modell.') }}</p>

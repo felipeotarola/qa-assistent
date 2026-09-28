@@ -72,7 +72,7 @@ async function save() {
   busy.value = true; error.value = ""; notice.value = "";
   try {
     await $fetch(`/api/workspaces/${props.workspaceId}/destinations`, { method: "PUT", body: { provider: provider.value, targetId: targetId.value, ...(provider.value === "linear" && projectId.value ? { projectId: projectId.value } : {}) } });
-    await refresh(); notice.value = "Destinationen är sparad för alla chattar i detta workspace.";
+    await refresh(); await refreshNuxtData(); notice.value = "Destinationen är sparad för alla chattar i detta workspace.";
   }
   catch { error.value = "Kunde inte spara destinationen. Kontrollera att du har åtkomst till valt repo eller projekt."; }
   finally { busy.value = false; }
@@ -81,7 +81,7 @@ async function remove() {
   busy.value = true; error.value = "";
   try {
     await $fetch(`/api/workspaces/${props.workspaceId}/destinations`, { method: "DELETE", query: { provider: provider.value } });
-    await refresh(); targetId.value = undefined; projectId.value = undefined; notice.value = "Workspace-kopplingen borttagen. Externa ärenden finns kvar.";
+    await refresh(); await refreshNuxtData(); targetId.value = undefined; projectId.value = undefined; notice.value = "Workspace-kopplingen borttagen. Externa ärenden finns kvar.";
   }
   catch { error.value = "Kunde inte ta bort kopplingen."; }
   finally { busy.value = false; }

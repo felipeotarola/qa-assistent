@@ -54,6 +54,13 @@ export async function saveItem(userId: string, workspaceId: string, input: { tit
       if (!image || image.content.kind !== "image") throw createError({ statusCode: 400, statusMessage: "Image must exist in the same workspace and not be in trash" });
     }
     if (input.content.kind === "text" && input.content.blocks) input.content.text = documentText(input.content.blocks);
+    if (input.content.kind === "test_plan") {
+      for (const source of input.content.sources) {
+        const [origin] = await tx.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.id, source.itemId), eq(schema.workspaceItems.workspaceId, workspaceId)));
+        const [snapshot] = await tx.select({ id: schema.workspaceItemVersions.id }).from(schema.workspaceItemVersions).where(and(eq(schema.workspaceItemVersions.itemId, source.itemId), eq(schema.workspaceItemVersions.version, source.version)));
+        if (!origin || !snapshot || source.itemId === id) throw createError({ statusCode: 400, statusMessage: "Test plan source must reference an existing version in this workspace" });
+      }
+    }
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`item:${id}`}, 0))`);
     const [existing] = await tx.select().from(schema.workspaceItems).where(eq(schema.workspaceItems.id, id));
     if (input.id && (!existing || existing.deletedAt || existing.workspaceId !== workspaceId)) throw createError({ statusCode: 404, statusMessage: "Item not found" });
@@ -79,6 +86,8 @@ export async function setItemDeleted(userId: string, workspaceId: string, itemId
   return db.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace-content:${workspaceId}`}, 0))`);
     if (deleted) {
+      const evidenceRuns = await tx.execute(sql`select id from pat_test_runs where workspace_id = ${workspaceId} and result->'evidenceItemIds' @> ${JSON.stringify([itemId])}::jsonb limit 1`);
+      if (evidenceRuns.length) throw createError({ statusCode: 409, statusMessage: "This file is evidence in a saved test run and must be retained." });
       const active = await tx.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.workspaceId, workspaceId), isNull(schema.workspaceItems.deletedAt)));
       if (active.some(item => imageReferences(item.content).some(ref => ref.itemId === itemId))) throw createError({ statusCode: 409, statusMessage: "Image is used in a document or table. Remove its references first." });
     }
