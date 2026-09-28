@@ -1,30 +1,45 @@
 <script setup lang="ts">
-import type { WorkspaceItem, ItemContent } from "#shared/workspace";
+import type { WorkspaceItem, ItemContent, EditableContent } from "#shared/workspace";
+import { imageReferences } from "#shared/workspace";
 const props = defineProps<{ item: WorkspaceItem }>();
 const emit = defineEmits<{ saved: [] }>();
 const expanded = ref(false);
 const editing = ref(false);
 const busy = ref(false);
 const error = ref("");
+const toast = useToast();
+async function remove() {
+  const endpoint = base.value;
+  busy.value = true; error.value = "";
+  try {
+    await $fetch(endpoint, { method: "DELETE" });
+    emit("saved");
+    toast.add({ title: "Flyttat till papperskorgen", description: props.item.title, actions: [{ label: "Ångra", onClick: async () => {
+      try { await $fetch(`${endpoint}/restore`, { method: "POST" }); emit("saved"); }
+      catch { toast.add({ title: "Kunde inte återställa. Försök via papperskorgen.", color: "error" }); }
+    } }] });
+  }
+  catch (cause) { error.value = (cause as { statusCode?: number }).statusCode === 409 ? "Bilden används i ett dokument eller en tabell. Ta bort bildreferensen där först." : "Kunde inte ta bort objektet. Försök igen."; }
+  finally { busy.value = false; }
+}
 const title = ref("");
-const text = ref("");
-const columns = ref<string[]>([]);
-const rows = ref<string[][]>([]);
+const draft = ref<EditableContent>({ kind: "text", text: "", blocks: [] });
+const images = computed(() => imageReferences(props.item.content));
 const editVersion = ref(0);
 const versions = ref<Array<{ version: number; title: string; content: ItemContent }>>([]);
 const base = computed(() => `/api/workspaces/${props.item.workspaceId}/items/${props.item.id}`);
 const isEditable = computed(() => ["text", "table"].includes(props.item.content.kind));
 function edit(content = props.item.content, name = props.item.title) {
   title.value = name; editVersion.value = props.item.version;
-  text.value = content.kind === "text" ? content.text : "";
-  columns.value = content.kind === "table" ? [...content.columns] : [];
-  rows.value = content.kind === "table" ? content.rows.map(r => [...r]) : [];
+  if (content.kind !== "text" && content.kind !== "table") return;
+  draft.value = JSON.parse(JSON.stringify(content));
+  if (draft.value.kind === "text") draft.value.blocks ??= [{ kind: "text", text: draft.value.text }];
   editing.value = true;
 }
 async function save() {
   busy.value = true; error.value = "";
   try {
-    await $fetch(base.value, { method: "PATCH", body: { title: title.value, expectedVersion: editVersion.value, content: props.item.content.kind === "table" ? { kind: "table", columns: columns.value, rows: rows.value } : { kind: "text", text: text.value } } });
+    await $fetch(base.value, { method: "PATCH", body: { title: title.value, expectedVersion: editVersion.value, content: draft.value } });
     editing.value = false; versions.value = []; emit("saved");
   }
   catch { error.value = "Kunde inte spara. Om objektet ändrats, avbryt och öppna redigeringen igen."; }
@@ -37,6 +52,11 @@ async function history() {
 </script>
 <template>
   <WorkspaceCard v-model:expanded="expanded" :title="item.title" :subtitle="`${item.content.kind === 'text' ? 'Dokument' : item.content.kind === 'table' ? 'Tabell' : item.content.kind === 'image' ? 'Bild' : 'Fil'} · version ${item.version}`" :icon="item.content.kind === 'table' ? 'i-lucide-table-2' : item.content.kind === 'image' ? 'i-lucide-image' : 'i-lucide-file-text'">
+    <template #actions>
+      <UDropdownMenu :items="[{ label: 'Ta bort', icon: 'i-lucide-trash-2', color: 'error', disabled: busy || editing, onSelect: remove }]">
+        <UButton icon="i-lucide-ellipsis" :aria-label="`Åtgärder för ${item.title}`" color="neutral" variant="ghost" :disabled="busy" />
+      </UDropdownMenu>
+    </template>
     <template #toolbar>
       <div class="flex flex-wrap gap-2 border-b border-default p-3">
         <template v-if="isEditable">
@@ -51,17 +71,12 @@ async function history() {
     <div class="h-full overflow-auto p-4" :class="expanded ? 'text-sm' : 'text-xs'">
       <template v-if="expanded && editing">
         <UInput v-model="title" aria-label="Titel" class="mb-4 w-full" />
-        <textarea v-if="item.content.kind === 'text'" v-model="text" aria-label="Dokumenttext" class="min-h-80 w-full resize-y rounded-lg border border-default bg-default p-3 leading-relaxed outline-primary" />
-        <template v-else>
-          <table class="w-full border-collapse"><thead><tr><th v-for="(_, c) in columns" :key="c" class="border border-default p-1"><input v-model="columns[c]" :aria-label="`Kolumn ${c + 1}`" class="w-full min-w-24 bg-transparent p-2"></th></tr></thead><tbody><tr v-for="(row, r) in rows" :key="r"><td v-for="(_, c) in columns" :key="c" class="border border-default p-1"><input v-model="row[c]" :aria-label="`Rad ${r + 1}, kolumn ${c + 1}`" class="w-full min-w-24 bg-transparent p-2"></td></tr></tbody></table>
-          <div class="mt-3 flex gap-2"><UButton label="Lägg till rad" variant="soft" @click="rows.push(columns.map(() => ''))" /><UButton label="Lägg till kolumn" variant="soft" @click="columns.push('Ny kolumn'); rows.forEach(row => row.push(''))" /></div>
-        </template>
+        <WorkspaceContentEditor v-model="draft" :workspace-id="item.workspaceId" />
       </template>
-      <p v-else-if="item.content.kind === 'text'" class="whitespace-pre-wrap leading-relaxed">{{ expanded ? item.content.text : item.content.text.slice(0, 500) }}</p>
-      <table v-else-if="item.content.kind === 'table'" class="w-full border-collapse text-left"><thead><tr><th v-for="(column, c) in item.content.columns" :key="c" class="border border-default bg-muted p-2 font-medium">{{ column }}</th></tr></thead><tbody><tr v-for="(row, r) in (expanded ? item.content.rows : item.content.rows.slice(0, 4))" :key="r"><td v-for="(cell, c) in row" :key="c" class="border border-default p-2">{{ cell }}</td></tr></tbody></table>
+      <WorkspaceContent v-else-if="item.content.kind === 'text' || item.content.kind === 'table'" :content="item.content" :workspace-id="item.workspaceId" :preview="!expanded" />
       <img v-else-if="item.content.kind === 'image'" :src="`${base}/file`" :alt="item.title" class="h-full w-full object-contain">
       <div v-else class="flex h-full flex-col items-center justify-center gap-3 text-muted"><UIcon name="i-lucide-file" class="size-10" /><span>{{ item.content.filename }}</span><span>{{ Math.ceil(item.content.size / 1024) }} KB</span></div>
     </div>
-    <template #footer><div class="px-4 py-2 text-[10px] text-dimmed">{{ editing ? 'Ändringarna sparas som en ny version' : 'Sparat i workspace' }}</div><p v-if="error" role="alert" class="px-4 pb-3 text-xs text-error">{{ error }}</p></template>
+    <template #footer><div v-if="images.length" class="flex items-center gap-2 border-b border-default px-4 py-2"><WorkspaceImage v-for="(image, i) in images.slice(0, 3)" :key="i" :workspace-id="item.workspaceId" :image="image" thumbnail /><span class="text-xs text-muted">{{ images.length }} bilder</span></div><div class="px-4 py-2 text-[10px] text-dimmed">{{ editing ? 'Ändringarna sparas som en ny version' : 'Sparat i workspace' }}</div><p v-if="error" role="alert" class="px-4 pb-3 text-xs text-error">{{ error }}</p></template>
   </WorkspaceCard>
 </template>

@@ -14,6 +14,7 @@ export const workspaceItems = pgTable("pat_workspace_items", {
   title: text("title").notNull(),
   content: jsonb("content").$type<ItemContent>().notNull(),
   blobPath: text("blob_path"),
+  deletedAt: timestamp("deleted_at"),
   version: integer("version").notNull().default(1),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }).enableRLS();

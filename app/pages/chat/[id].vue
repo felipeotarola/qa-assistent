@@ -44,6 +44,12 @@ const { resetTurnEventCounts } = useStreamLog();
 const { pendingChallenges, failedChallenges, tryResumeConnectedChallenges } = useAuthorizationChallenges();
 
 const input = ref("");
+const promptRef = useTemplateRef("promptRef");
+function selectSuggestion(prompt: string) {
+  if (isBusy.value) return;
+  input.value = input.value.trim() ? `${input.value.trim()}\n${prompt}` : prompt;
+  nextTick(() => promptRef.value?.textareaRef?.focus());
+}
 
 watch(status, (value) => {
   if (value === "submitted") {
@@ -117,6 +123,7 @@ function handleInputResponses(responses: Parameters<typeof respond>[0]) {
                 :is-last="message.id === messages.at(-1)?.id"
                 :can-respond="!isBusy"
                 @input-responses="handleInputResponses"
+                @suggestion="selectSuggestion"
               />
             </template>
           </UChatMessages>
@@ -138,6 +145,7 @@ function handleInputResponses(responses: Parameters<typeof respond>[0]) {
           </div>
 
           <UChatPrompt
+            ref="promptRef"
             v-model="input"
             :error="chatError"
             variant="subtle"

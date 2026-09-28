@@ -7,6 +7,7 @@ import {
   isToolUIPart,
 } from "ai";
 import type { UIMessage } from "ai";
+import { suggestionsSchema } from "#shared/chat-suggestions";
 import type { EveDynamicToolPart } from "eve/vue";
 import { isPartStreaming, isToolStreaming } from "@nuxt/ui/utils/ai";
 import type { AgentInputResponse } from "~/components/AgentInputRequest.vue";
@@ -24,10 +25,18 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   inputResponses: [responses: AgentInputResponse[]];
+  suggestion: [prompt: string];
 }>();
 
 const rawParts = computed(() => props.message.parts);
-const displayParts = computed(() => getMergedParts(normalizeEveParts(rawParts.value)));
+const displayParts = computed(() => getMergedParts(normalizeEveParts(rawParts.value)).filter(part => !((isToolUIPart(part) || isDynamicToolUIPart(part)) && getToolName(part) === "suggest_next_steps")));
+const suggestions = computed(() => {
+  if (!props.isLast || props.message.role !== "assistant" || props.status !== "ready") return [];
+  const part = [...rawParts.value].reverse().find(part => (isToolUIPart(part) || isDynamicToolUIPart(part)) && getToolName(part) === "suggest_next_steps");
+  if (!part || !(isToolUIPart(part) || isDynamicToolUIPart(part)) || part.state !== "output-available") return [];
+  const result = suggestionsSchema.safeParse(part.output);
+  return result.success ? result.data.suggestions : [];
+});
 
 const isBusy = computed(
   () => props.status === "submitted" || props.status === "streaming",
@@ -136,4 +145,5 @@ const showThinking = computed(
       </p>
     </template>
   </template>
+  <ChatSuggestions :suggestions="suggestions" :disabled="!(canRespond ?? true)" @select="emit('suggestion', $event)" />
 </template>

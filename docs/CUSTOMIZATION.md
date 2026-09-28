@@ -179,6 +179,17 @@ See [Deploy on Vercel](../README.md#deploy-on-vercel) in the README. Remember:
 
 ## Chat models
 
+### Contextual follow-up suggestions
+
+`agent/tools/suggest_next_steps.ts` returns up to four label/prompt pairs using
+`shared/chat-suggestions.ts`. The agent chooses them from the current conversation
+after completing its work; they are not a fixed list. `ChatSuggestions` renders
+the completed tool result below the latest assistant response, using Nuxt UI
+buttons. Selecting one adds its prompt to the composer without discarding a
+draft or executing the action. Suggestions are hidden during streaming and on
+older messages, and validated before rendering. Existing replies are not
+retroactively given suggestions.
+
 The Grunden model allowlist and labels live in `shared/chat-models.ts`.
 `agent/lib/grunden.ts` creates the server-only provider; `agent/agent.ts`
 selects it from the current authenticated turn. The composer toggle is

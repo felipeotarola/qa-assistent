@@ -1,5 +1,22 @@
 # Workspaces
 
+## Images within content
+
+Text documents may contain ordered `blocks` (text, heading, image). Legacy
+`{kind: "text", text: "..."}` documents remain supported; when blocks are supplied,
+the server derives the plain text summary from them. Image blocks and table image
+cells use `{kind: "image", itemId: "<workspace image ID>", caption: "..."}`.
+Images are stored once in private Blob and referenced by ID, never public URLs.
+References must point to active images in the same workspace.
+
+The editor supports adding/removing/reordering blocks, captions and selecting
+existing workspace images. Upload images using the workspace upload button first.
+Cards show image thumbnails/counts. Referenced images are hidden from the normal
+card overview; the images toolbar button reveals them. Removing a reference does
+not delete the asset. Deleting images used in active documents/tables is blocked.
+Historical versions retain references; if the asset was later trashed, restore it
+before restoring that version. Unavailable references render a placeholder.
+
 A workspace owns multiple chats, a shared browser, and persistent objects.
 Select or create a workspace in the sidebar. Existing chats are assigned to
 their owner's initial **Mitt workspace** by migration 0002.
@@ -8,6 +25,12 @@ The workspace panel displays expandable cards for text documents, structured
 tables, images and files. Documents and tables can be edited and restored from
 history; every save creates a new version. Optimistic version checks reject
 overwrites when another chat or the user has edited the same object.
+
+The card action menu moves objects to the workspace trash. Undo is available
+in the toast, or restore later using the trash button in the workspace toolbar.
+Trashed objects are hidden from normal lists, agent reads/updates and downloads.
+Content, versions and private Blob files are retained indefinitely for recovery;
+there is no permanent purge or automatic retention cleanup yet.
 
 The agent's `workspace` tool can list, read, create and update objects, save
 generated text/code/CSV files, and capture the current browser as a PNG. It gets

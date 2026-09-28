@@ -50,6 +50,24 @@ Browserbase runs remotely: your computer's localhost is not its localhost.
 
 ## Verification
 
+### Background research
+
+The agent's `research` tool renders one public URL per call in a fresh Browserbase
+session, separate from the live browser and its saved login context. It returns
+up to 20,000 text characters, 100 unique links, title, description, final URL,
+HTTP status and fetch time. `screenshot: true` saves a 1280×900 viewport PNG as a
+private workspace image. It does not supply visual interpretation to the model.
+The agent can follow returned links with additional calls and save reports using
+the workspace tool. This is bounded research, not an exhaustive crawler.
+
+Sessions are closed in `finally`, with a two-minute provider timeout as a crash
+backstop. No persistent profile is attached. Public-domain HTTP(S) validation
+and request interception reject local/private IPv4 destinations; this does not
+replace the provider's network isolation or provide protection against DNS
+rebinding. Login and interactive tasks remain in the live workspace browser.
+Set `TEST_RESEARCH=1` with `RUN_WORKSPACE_TESTS=1` to exercise a real GLM research
+turn and authenticated screenshot download in the workspace integration test.
+
 Run `pnpm typecheck`, `pnpm lint`, and `pnpm build:agent`.
 The opt-in `tests/browser.integration.mjs` creates a temporary Supabase account
 and real Browserbase sessions, verifies ownership/control/navigation/cleanup,

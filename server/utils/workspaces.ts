@@ -1,7 +1,8 @@
-import { and, eq, desc, sql } from "drizzle-orm";
+import { and, eq, desc, sql, isNull, isNotNull } from "drizzle-orm";
 import { db, schema } from "@nuxthub/db";
 import { put, del } from "@vercel/blob";
 import type { ItemContent } from "../../shared/workspace";
+import { imageReferences } from "../../shared/workspace";
 
 export function workspaceBlobToken() {
   const token = process.env.WORKSPACE_BLOB_READ_WRITE_TOKEN;
@@ -31,23 +32,29 @@ export async function listWorkspaces(userId: string) {
 export function publicItem(row: typeof schema.workspaceItems.$inferSelect) {
   return { id: row.id, workspaceId: row.workspaceId, title: row.title, content: row.content, version: row.version, updatedAt: row.updatedAt.toISOString() };
 }
-export async function listItems(userId: string, workspaceId: string) {
+export async function listItems(userId: string, workspaceId: string, trash = false) {
   await requireWorkspace(userId, workspaceId);
-  return (await db.select().from(schema.workspaceItems).where(eq(schema.workspaceItems.workspaceId, workspaceId)).orderBy(desc(schema.workspaceItems.updatedAt))).map(publicItem);
+  return (await db.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.workspaceId, workspaceId), trash ? isNotNull(schema.workspaceItems.deletedAt) : isNull(schema.workspaceItems.deletedAt))).orderBy(desc(schema.workspaceItems.updatedAt))).map(publicItem);
 }
 export async function ownedItem(userId: string, workspaceId: string, itemId: string) {
   await requireWorkspace(userId, workspaceId);
   const [item] = await db.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.id, itemId), eq(schema.workspaceItems.workspaceId, workspaceId)));
-  if (!item) throw createError({ statusCode: 404, statusMessage: "Item not found" });
+  if (!item || item.deletedAt) throw createError({ statusCode: 404, statusMessage: "Item not found" });
   return item;
 }
 export async function saveItem(userId: string, workspaceId: string, input: { title: string; content: ItemContent; id?: string; expectedVersion?: number; blobPath?: string }) {
   await requireWorkspace(userId, workspaceId);
   return db.transaction(async tx => {
     const id = input.id ?? crypto.randomUUID();
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace-content:${workspaceId}`}, 0))`);
+    for (const ref of imageReferences(input.content)) {
+      const [image] = await tx.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.id, ref.itemId), eq(schema.workspaceItems.workspaceId, workspaceId), isNull(schema.workspaceItems.deletedAt)));
+      if (!image || image.content.kind !== "image") throw createError({ statusCode: 400, statusMessage: "Image must exist in the same workspace and not be in trash" });
+    }
+    if (input.content.kind === "text" && input.content.blocks) input.content.text = input.content.blocks.filter(b => b.kind !== "image").map(b => b.text).join("\n\n");
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`item:${id}`}, 0))`);
     const [existing] = await tx.select().from(schema.workspaceItems).where(eq(schema.workspaceItems.id, id));
-    if (input.id && (!existing || existing.workspaceId !== workspaceId)) throw createError({ statusCode: 404, statusMessage: "Item not found" });
+    if (input.id && (!existing || existing.deletedAt || existing.workspaceId !== workspaceId)) throw createError({ statusCode: 404, statusMessage: "Item not found" });
     if (existing && existing.version !== input.expectedVersion) throw createError({ statusCode: 409, statusMessage: "Item changed. Reload before saving." });
     if (existing?.blobPath) throw createError({ statusCode: 400, statusMessage: "Uploaded files cannot be replaced with text" });
     if (existing && existing.content.kind !== input.content.kind) throw createError({ statusCode: 400, statusMessage: "Keep the object's content type when updating" });
@@ -60,6 +67,22 @@ export async function saveItem(userId: string, workspaceId: string, input: { tit
     return publicItem(saved!);
   });
 }
+export async function setItemDeleted(userId: string, workspaceId: string, itemId: string, deleted: boolean) {
+  await requireWorkspace(userId, workspaceId);
+  return db.transaction(async tx => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace-content:${workspaceId}`}, 0))`);
+    if (deleted) {
+      const active = await tx.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.workspaceId, workspaceId), isNull(schema.workspaceItems.deletedAt)));
+      if (active.some(item => imageReferences(item.content).some(ref => ref.itemId === itemId))) throw createError({ statusCode: 409, statusMessage: "Image is used in a document or table. Remove its references first." });
+    }
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`item:${itemId}`}, 0))`);
+    const [item] = await tx.update(schema.workspaceItems).set({ deletedAt: deleted ? new Date() : null })
+      .where(and(eq(schema.workspaceItems.id, itemId), eq(schema.workspaceItems.workspaceId, workspaceId))).returning();
+    if (!item) throw createError({ statusCode: 404, statusMessage: "Item not found" });
+    return publicItem(item);
+  });
+}
+
 export async function saveFile(userId: string, workspaceId: string, name: string, mime: string, bytes: Buffer) {
   await requireWorkspace(userId, workspaceId);
   if (!bytes.length || bytes.length > 4 * 1024 * 1024) throw createError({ statusCode: 413, statusMessage: "Files must be between 1 byte and 4 MB" });

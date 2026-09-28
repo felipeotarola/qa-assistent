@@ -24,6 +24,7 @@ function collapse() {
         <h3 class="truncate text-sm font-medium text-highlighted" :title="title">{{ title }}</h3>
         <p v-if="subtitle" class="truncate text-xs text-dimmed" :title="subtitle">{{ subtitle }}</p>
       </div>
+      <slot name="actions" />
       <button
         ref="toggle" type="button"
         class="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
