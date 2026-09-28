@@ -34,7 +34,9 @@ export function publicItem(row: typeof schema.workspaceItems.$inferSelect) {
 }
 export async function listItems(userId: string, workspaceId: string, trash = false) {
   await requireWorkspace(userId, workspaceId);
-  return (await db.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.workspaceId, workspaceId), trash ? isNotNull(schema.workspaceItems.deletedAt) : isNull(schema.workspaceItems.deletedAt))).orderBy(desc(schema.workspaceItems.updatedAt))).map(publicItem);
+  const links = await db.select({ itemId: schema.workspaceEvidence.itemId, sources: sql<number>`count(*) filter (where ${schema.workspaceEvidence.kind} in ('source', 'capture'))::int`, tickets: sql<number>`count(*) filter (where ${schema.workspaceEvidence.kind} = 'ticket')::int`, related: sql<number>`count(*) filter (where ${schema.workspaceEvidence.kind} = 'item')::int` }).from(schema.workspaceEvidence).where(eq(schema.workspaceEvidence.workspaceId, workspaceId)).groupBy(schema.workspaceEvidence.itemId);
+  const counts = new Map(links.map(row => [row.itemId, { sources: row.sources, tickets: row.tickets, related: row.related }]));
+  return (await db.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.workspaceId, workspaceId), trash ? isNotNull(schema.workspaceItems.deletedAt) : isNull(schema.workspaceItems.deletedAt))).orderBy(desc(schema.workspaceItems.updatedAt))).map(row => ({ ...publicItem(row), evidenceSummary: counts.get(row.id) }));
 }
 export async function ownedItem(userId: string, workspaceId: string, itemId: string) {
   await requireWorkspace(userId, workspaceId);
@@ -42,7 +44,7 @@ export async function ownedItem(userId: string, workspaceId: string, itemId: str
   if (!item || item.deletedAt) throw createError({ statusCode: 404, statusMessage: "Item not found" });
   return item;
 }
-export async function saveItem(userId: string, workspaceId: string, input: { title: string; content: ItemContent; id?: string; expectedVersion?: number; blobPath?: string }) {
+export async function saveItem(userId: string, workspaceId: string, input: { title: string; content: ItemContent; id?: string; expectedVersion?: number; blobPath?: string; threadId?: string }) {
   await requireWorkspace(userId, workspaceId);
   return db.transaction(async tx => {
     const id = input.id ?? crypto.randomUUID();
@@ -64,6 +66,11 @@ export async function saveItem(userId: string, workspaceId: string, input: { tit
       ? await tx.update(schema.workspaceItems).set(values).where(eq(schema.workspaceItems.id, id)).returning()
       : await tx.insert(schema.workspaceItems).values({ id, workspaceId, ...values, blobPath: input.blobPath }).returning();
     await tx.insert(schema.workspaceItemVersions).values({ id: crypto.randomUUID(), itemId: id, version, title: input.title, content: input.content });
+    if (input.threadId) {
+      const [thread] = await tx.select().from(schema.threads).where(and(eq(schema.threads.id, input.threadId), eq(schema.threads.userId, userId), eq(schema.threads.workspaceId, workspaceId)));
+      if (!thread) throw createError({ statusCode: 404, statusMessage: "Thread not found" });
+      await tx.insert(schema.workspaceEvidence).values({ id: `origin:${id}:${version}`, workspaceId, itemId: id, itemVersion: version, kind: "origin", label: "Skapat eller uppdaterat i chatt", threadId: input.threadId });
+    }
     return publicItem(saved!);
   });
 }
@@ -83,7 +90,7 @@ export async function setItemDeleted(userId: string, workspaceId: string, itemId
   });
 }
 
-export async function saveFile(userId: string, workspaceId: string, name: string, mime: string, bytes: Buffer) {
+export async function saveFile(userId: string, workspaceId: string, name: string, mime: string, bytes: Buffer, threadId?: string) {
   await requireWorkspace(userId, workspaceId);
   if (!bytes.length || bytes.length > 4 * 1024 * 1024) throw createError({ statusCode: 413, statusMessage: "Files must be between 1 byte and 4 MB" });
   const filename = name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 150) || "file";
@@ -91,7 +98,7 @@ export async function saveFile(userId: string, workspaceId: string, name: string
   const token = workspaceBlobToken();
   const blob = await put(`pat/workspaces/${workspaceId}/${crypto.randomUUID()}/${filename}`, bytes, { token, access: "private", contentType: mime, addRandomSuffix: true });
   try {
-    return await saveItem(userId, workspaceId, { title: filename, content: { kind: safeImage ? "image" : "file", filename, mime, size: bytes.length }, blobPath: blob.pathname });
+    return await saveItem(userId, workspaceId, { title: filename, content: { kind: safeImage ? "image" : "file", filename, mime, size: bytes.length }, blobPath: blob.pathname, threadId });
   }
   catch (error) { await del(blob.pathname, { token }).catch(() => {}); throw error; }
 }

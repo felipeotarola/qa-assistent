@@ -19,5 +19,5 @@ export function imageReferences(content: ItemContent): ImageReference[] {
 }
 export type ItemContent = z.infer<typeof contentSchema> | { kind: "image" | "file"; filename: string; mime: string; size: number };
 export interface Workspace { id: string; name: string }
-export interface WorkspaceItem { id: string; workspaceId: string; title: string; content: ItemContent; version: number; updatedAt: string }
+export interface WorkspaceItem { id: string; workspaceId: string; title: string; content: ItemContent; version: number; updatedAt: string; evidenceSummary?: { sources: number; tickets: number; related: number } }
 export const itemWriteSchema = z.object({ title: z.string().trim().min(1).max(200), content: contentSchema });

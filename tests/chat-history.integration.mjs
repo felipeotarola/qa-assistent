@@ -29,13 +29,16 @@ async function api(origin, path, method = "GET", body) {
 try {
   assert.equal((await auth.auth.signInWithPassword({ email, password })).error, null);
   const { thread } = await api(local, "/api/threads", "POST", { title: "Shared history fixture" });
+  const workspaceName = `QA-${randomUUID().slice(0, 8)}`;
+  await sql`update pat_workspaces set name = ${workspaceName} where id = ${thread.workspaceId} and user_id = ${userId}`;
   const client = origin => new Client({ host: origin, headers: { cookie: cookie(), "x-pat-browser-thread": thread.id, "x-pat-chat-model": "glm-5.3-flash", "x-pat-reasoning": "low" } });
   const marker = `Sommar-${randomUUID().slice(0, 8)}`;
-  const first = await client(local).sessions.create({ message: `Projektets testkod är ${marker}. Svara bara: Noterat. Spara inget i minne eller workspace, använd inga verktyg.` });
+  const first = await client(local).sessions.create({ message: `Projektets testkod är ${marker}. Svara Noterat och namnet på det workspace vi arbetar i. Spara inget i minne eller workspace, använd inga verktyg.` });
   assert.notEqual((await first.response.result()).status, "failed");
   const initial = (await api(local, `/api/threads/${thread.id}`)).thread;
   assert.equal(initial.sessionId, first.session.state.sessionId, "Server hook saves runtime binding without browser callbacks");
   assert.ok(initial.history.some(row => row.message.parts.some(p => p.type === "text" && p.text.includes(marker))));
+  assert.ok(initial.history.some(row => row.message.role === "assistant" && row.message.parts.some(p => p.type === "text" && p.text.includes(workspaceName))), "Agent receives the current workspace name without being told in the user message");
   const count = initial.history.length;
   if (secondOrigin === local) {
     // Simulate the first session belonging to another runtime without changing

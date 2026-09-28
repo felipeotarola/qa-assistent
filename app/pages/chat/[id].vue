@@ -4,6 +4,7 @@ import { useChatNavigation, refreshThreadList } from "~/composables/chat/navigat
 import { useAuthorizationChallenges } from "~/composables/chat/useAuthorizationChallenges";
 import { useStreamLog } from "~/composables/chat/stream-log";
 import { useChatSession } from "~/composables/chat/useChatSession";
+import { chatFailureMessage, draftKey } from "#shared/chat-recovery";
 
 const route = useRoute();
 const chatId = computed(() => route.params.id as string);
@@ -37,6 +38,8 @@ const {
   respond,
   cancel,
   retry,
+  savedText,
+  dismissSavedText,
 } = useChatSession(thread.value);
 
 const { consumePendingOnMount } = useChatNavigation(chatId);
@@ -44,6 +47,16 @@ const { resetTurnEventCounts } = useStreamLog();
 const { pendingChallenges, failedChallenges, tryResumeConnectedChallenges } = useAuthorizationChallenges();
 
 const input = ref("");
+const recoveryMessage = computed(() => chatError.value
+  ? chatFailureMessage(chatError.value)
+  : "Text från ett tidigare skickförsök finns kvar. Kontrollera historiken innan du skickar den igen; arbete kan redan ha utförts.");
+onMounted(() => { try { input.value = sessionStorage.getItem(draftKey(chatId.value, "draft")) ?? ""; } catch { /* Storage may be disabled. */ } });
+watch(input, value => { try { sessionStorage.setItem(draftKey(chatId.value, "draft"), value); } catch { /* Keep the in-memory draft. */ } });
+function restoreSavedText() {
+  input.value = [input.value.trim(), savedText.value].filter(Boolean).join("\n\n");
+  dismissSavedText();
+  nextTick(() => promptRef.value?.textareaRef?.focus());
+}
 const promptRef = useTemplateRef("promptRef");
 function selectSuggestion(prompt: string) {
   if (isBusy.value) return;
@@ -75,7 +88,7 @@ onMounted(() => {
 function handleSubmit(e: Event) {
   e.preventDefault();
   const text = input.value.trim();
-  if (!text || isBusy.value) return;
+  if (!text || isBusy.value || savedText.value) return;
   input.value = "";
   void send(text);
 }
@@ -147,12 +160,21 @@ function handleInputResponses(responses: Parameters<typeof respond>[0]) {
           <UChatPrompt
             ref="promptRef"
             v-model="input"
-            :error="chatError"
             variant="subtle"
             class="sticky bottom-0 z-10 [view-transition-name:chat-prompt] rounded-b-none"
             :ui="{ base: 'px-1.5', footer: 'flex-wrap gap-2' }"
             @submit="handleSubmit"
           >
+            <template #header>
+              <ChatRecoveryNotice
+                v-if="chatError || (savedText && !isBusy)"
+                :message="recoveryMessage"
+                :saved-text="savedText"
+                @reconnect="retry()"
+                @restore="restoreSavedText"
+                @dismiss="dismissSavedText()"
+              />
+            </template>
             <template #footer>
               <div class="flex flex-wrap items-center gap-2">
                 <ChatModelToggle v-model="selectedModel" :disabled="isBusy" />

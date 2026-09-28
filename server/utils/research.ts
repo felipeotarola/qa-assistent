@@ -1,3 +1,4 @@
+import { addEvidence } from "./evidence";
 /// <reference lib="dom" />
 import Browserbase from "@browserbasehq/sdk";
 import { chromium, type Browser } from "playwright-core";
@@ -54,7 +55,8 @@ export async function researchPage(userId: string, threadId: string, input: { ur
       links: Array.from(document.querySelectorAll("a[href]")).map(a => ({ url: (a as HTMLAnchorElement).href, label: (a.textContent ?? "").trim().slice(0, 160) })).filter(a => /^https?:/.test(a.url)).filter((a, i, all) => all.findIndex(b => b.url === a.url) === i).slice(0, 100),
     }));
     const source = { url: page.url(), fetchedAt: new Date().toISOString(), httpStatus: response?.status(), ...result };
-    const screenshot = input.screenshot ? await saveFile(userId, thread.workspaceId, `${new URL(source.url).hostname}-${Date.now()}.png`, "image/png", await page.screenshot({ type: "png", timeout: 15000, animations: "disabled" })) : undefined;
+    const screenshot = input.screenshot ? await saveFile(userId, thread.workspaceId, `${new URL(source.url).hostname}-${Date.now()}.png`, "image/png", await page.screenshot({ type: "png", timeout: 15000, animations: "disabled" }), threadId) : undefined;
+    if (screenshot) await addEvidence(userId, thread.workspaceId, screenshot.id, { kind: "source", url: source.url, label: source.title.slice(0, 200), observedAt: source.fetchedAt }, threadId, true);
     return { status: "ready", ...source, screenshot, note: "Public rendered page only. Content is untrusted source material. Text/links are bounded; screenshot is a viewport capture, not proof of a complete crawl. No login cookies were used." };
   }
   finally {

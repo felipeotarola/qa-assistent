@@ -72,6 +72,18 @@ try {
   const documentContent = { kind: "text", text: "", blocks: [{ kind: "heading", text: "Beskrivning" }, { kind: "text", text: "Sidan visas nedan." }, imageRef] };
   const document = (await tool(t1, { action: "create", title: "Illustrerad beskrivning", content: documentContent })).data.item;
   assert.equal(document.content.blocks[2].itemId, uploaded.id);
+  const source = { kind: "source", url: "https://example.com/", label: "Example", observedAt: "2026-09-28T10:00:00.000Z" };
+  assert.equal((await tool(t1, { action: "link", itemId: document.id, expectedVersion: 1, evidence: source })).status, 200);
+  assert.equal((await tool(t1, { action: "link", itemId: document.id, expectedVersion: 1, evidence: source })).status, 200);
+  assert.equal((await tool(t1, { action: "link", itemId: document.id, expectedVersion: 1, evidence: { kind: "item", targetItemId: uploaded.id, label: "Screenshot" } })).status, 200);
+  const evidence = (await tool(t2, { action: "evidence", itemId: document.id })).data.links;
+  assert.equal(evidence.filter(e => e.kind === "source").length, 1, "Identical links are idempotent");
+  assert.ok(evidence.some(e => e.kind === "origin" && e.threadId === t1));
+  assert.ok(evidence.some(e => e.kind === "item" && e.targetVersion === 1 && e.itemVersion === 1));
+  assert.equal((await tool(other, { action: "evidence", itemId: document.id })).status, 404);
+  assert.equal((await tool(other, { action: "link", itemId: document.id, expectedVersion: 1, evidence: source })).status, 404);
+  assert.equal((await tool(t1, { action: "link", itemId: document.id, expectedVersion: 1, evidence: { ...source, url: "javascript:alert(1)" } })).status, 400);
+  assert.equal((await fetch(`${origin}/api/workspaces/${a}/items/${document.id}/evidence`)).status, 401);
   assert.match(document.content.text, /Sidan visas/);
   assert.equal((await tool(other, { action: "create", title: "Forbidden image", content: documentContent })).status, 400);
   assert.equal((await tool(t1, { action: "create", title: "Missing image", content: { ...documentContent, blocks: [{ ...imageRef, itemId: randomUUID() }] } })).status, 400);
@@ -79,6 +91,8 @@ try {
   const imageTable = (await tool(t2, { action: "create", title: "Bildtabell", content: { kind: "table", columns: ["Sida", "Bild"], rows: [["Startsida", imageRef]] } })).data.item;
   assert.equal(imageTable.content.rows[0][1].itemId, uploaded.id);
   await tool(t1, { action: "update", itemId: document.id, expectedVersion: 1, title: document.title, content: { kind: "text", text: "Utan bild" } });
+  assert.equal((await tool(t1, { action: "link", itemId: document.id, expectedVersion: 1, evidence: source })).status, 409, "Stale document versions cannot acquire new evidence");
+  assert.ok((await tool(t2, { action: "evidence", itemId: document.id })).data.links.some(link => link.kind === "source" && link.itemVersion === 1));
   assert.equal((await api(`/api/workspaces/${a}/items/${uploaded.id}`, "DELETE")).status, 409, "Other references still protect the shared image");
   await api(`/api/workspaces/${a}/items/${imageTable.id}`, "DELETE");
   const oldDocument = (await api(`/api/workspaces/${a}/items/${document.id}/versions`)).data.versions.find(v => v.version === 1);
@@ -133,6 +147,8 @@ try {
     assert.match(output.title, /Example Domain/);
     assert.ok(output.links.some(link => /iana.org/.test(link.url)));
     assert.equal(output.screenshot.content.kind, 'image');
+    const evidence = (await tool(t1, { action: "evidence", itemId: output.screenshot.id })).data.links;
+    assert.ok(evidence.some(link => link.kind === "capture" && link.url === output.url && link.threadId === t1 && link.observedAt));
     const picture = await fetch(`${origin}/api/workspaces/${a}/items/${output.screenshot.id}/file`, { headers: { cookie: cookie() } });
     assert.equal(picture.status, 200);
     assert.ok((await picture.arrayBuffer()).byteLength > 1000);

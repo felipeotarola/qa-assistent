@@ -4,9 +4,10 @@ import { db, schema } from "@nuxthub/db";
 import type { Destination, ExternalProvider, ExternalInput } from "../../shared/external";
 import { getConnector } from "../connectors";
 import { mintUserToken } from "./connect";
-import { requireWorkspace } from "./workspaces";
+import { requireWorkspace, ownedItem } from "./workspaces";
 import { githubAdapter, openLinearAdapter, ExternalServiceError } from "./external-providers";
 import { finishExternalWrite, replayExternalReceipt, ReceiptConflict } from "./external-receipts";
+import { confirmedEvidence } from "./confirmed-evidence";
 
 export async function externalAdapter(provider: ExternalProvider, userId: string) {
   let token: string;
@@ -37,13 +38,14 @@ export async function operationHistory(userId: string, workspaceId: string) {
   return db.select({ id: schema.externalOperations.id, provider: schema.externalOperations.provider, action: schema.externalOperations.action, state: schema.externalOperations.state, destination: schema.externalOperations.destination, result: schema.externalOperations.result, createdAt: schema.externalOperations.createdAt }).from(schema.externalOperations).where(eq(schema.externalOperations.workspaceId, workspaceId)).orderBy(desc(schema.externalOperations.createdAt)).limit(30);
 }
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
-export async function externalOperation(userId: string, workspaceId: string, callKey: string, input: ExternalInput) {
+export async function externalOperation(userId: string, workspaceId: string, callKey: string, input: ExternalInput, threadId?: string) {
   const targets = await destinations(userId, workspaceId);
   if (input.action === "destinations") return { destinations: targets };
   if (input.action === "history") return { operations: await operationHistory(userId, workspaceId) };
   const target = targets.find(d => d.provider === input.provider);
   if (!target) throw createError({ statusCode: 400, statusMessage: "Choose a provider and configure its destination in this workspace first. Do not guess a destination." });
   const writing = ["create", "update", "comment"].includes(input.action);
+  const evidenceItems = writing ? await Promise.all([...new Set(input.evidenceItemIds ?? [])].map(id => ownedItem(userId, workspaceId, id))) : [];
   if (["read", "update", "comment"].includes(input.action) && !input.issueId) throw createError({ statusCode: 400, statusMessage: "issueId required" });
   if (input.action === "create" && !input.title) throw createError({ statusCode: 400, statusMessage: "title required" });
   if (input.action === "comment" && !input.body?.trim()) throw createError({ statusCode: 400, statusMessage: "comment body required" });
@@ -70,7 +72,11 @@ export async function externalOperation(userId: string, workspaceId: string, cal
     });
     if (cached) return { saved: true, destination: target, issue: cached, replayed: true };
     const result = await finishExternalWrite(() => adapter.write(target, input), async (state, result) => {
-      await db.update(schema.externalOperations).set({ state, ...(result ? { result } : {}) }).where(eq(schema.externalOperations.id, id));
+      await db.transaction(async tx => {
+        await tx.update(schema.externalOperations).set({ state, ...(result ? { result } : {}) }).where(eq(schema.externalOperations.id, id));
+        const links = confirmedEvidence(state, result, evidenceItems, { operationId: id, workspaceId, provider: target.provider, threadId });
+        if (links.length) await tx.insert(schema.workspaceEvidence).values(links).onConflictDoNothing();
+      });
     });
     return { saved: true, destination: target, issue: result };
   }

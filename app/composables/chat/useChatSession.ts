@@ -1,4 +1,3 @@
-import type { EveMessageData } from "eve/vue";
 import type { UIMessage } from "ai";
 import type { ThreadRecord } from "#shared/types/thread";
 import type { AgentInputResponse } from "~/components/AgentInputRequest.vue";
@@ -10,24 +9,10 @@ import { clearTurnFailure, recordTurnFailure, turnFailure } from "~/composables/
 import { CHAT_MODEL_HEADER, REASONING_HEADER } from "#shared/chat-models";
 import { BROWSER_THREAD_HEADER } from "#shared/browser";
 import type { ArchivedMessage } from "#shared/chat-history";
+import { draftKey } from "#shared/chat-recovery";
 
 /** The four statuses the Nuxt UI chat components understand. */
 export type ChatStatus = "ready" | "submitted" | "streaming" | "error";
-
-function lastUserMessageText(data: EveMessageData) {
-  for (let index = data.messages.length - 1; index >= 0; index -= 1) {
-    const message = data.messages[index];
-    if (message?.role !== "user") continue;
-
-    const text = message.parts
-      .filter(part => part.type === "text")
-      .map(part => part.text)
-      .join("\n")
-      .trim();
-
-    if (text) return text;
-  }
-}
 
 /**
  * Binds one durable eve session to one thread, for the lifetime of the page.
@@ -43,6 +28,14 @@ export function useChatSession(thread: ThreadRecord) {
   const selectedReasoning = useChatReasoning();
   const archived = ref<ArchivedMessage[]>(thread.history ?? []);
   const persistenceError = ref<Error>();
+  const actionError = ref<Error>();
+  const sending = ref(false);
+  const savedText = ref("");
+  function saveOutgoing(text: string) {
+    savedText.value = text;
+    try { if (import.meta.client) { if (text) sessionStorage.setItem(draftKey(chatId, "outgoing"), text); else sessionStorage.removeItem(draftKey(chatId, "outgoing")); } } catch { /* Keep the in-memory copy if storage is unavailable. */ }
+  }
+  onMounted(() => { try { savedText.value = sessionStorage.getItem(draftKey(chatId, "outgoing")) ?? ""; } catch { /* Storage may be disabled. */ } });
   let boundSession = thread.sessionId;
 
   const agent = useEveAgent({
@@ -120,13 +113,14 @@ export function useChatSession(thread: ThreadRecord) {
   });
 
   const error = computed(() => {
+    if (actionError.value) return actionError.value;
     if (persistenceError.value) return persistenceError.value;
     if (agent.error.value) return agent.error.value;
     const failure = turnFailure(chatId);
     return failure ? new Error(failure) : undefined;
   });
 
-  const isBusy = computed(() => status.value === "submitted" || status.value === "streaming");
+  const isBusy = computed(() => sending.value || agent.status.value === "resuming" || status.value === "submitted" || status.value === "streaming");
 
   /** eve rejects sends while a session replays; wait rather than drop them. */
   async function whenSendable(text?: string) {
@@ -134,9 +128,11 @@ export function useChatSession(thread: ThreadRecord) {
 
     queued.value = text ?? "";
     try {
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => { stop(); reject(new Error("Det tog för lång tid att återansluta till chatten.")); }, 30000);
         const stop = watch(agent.status, (value) => {
           if (value === "resuming") return;
+          clearTimeout(timer);
           stop();
           resolve();
         });
@@ -149,29 +145,39 @@ export function useChatSession(thread: ThreadRecord) {
 
   async function send(text: string) {
     const trimmed = text.trim();
-    if (!trimmed) return;
-
+    if (!trimmed || sending.value) return;
+    if (savedText.value) {
+      actionError.value = new Error("Kontrollera den sparade texten innan du skickar ett nytt meddelande.");
+      return;
+    }
+    sending.value = true;
+    saveOutgoing(trimmed);
+    actionError.value = undefined;
     clearTurnFailure(chatId);
-    if (persistenceError.value) throw persistenceError.value;
-    await whenSendable(trimmed);
-    await agent.send(trimmed);
+    try {
+      if (persistenceError.value) throw persistenceError.value;
+      await whenSendable(trimmed);
+      await agent.send(trimmed);
+      if (!agent.error.value && !turnFailure(chatId)) saveOutgoing("");
+    } catch (cause) { actionError.value = cause instanceof Error ? cause : new Error("Meddelandet kunde inte skickas"); }
+    finally { sending.value = false; }
   }
 
   async function respond(responses: AgentInputResponse[]) {
-    clearTurnFailure(chatId);
-    await whenSendable();
-    await agent.respond(responses);
+    try {
+      clearTurnFailure(chatId);
+      await whenSendable();
+      await agent.respond(responses);
+    } catch (cause) { actionError.value = cause instanceof Error ? cause : new Error("Svaret kunde inte skickas"); }
   }
 
-  async function retry() {
-    if (isBusy.value) return;
-
-    const text = lastUserMessageText(agent.data.value);
-    if (!text) return;
-
-    clearTurnFailure(chatId);
-    await whenSendable(text);
-    await agent.send(text);
+  // Reload re-fetches the authoritative runtime binding and replays its stream.
+  // Never resend the previous message: a lost response can hide a successful write.
+  function retry() { if (import.meta.client) window.location.reload(); }
+  function dismissSavedText() { saveOutgoing(""); actionError.value = undefined; }
+  async function cancel() {
+    try { await agent.cancel(); }
+    catch (cause) { actionError.value = cause instanceof Error ? cause : new Error("Kunde inte bekräfta att agenten stoppats"); }
   }
 
   const browserResume = useState<string | null>("browser-resume", () => null);
@@ -191,6 +197,8 @@ export function useChatSession(thread: ThreadRecord) {
     send,
     respond,
     retry,
-    cancel: agent.cancel,
+    cancel,
+    savedText,
+    dismissSavedText,
   };
 }

@@ -10,6 +10,7 @@ export const destinationSchema = z.object({
 export type Destination = z.infer<typeof destinationSchema> & { label: string };
 export interface DestinationOption { id: string; label: string }
 export const externalInputSchema = z.object({
+  evidenceItemIds: z.array(z.string().uuid()).max(20).optional(),
   action: z.enum(["destinations", "list", "read", "create", "update", "comment", "history"]),
   provider: providerSchema.optional(),
   issueId: z.string().min(1).max(100).optional(),
