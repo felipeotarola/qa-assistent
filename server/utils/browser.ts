@@ -6,6 +6,7 @@ import { db, schema } from "@nuxthub/db";
 import type { BrowserAction, BrowserView } from "../../shared/browser";
 import { getThreadForUser } from "./threads";
 import { requireWorkspace } from "./workspaces";
+import { captureTestStep } from './test-captures';
 
 const IDLE_MS = 10 * 60 * 1000;
 type Row = typeof schema.workspaceBrowsers.$inferSelect;
@@ -213,7 +214,12 @@ export async function browserAction(userId: string, threadId: string, input: Bro
       // on a newly attached CDP connection. The body locator waits for the DOM.
       const result = await snapshot(activePage);
       await patch(tx, row, { url: result.url, title: result.title, activeAt: new Date() });
-      return { status: "ready", ...result };
+      // A screenshot failure must never turn a completed click into a failed
+      // browser action (which might cause the agent to repeat a submission).
+      let capture = {};
+      try { capture = await captureTestStep(userId, row.workspaceId, threadId, input.action, activePage, input.runId); }
+      catch { capture = { captureWarning: 'Screenshot recording unavailable. Browser action completed; do not repeat it.' }; }
+      return { status: "ready", ...result, ...capture };
     }
     catch (error) {
       // Never leak provider connection URLs/API keys or filled text in errors.

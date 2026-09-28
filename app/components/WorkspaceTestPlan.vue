@@ -2,6 +2,7 @@
 import WorkspaceRunSummary from './WorkspaceRunSummary.vue';
 import WorkspaceRunStatus from './WorkspaceRunStatus.vue';
 import WorkspaceRunHistory from './WorkspaceRunHistory.vue';
+import WorkspaceTestRequirements from './WorkspaceTestRequirements.vue';
 import type { TableColumn, TableRow } from '@nuxt/ui';
 import type { TestPlan, TestCase } from '#shared/test-plan';
 import { caseReady } from '#shared/test-plan';
@@ -60,7 +61,8 @@ watch(selected, value => { if (!value) open.value = false; });
       </section>
       <UModal v-model:open="open" :title="selected?.title || 'Testfall'" description="Testfallets definition och förväntningar." :ui="{ content: 'max-w-2xl' }">
         <template #body><div v-if="selected" class="space-y-5">
-          <WorkspaceRunHistory v-if="item" :item="item" :case-id="selected.id" />
+          <WorkspaceTestRequirements v-if="item" :key="selected.id" :item="item" :case-id="selected.id" @open-material="open = false" />
+          <WorkspaceRunHistory v-if="item" :key="`run:${selected.id}`" :item="item" :case-id="selected.id" />
           <div class="flex flex-wrap items-center gap-2"><UBadge color="neutral" variant="soft" :icon="icons[selected.type]">{{ types[selected.type] }}</UBadge><UBadge :color="caseReady(selected) ? 'info' : 'warning'" variant="soft">{{ caseReady(selected) ? 'Beskrivet' : 'Komplettera' }}</UBadge><span class="font-mono text-xs text-muted">{{ selected.id.slice(0,8).toUpperCase() }}</span></div>
           <section class="rounded-xl border border-default p-4"><h4 class="mb-2 flex items-center gap-2 font-semibold"><UIcon name="i-lucide-key-round" class="size-4 text-muted" /> Förutsättningar</h4><p class="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted">{{ selected.preconditions || 'Ej angivna — kontrollera vad som behövs före körning.' }}</p></section>
           <section class="rounded-xl border border-default p-4"><h4 class="mb-2 flex items-center gap-2 font-semibold"><UIcon name="i-lucide-list-ordered" class="size-4 text-muted" /> Teststeg</h4><p class="whitespace-pre-wrap break-words text-sm leading-loose">{{ selected.steps || 'Steg behöver läggas till.' }}</p></section>

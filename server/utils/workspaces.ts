@@ -88,6 +88,8 @@ export async function setItemDeleted(userId: string, workspaceId: string, itemId
     if (deleted) {
       const evidenceRuns = await tx.execute(sql`select id from pat_test_runs where workspace_id = ${workspaceId} and result->'evidenceItemIds' @> ${JSON.stringify([itemId])}::jsonb limit 1`);
       if (evidenceRuns.length) throw createError({ statusCode: 409, statusMessage: "This file is evidence in a saved test run and must be retained." });
+      const captures = await tx.execute(sql`select id from pat_test_captures where item_id = ${itemId} limit 1`);
+      if (captures.length) throw createError({ statusCode: 409, statusMessage: 'This screenshot belongs to a test run and must be retained.' });
       const active = await tx.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.workspaceId, workspaceId), isNull(schema.workspaceItems.deletedAt)));
       if (active.some(item => imageReferences(item.content).some(ref => ref.itemId === itemId))) throw createError({ statusCode: 409, statusMessage: "Image is used in a document or table. Remove its references first." });
     }

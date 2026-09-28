@@ -33,6 +33,8 @@ const threadId = computed(() => typeof route.params.id === "string" ? route.para
 const items = ref<WorkspaceItem[]>([]);
 const runs = ref<import('#shared/test-run').TestRun[]>([]);
 provide('workspace-test-runs', runs);
+provide('workspace-items', items);
+provide('workspace-open-item', (id: string) => { const item = items.value.find(i => i.id === id); if (item) openItem(item); });
 const loaded = ref(false);
 const imageInsertion = ref<{ image: WorkspaceItem; targetId?: string }>();
 function insertImage(imageId: string, targetId?: string) {
@@ -79,7 +81,7 @@ function startCardDrag(event: DragEvent, id: string) {
   if (event.dataTransfer) { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", id); }
 }
 const showLibrary = ref(false);
-const referencedImages = computed(() => new Set(items.value.flatMap(item => imageReferences(item.content).map(ref => ref.itemId))));
+const referencedImages = computed(() => new Set([...items.value.flatMap(item => imageReferences(item.content).map(ref => ref.itemId)), ...runs.value.flatMap(run => run.captures?.flatMap(c => c.itemId ? [c.itemId] : []) ?? [])]));
 const visibleItems = computed(() => showLibrary.value ? items.value : items.value.filter(item => item.content.kind !== "image" || !referencedImages.value.has(item.id)));
 const trash = ref(false);
 async function restore(item: WorkspaceItem) {
