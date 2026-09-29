@@ -82,6 +82,10 @@ defineShortcuts({
       </template>
 
       <template #default="{ collapsed }">
+        <div class="border-b border-default pb-3">
+          <p v-if="!collapsed" class="px-2 pb-2 text-xs font-semibold text-muted">Globalt</p>
+          <UNavigationMenu :items="[{ label: 'Agenten', icon: 'i-lucide-bot', to: '/agents' }]" :collapsed="collapsed" orientation="vertical" />
+        </div>
         <WorkspaceSwitcher v-if="!collapsed" />
         <UNavigationMenu
           :items="[

@@ -145,6 +145,17 @@ breakpoint (1024px), full-width pages and shared 80rem detail dialogs are retain
 QAA's 720px chat and 760px detail limits do not override those agreed layouts.
 No test behavior, saved objects or agent integrations are changed by the theme.
 
+## Global agent guide
+
+`/agents` is accessible through Globalt → Agenten, independently of the selected
+workspace. `shared/agent-capabilities.ts` describes implemented capabilities,
+prerequisites, result locations and related capabilities. Update this catalog when
+tool behavior changes; it is product guidance, not runtime health or permissions.
+The page uses `useConnectors()` for account-specific Linear/GitHub status and links
+to the existing integration settings. It never starts a test or publishes an issue
+when selecting a capability or copying an example. Do not invent specialist agents,
+running-task counts, browser availability or workspace destination readiness here.
+
 ## Material diagrams
 
 Material supports a versioned `diagram` object rendered with Vue Flow and Dagre automatic layout. The canvas provides pan, zoom and fit controls; node positions are generated, not manually saved. Standard controls remain Nuxt UI. Nodes and relationships can be edited through the normal workspace editor or its agent quick task.
