@@ -9,7 +9,7 @@ defineProps<{
   <section>
     <div class="mb-3 flex items-start justify-between gap-3">
       <div class="min-w-0">
-        <h2 class="text-[10px] font-medium uppercase tracking-wider text-muted">
+        <h2 class="text-sm font-semibold text-highlighted">
           {{ title }}
         </h2>
         <p
@@ -23,7 +23,7 @@ defineProps<{
       <slot name="actions" />
     </div>
 
-    <div class="divide-y divide-default rounded-lg border border-default">
+    <div class="qaa-panel divide-y divide-default border border-default">
       <slot />
     </div>
   </section>

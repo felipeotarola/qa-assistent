@@ -10,7 +10,7 @@ settings, and future mini apps.
 - Nuxt UI 4 (`@nuxt/ui`) for UI primitives and dashboard components.
 - Tailwind CSS 4 for layout and utility classes.
 - Lucide (`i-lucide-*`) for interface icons. Simple Icons are available for brand logos.
-- Geist and Geist Mono for typography, configured in the global stylesheet.
+- Inter and Geist Mono for typography, configured through Nuxt Fonts and the global stylesheet.
 
 Continue using this stack. Do not add another UI kit or copy components from a
 React/shadcn library into this Vue app. Use the installed Nuxt UI types and
@@ -21,10 +21,13 @@ implementation when checking supported props, slots, and theme options.
 | Concern | Source of truth |
 | --- | --- |
 | Nuxt UI component defaults, shared slots and variants | `app/app.config.ts`, under `ui` |
-| Colors, fonts, radius, global styles and light/dark tokens | `app/assets/css/main.css` |
+| QAA semantic colors, spacing, radii, shadows and light/dark tokens | `app/assets/css/qaa-tokens.css` |
+| Nuxt token bridge, fonts and global styles | `app/assets/css/main.css` |
+| Shared QAA control/panel appearance, attached through Nuxt UI slots | `app/assets/css/qaa-primitives.css` |
 | Sidebar, chat/workspace split and application shell | `app/layouts/default.vue` |
 | Shared application header and account controls | `app/components/AppNavbar.vue`, `UserMenu.vue` |
 | Workspace card preview, expansion and collapse | `app/components/WorkspaceCard.vue` |
+| Workspace collection heading, description, divider and actions | `app/components/WorkspacePageHeader.vue` |
 | Workspace content rendering and editing | `app/components/WorkspaceItemCard.vue` |
 | Settings sections, rows and navigation | `app/components/settings/`, composed by `app/pages/settings/` |
 | Feature state and reusable behavior | `app/composables/` |
@@ -120,6 +123,28 @@ typecheck for code changes. Documentation-only changes need link/path checks.
 New exceptions should have a concrete interaction requirement documented near
 the implementation. Routine decisions following these conventions do not need
 additional user approval.
+
+## QAA visual identity
+
+The visual reference is QAA Platform (`C:/Projects/qaa-platform/src/frontend/chatbot`)
+and its live workspace at `https://qa.felipeotarola.com/workspace`. Semantic root
+tokens are copied from its `theme.css`; shared control appearance and the page
+header/metric strip patterns are adapted from `primitives.css` and
+`design-system.css`. Keep palette literals exclusively in `qaa-tokens.css`.
+
+Import order is Tailwind, Nuxt UI, QAA tokens, QAA primitives, then the Nuxt
+semantic bridge in `main.css`. Named `qaa-*` slot classes implement shared
+appearance without replacing Nuxt/Reka keyboard, focus, popup or field behavior.
+Use the Nuxt UI size prop for intentional compact controls; standard actions are
+40px (44px on mobile), metadata is 12px and controls/body text are 14px. Status
+colors retain independent success, warning, error and info tokens in both modes.
+
+Necessary framework/layout adaptations: this remains Vue/Nuxt UI and Vue Flow,
+not React/shadcn/React Flow. The existing resizable split, Nuxt sidebar drawer
+breakpoint (1024px), full-width pages and shared 80rem detail dialogs are retained.
+QAA's 720px chat and 760px detail limits do not override those agreed layouts.
+No test behavior, saved objects or agent integrations are changed by the theme.
+
 ## Material diagrams
 
 Material supports a versioned `diagram` object rendered with Vue Flow and Dagre automatic layout. The canvas provides pan, zoom and fit controls; node positions are generated, not manually saved. Standard controls remain Nuxt UI. Nodes and relationships can be edited through the normal workspace editor or its agent quick task.

@@ -19,17 +19,14 @@ function readiness(item: WorkspaceItem) {
 
 <template>
   <div class="w-full space-y-8">
-    <div>
-      <h2 class="text-xl font-semibold text-highlighted">Fortsätt där ni var</h2>
-      <p class="mt-2 text-sm text-muted">Testplaner och gemensamt underlag, samlat för detta workspace.</p>
-    </div>
+    <WorkspacePageHeader title="Fortsätt där ni var" description="Testplaner och gemensamt underlag, samlat för detta workspace." />
     <UButton v-if="browserPresent" label="Visa webbläsaren" icon="i-lucide-globe" color="neutral" variant="soft" @click="$emit('material')" />
     <section aria-label="Testplaner" class="space-y-3">
       <div class="flex items-center justify-between gap-2">
         <h3 class="text-sm font-medium">Testplaner</h3>
         <UButton label="Visa alla" trailing-icon="i-lucide-arrow-right" color="neutral" variant="ghost" @click="$emit('testing')" />
       </div>
-      <div v-if="plans.length" class="divide-y divide-default overflow-hidden rounded-xl border border-default bg-default">
+      <div v-if="plans.length" class="qaa-panel divide-y divide-default overflow-hidden border border-default">
         <div v-for="item in plans.slice(0, 5)" :key="item.id" class="flex flex-wrap items-center gap-3 p-4">
           <UIcon name="i-lucide-list-checks" class="size-5 shrink-0 text-muted" />
           <div class="min-w-0 flex-1 basis-40">

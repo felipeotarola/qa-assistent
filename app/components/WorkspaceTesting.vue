@@ -11,13 +11,11 @@ const cases = computed(() => plans.value.flatMap(item => item.content.kind === '
 </script>
 <template>
   <section aria-label="Testplansbibliotek" class="space-y-6">
-    <div class="rounded-2xl border border-default bg-default p-5 sm:p-6">
-      <div class="flex items-center gap-3"><div class="rounded-xl bg-elevated p-3"><UIcon name="i-lucide-clipboard-check" class="size-6" /></div><div><h2 class="text-xl font-semibold">Era testplaner</h2><p class="mt-1 text-sm text-muted">Från krav och testidéer till tydliga testfall.</p></div></div>
-      <div class="mt-6 flex flex-wrap gap-8"><div><p class="text-2xl font-semibold">{{ plans.length }}</p><p class="text-xs text-muted">Testplaner</p></div><div><p class="text-2xl font-semibold">{{ cases.length }}</p><p class="text-xs text-muted">Testfall</p></div><div><p class="text-2xl font-semibold" :class="cases.some(c => !caseReady(c)) ? 'text-warning' : ''">{{ cases.filter(c => !caseReady(c)).length }}</p><p class="text-xs text-muted">Behöver beskrivas</p></div></div>
-    </div>
+    <WorkspacePageHeader title="Era testplaner" description="Från krav och testidéer till tydliga testfall." />
+    <div class="qaa-metric-strip"><div><p>{{ plans.length }}</p><p class="text-xs text-muted">Testplaner</p></div><div><p>{{ cases.length }}</p><p class="text-xs text-muted">Testfall</p></div><div><p :class="cases.some(c => !caseReady(c)) ? 'text-warning' : ''">{{ cases.filter(c => !caseReady(c)).length }}</p><p class="text-xs text-muted">Behöver beskrivas</p></div></div>
     <UInput v-model="query" icon="i-lucide-search" placeholder="Hitta en testplan…" aria-label="Sök testplaner" class="w-full sm:max-w-sm" />
     <div class="space-y-3">
-      <div v-for="item in filtered" :key="item.id" class="rounded-xl border border-default bg-default p-5 shadow-sm">
+      <div v-for="item in filtered" :key="item.id" class="qaa-panel border border-default p-5">
         <template v-if="item.content.kind === 'test_plan'">
           <div class="flex flex-wrap items-start justify-between gap-3"><div class="min-w-0 flex-1"><p class="mb-2 text-xs text-muted">TESTPLAN · VERSION {{ item.version }}</p><h3 class="break-words text-base font-semibold">{{ item.title }}</h3></div><UButton label="Öppna plan" trailing-icon="i-lucide-arrow-right" color="neutral" :aria-label="`Öppna testplan: ${item.title}`" @click="$emit('open', item)" /></div>
           <WorkspaceRunSummary :item="item" compact /><div class="mt-4 flex flex-wrap gap-2"><UBadge color="neutral" variant="soft">{{ item.content.cases.length }} testfall</UBadge><UBadge color="neutral" variant="outline">{{ item.content.sources.length }} underlag</UBadge><UBadge v-if="item.content.cases.some(c => !caseReady(c))" color="warning" variant="soft">Behöver kompletteras</UBadge><UBadge v-else color="info" variant="soft">{{ item.content.cases.length ? 'Testfallen är beskrivna' : 'Utkast' }}</UBadge></div>

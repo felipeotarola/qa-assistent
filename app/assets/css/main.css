@@ -1,17 +1,42 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+@import "./qaa-tokens.css";
+@import "./qaa-primitives.css";
 
 @theme {
-  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, monospace;
 }
 
-:root {
-  --ui-primary: black;
+:root, :root.dark {
+  --font-qaa-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-geist-mono: "Geist Mono", ui-monospace, monospace;
+  --ui-primary: var(--primary);
+  --ui-secondary: var(--secondary);
+  --ui-success: var(--qaa-success);
+  --ui-warning: var(--qaa-warning);
+  --ui-error: var(--qaa-danger);
+  --ui-info: var(--qaa-info);
+  --ui-bg: var(--card);
+  --ui-bg-muted: var(--secondary);
+  --ui-bg-elevated: var(--muted);
+  --ui-bg-accented: var(--accent);
+  --ui-bg-inverted: var(--primary);
+  --ui-text: var(--foreground);
+  --ui-text-highlighted: var(--foreground);
+  --ui-text-toned: var(--foreground);
+  --ui-text-muted: var(--muted-foreground);
+  --ui-text-dimmed: var(--muted-foreground);
+  --ui-text-inverted: var(--primary-foreground);
+  --ui-border: var(--border);
+  --ui-border-muted: var(--border);
+  --ui-border-accented: var(--qaa-border-component);
+  --ui-border-inverted: var(--primary);
+  --ui-header-height: var(--qaa-header-height);
   --ui-container: 100%;
   --app-dialog-width: 80rem;
-  --app-page-padding: clamp(1rem, 2vw, 2rem);
-  --ui-radius: 0.15rem;
+  --app-page-padding: var(--page-padding);
+  --ui-radius: 0.25rem;
   overscroll-behavior-y: none;
 }
 
@@ -21,10 +46,6 @@
 .readable-content li + li { margin-top: .75rem; }
 .readable-content h3 { margin-top: 1.25rem; margin-bottom: .5rem; font-weight: 600; }
 
-.dark {
-  --ui-primary: white;
-}
-
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
@@ -32,7 +53,7 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: oklch(25% 0 0 / 0.5) transparent;
+  scrollbar-color: var(--qaa-border-component) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -45,27 +66,19 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background: oklch(25% 0 0 / 0.5);
+  background: var(--qaa-border-component);
   border-radius: 3px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: oklch(35% 0 0 / 0.6);
-}
-
-.dark {
-  --ui-bg: oklch(14.5% 0 0);
-  --ui-bg-muted: oklch(17.5% 0 0);
-  --ui-bg-elevated: oklch(20.5% 0 0);
-  --ui-bg-accented: oklch(26.9% 0 0);
-  --ui-border: oklch(26.9% 0 0);
-  --ui-border-muted: oklch(23% 0 0);
-  --ui-border-accented: oklch(30% 0 0);
+  background: var(--qaa-border-strong);
 }
 
 @layer base {
   body {
     @apply antialiased;
+    font-size: var(--qaa-text-body);
+    background: var(--qaa-page-surface) var(--qaa-page-backdrop) no-repeat;
   }
 }
 

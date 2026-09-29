@@ -161,8 +161,8 @@ async function uploadFile(event: Event) {
 }
 </script>
 <template>
-  <aside class="workspace-surface relative flex h-full min-h-0 flex-col overflow-hidden bg-default" aria-label="Workspace">
-    <header class="flex shrink-0 flex-wrap items-center gap-2 border-b border-default/60 px-4 py-3">
+  <aside class="workspace-surface relative flex h-full min-h-0 flex-col overflow-hidden" aria-label="Workspace">
+    <header class="flex min-h-(--ui-header-height) shrink-0 flex-wrap items-center gap-2 border-b border-default bg-default px-4 py-2">
       <UIcon name="i-lucide-layout-grid" class="size-4 text-dimmed" />
       <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ workspaces.find(w => w.id === activeId)?.name || 'Workspace' }}</span>
       <WorkspaceDestinations v-if="activeId" :key="activeId" :workspace-id="activeId" />
@@ -187,7 +187,7 @@ async function uploadFile(event: Event) {
       </template>
     </UTabs>
     <p v-if="error" role="alert" class="px-4 py-2 text-xs text-error">{{ error }}</p>
-    <div class="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
+    <div class="qaa-workspace-content min-h-0 flex-1 overflow-auto">
       <p v-if="!loaded && !error" role="status" class="py-8 text-center text-sm text-muted">Hämtar workspace…</p>
       <div v-if="trash" class="space-y-2">
         <p class="mb-4 text-sm text-muted">Papperskorg — objekt och filer behålls tills vidare och kan återställas.</p>
@@ -199,12 +199,10 @@ async function uploadFile(event: Event) {
       </div>
       <WorkspaceOverview v-if="loaded && !trash && view === 'overview'" :items="items" :browser-present="browserPresent" @open="openItem" @testing="view = 'testing'" @material="view = 'material'" />
       <WorkspaceTesting v-if="loaded && !trash && view === 'testing'" :items="plans" @open="openItem" />
-      <div v-if="!trash && view === 'material'" class="mb-5">
-        <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-lg font-semibold">Material</h2>
+      <WorkspacePageHeader v-if="!trash && view === 'material'" title="Material" description="Gemensamma dokument, tabeller, bilder och filer för alla chattar.">
           <div class="flex flex-wrap gap-2"><UInput v-model="materialQuery" icon="i-lucide-search" aria-label="Sök material" placeholder="Sök namn eller ID" />
-          <UFieldGroup><UButton icon="i-lucide-layout-grid" label="Kort" :aria-pressed="materialMode !== 'table'" :variant="materialMode !== 'table' ? 'solid' : 'outline'" color="neutral" @click="materialMode = 'cards'" /><UButton icon="i-lucide-list" label="Tabell" :aria-pressed="materialMode === 'table'" :variant="materialMode === 'table' ? 'solid' : 'outline'" color="neutral" @click="materialMode = 'table'" /></UFieldGroup></div></div>
-        <p class="mt-1 text-sm text-muted">Gemensamma dokument, tabeller, bilder och filer för alla chattar.</p>
-      </div>
+          <UFieldGroup><UButton icon="i-lucide-layout-grid" label="Kort" :aria-pressed="materialMode !== 'table'" :variant="materialMode !== 'table' ? 'solid' : 'outline'" color="neutral" @click="materialMode = 'cards'" /><UButton icon="i-lucide-list" label="Tabell" :aria-pressed="materialMode === 'table'" :variant="materialMode === 'table' ? 'solid' : 'outline'" color="neutral" @click="materialMode = 'table'" /></UFieldGroup></div>
+      </WorkspacePageHeader>
       <WorkspaceMaterialTable v-if="!trash && view === 'material' && materialMode === 'table'" :items="tableMaterials" @open="openItem" />
       <p v-if="loaded && !trash && view === 'material' && materialMode !== 'table' && materialQuery.trim() && !tableMaterials.length" role="status" class="rounded-xl border border-default bg-default p-6 text-sm text-muted">Inget material matchar sökningen.</p>
       <TransitionGroup v-show="!trash && view !== 'overview'" name="cards" tag="div" class="flex flex-wrap items-start gap-4">
@@ -232,7 +230,7 @@ icon="i-lucide-grip-vertical" color="neutral" variant="ghost" size="xs" class="c
   </aside>
 </template>
 <style scoped>
-.workspace-surface { background-image: radial-gradient(color-mix(in oklab, var(--ui-text-dimmed) 16%, transparent) 0.7px, transparent 0.7px); background-size: 20px 20px; }
+.workspace-surface { container-type: inline-size; }
 .expanded-card-host { transform: none !important; position: static; }
 .cards-move { transition: transform 220ms ease; }
 @media (prefers-reduced-motion: reduce) { .expanded-card-host { transform: none !important; position: static; }

@@ -54,23 +54,25 @@ defineShortcuts({
 </script>
 
 <template>
-  <UDashboardGroup unit="rem">
+  <UDashboardGroup unit="rem" class="qaa-shell">
     <UDashboardSidebar
       id="default"
       v-model:open="sidebarOpen"
       :min-size="12"
+      :default-size="14.75"
       collapsible
       resizable
-      :menu="{ inset: true }"
-      class="border-r-0 py-4 dark:[--ui-bg-elevated:var(--ui-color-neutral-900)]"
+      :menu="{ inset: false, title: 'Navigation', description: 'Välj workspace eller chatt' }"
+      class="border-r border-default"
     >
       <template #header="{ collapsed }">
         <NuxtLink
           to="/?view=workspaces"
-          class="flex items-center min-w-0"
-          :class="collapsed ? 'mx-auto' : 'px-2.5'"
+          class="flex items-center gap-2 min-w-0"
+          :class="collapsed ? 'mx-auto' : ''"
         >
-          <AppLogo class="h-5 w-auto shrink-0 text-highlighted" />
+          <span class="qaa-sidebar-brand"><AppLogo class="size-3.5" /></span>
+          <span v-if="!collapsed" class="text-sm font-semibold">Workspace</span>
         </NuxtLink>
 
         <UDashboardSidebarCollapse
@@ -120,7 +122,7 @@ defineShortcuts({
 
         <ChatThreadList
           v-if="!collapsed"
-          class="mt-4 min-h-0 flex-1"
+          class="mt-3 min-h-0 flex-1 border-t border-default pt-4"
           :threads="workspaceThreads"
           :pending="pending"
           @refresh="refresh()"
@@ -136,7 +138,7 @@ defineShortcuts({
       :groups="searchGroups"
     />
 
-    <div class="m-2 flex min-h-0 flex-1 min-w-0 flex-col overflow-hidden rounded-xl bg-muted shadow-sm ring ring-default lg:ml-0">
+    <div class="flex min-h-0 flex-1 min-w-0 flex-col overflow-hidden">
       <AppNavbar v-if="hasWorkspace" embedded>
         <template #title>
           <div class="flex min-w-0 items-center gap-2.5">

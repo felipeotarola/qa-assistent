@@ -1,0 +1,73 @@
+/* QAA Platform primitives adapted to Nuxt UI slots. Features own geometry only. */
+.qaa-button {
+  border-radius: var(--qaa-control-radius);
+  font-weight: 600;
+  line-height: 1.4;
+  transition: background-color 150ms, border-color 150ms, box-shadow 150ms;
+}
+.qaa-button-standard { min-height: var(--qaa-control-height); }
+.qaa-button-primary {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  box-shadow: var(--qaa-shadow-control), inset 0 1px 0 color-mix(in srgb, var(--card) 12%, transparent);
+}
+.qaa-button-outline {
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--qaa-border-component), var(--qaa-shadow-control);
+}
+.qaa-button-secondary {
+  color: var(--foreground);
+  background: var(--secondary);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.qaa-button-quiet { color: var(--qaa-link); }
+.qaa-button-outline:hover:not(:disabled), .qaa-button-secondary:hover:not(:disabled), .qaa-button-quiet:hover:not(:disabled) { background: var(--accent); }
+.qaa-button-primary:hover:not(:disabled) { filter: brightness(.96); }
+.dark .qaa-button-primary:hover:not(:disabled) { filter: brightness(1.12); }
+.qaa-button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; box-shadow: var(--qaa-focus-shadow); }
+.qaa-button:disabled, .qaa-button[aria-disabled=true] { opacity: .5; }
+.qaa-field { border-radius: var(--qaa-control-radius); line-height: 1.5; }
+.qaa-field-standard { min-height: var(--qaa-control-height); }
+.qaa-field-outline { background: var(--card); box-shadow: inset 0 0 0 1px var(--qaa-border-component), var(--qaa-shadow-control); }
+.qaa-field:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; box-shadow: var(--qaa-focus-shadow); }
+.qaa-field[aria-invalid=true] { outline-color: var(--qaa-danger); box-shadow: inset 0 0 0 1px var(--qaa-danger); }
+.qaa-field:disabled { background: var(--muted); opacity: .65; }
+.qaa-popup { background: var(--popover); border-radius: var(--qaa-control-radius); box-shadow: 0 0 0 1px var(--border), var(--shadow-float); }
+.qaa-panel, .workspace-card { border-radius: var(--qaa-panel-radius); background: var(--card); box-shadow: var(--qaa-panel-shadow); }
+.workspace-card-expanded { box-shadow: var(--shadow-float); }
+.qaa-modal { box-shadow: 0 0 0 1px var(--border), var(--shadow-float); }
+.qaa-composer { background: var(--card); border-radius: var(--qaa-panel-radius); box-shadow: 0 0 0 1px var(--qaa-border-component), var(--shadow-composer); }
+.qaa-composer:focus-within { outline: none; box-shadow: var(--shadow-composer-focus); }
+.qaa-composer textarea { font-size: 16px; outline: none; box-shadow: none; }
+.qaa-shell, .workspace-surface { background-color: var(--qaa-page-surface); background-image: var(--qaa-page-backdrop); background-repeat: no-repeat; background-size: 100% 100%; }
+.qaa-sidebar { background: var(--sidebar); }
+.qaa-navigation-drawer { width: min(320px, calc(100vw - 40px)); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); box-shadow: var(--shadow-float); }
+.qaa-navigation-drawer :is(button, [role=combobox]) { min-height: 44px; }
+.qaa-sidebar-brand { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: var(--primary); color: var(--primary-foreground); box-shadow: var(--qaa-shadow-control); }
+.qaa-page-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--qaa-space-4); margin-bottom: var(--qaa-space-5); padding-bottom: var(--qaa-space-5); border-bottom: 1px solid var(--border); }
+.qaa-page-header > div { min-width: 0; }
+.qaa-page-header h2 { font-size: clamp(22px, 2.5cqi, 28px); font-weight: 600; line-height: 1.25; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.qaa-page-header p { margin-top: 8px; font-size: 14px; line-height: 1.6; color: var(--muted-foreground); }
+.qaa-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.qaa-metric-strip { display: flex; flex-wrap: wrap; gap: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--qaa-panel-radius); background: color-mix(in srgb, var(--muted) 60%, var(--card)); }
+.qaa-metric-strip > div { flex: 1 1 140px; padding: 16px 20px; border-inline-end: 1px solid var(--border); }
+.qaa-metric-strip > div:last-child { border-inline-end: 0; }
+.qaa-metric-strip p:first-child { font-size: 18px; font-weight: 600; }
+.qaa-metric-strip p + p { margin-top: 4px; }
+.qaa-workspace-content { padding: var(--page-padding); }
+.qaa-badge { border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.35; }
+.qaa-badge-success { color: var(--qaa-success); background: var(--qaa-success-surface); }
+.qaa-badge-warning { color: var(--qaa-warning); background: var(--qaa-warning-surface); }
+.qaa-badge-error { color: var(--qaa-danger); background: var(--qaa-danger-surface); }
+.qaa-badge-info { color: var(--qaa-info); background: var(--qaa-info-surface); }
+.qaa-badge-neutral { color: var(--muted-foreground); background: var(--muted); }
+@media (max-width: 899px) {
+  :root, :root.dark { --ui-header-height: var(--qaa-mobile-header-height); }
+  .qaa-button-standard { min-height: 44px; }
+  .qaa-field { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qaa-button, .qaa-field { transition: none; }
+}
+@media print { .qaa-shell, .workspace-surface { background: var(--card); } }

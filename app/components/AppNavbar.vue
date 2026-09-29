@@ -8,7 +8,7 @@ defineProps<{ embedded?: boolean }>();
   <UDashboardNavbar
     class="z-10 sm:px-4"
     :class="embedded
-      ? 'relative shrink-0 border-b border-default bg-default/80'
+      ? 'relative shrink-0 border-b border-default bg-default'
       : 'pointer-events-none absolute inset-x-0 top-0 border-b-0 backdrop-blur lg:backdrop-blur-none'"
     :ui="{ left: 'pointer-events-auto min-w-0', right: 'pointer-events-auto gap-1' }"
   >

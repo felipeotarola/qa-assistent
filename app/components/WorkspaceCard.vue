@@ -11,17 +11,17 @@ function collapse() {
 
 <template>
   <section
-    class="workspace-card flex min-h-0 flex-col overflow-hidden rounded-2xl border border-default bg-default"
-    :class="expanded ? 'workspace-card-expanded absolute inset-3 z-10 shadow-xl sm:inset-5' : 'relative w-full max-w-80 shadow-sm hover:border-accented hover:shadow-md'"
+    class="workspace-card flex min-h-0 flex-col overflow-hidden border border-default bg-default"
+    :class="expanded ? 'workspace-card-expanded absolute inset-3 z-10 sm:inset-5' : 'relative w-full max-w-80 hover:border-accented'"
     :aria-label="title"
     @keydown.esc.stop="collapse"
   >
-    <header class="flex shrink-0 items-center gap-3 border-b border-default/70 px-4 py-3">
+    <header class="flex shrink-0 items-center gap-3 border-b border-default bg-muted/50 px-4 py-4">
       <div class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted">
         <UIcon :name="icon || 'i-lucide-panel-top'" class="size-4" />
       </div>
       <div class="min-w-0 flex-1">
-        <h3 class="truncate text-sm font-medium text-highlighted" :title="title">{{ title }}</h3>
+        <h3 class="truncate text-sm font-semibold text-highlighted" :title="title">{{ title }}</h3>
         <p v-if="subtitle" class="truncate text-xs text-dimmed" :title="subtitle">{{ subtitle }}</p>
       </div>
       <slot name="actions" />
