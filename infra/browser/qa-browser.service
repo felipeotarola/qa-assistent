@@ -1,0 +1,14 @@
+[Unit]
+Description=QA workspace browser (private Tailscale pilot)
+After=docker.service tailscaled.service network-online.target
+Requires=docker.service
+
+[Service]
+ExecStart=/bin/sh /opt/qa-browser/run.sh
+ExecStop=/usr/bin/docker stop -t 15 qa-browser
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

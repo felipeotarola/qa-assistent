@@ -117,7 +117,7 @@ try {
     const after=await browserAction({action:'inspect'});
     assert.equal(after.data.capture,undefined,'No capture after run completes');
     await api(`/api/threads/${t}/browser`,'POST',{control:'close'});
-    console.log('PASS real Browserbase full-page capture, private Blob image, run association, gallery data, retention and completed-run isolation');
+    console.log('PASS real browser full-page capture, private Blob image, run association, gallery data, retention and completed-run isolation');
   }
   if (process.env.TEST_REQUIREMENT_AGENT === '1') {
     const eve = new Client({ host: origin, headers: {cookie:cookie(),'x-pat-browser-thread':t,'x-pat-chat-model':'glm-5.3-flash','x-pat-reasoning':'low'} });

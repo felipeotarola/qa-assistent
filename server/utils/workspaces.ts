@@ -3,6 +3,7 @@ import { db, schema } from "@nuxthub/db";
 import { put, del } from "@vercel/blob";
 import type { ItemContent } from "../../shared/workspace";
 import { imageReferences, documentText } from "../../shared/workspace";
+type WorkspaceDatabase = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export function workspaceBlobToken() {
   const token = process.env.WORKSPACE_BLOB_READ_WRITE_TOKEN;
@@ -10,8 +11,8 @@ export function workspaceBlobToken() {
   return token;
 }
 
-export async function requireWorkspace(userId: string, id: string) {
-  const [workspace] = await db.select().from(schema.workspaces).where(and(eq(schema.workspaces.id, id), eq(schema.workspaces.userId, userId)));
+export async function requireWorkspace(userId: string, id: string, connection: WorkspaceDatabase = db) {
+  const [workspace] = await connection.select().from(schema.workspaces).where(and(eq(schema.workspaces.id, id), eq(schema.workspaces.userId, userId)));
   if (!workspace) throw createError({ statusCode: 404, statusMessage: "Workspace not found" });
   return workspace;
 }
@@ -44,9 +45,9 @@ export async function ownedItem(userId: string, workspaceId: string, itemId: str
   if (!item || item.deletedAt) throw createError({ statusCode: 404, statusMessage: "Item not found" });
   return item;
 }
-export async function saveItem(userId: string, workspaceId: string, input: { title: string; content: ItemContent; id?: string; expectedVersion?: number; blobPath?: string; threadId?: string }) {
-  await requireWorkspace(userId, workspaceId);
-  return db.transaction(async tx => {
+export async function saveItem(userId: string, workspaceId: string, input: { title: string; content: ItemContent; id?: string; expectedVersion?: number; blobPath?: string; threadId?: string }, connection: WorkspaceDatabase = db) {
+  await requireWorkspace(userId, workspaceId, connection);
+  return connection.transaction(async tx => {
     const id = input.id ?? crypto.randomUUID();
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace-content:${workspaceId}`}, 0))`);
     for (const ref of imageReferences(input.content)) {
@@ -54,11 +55,11 @@ export async function saveItem(userId: string, workspaceId: string, input: { tit
       if (!image || image.content.kind !== "image") throw createError({ statusCode: 400, statusMessage: "Image must exist in the same workspace and not be in trash" });
     }
     if (input.content.kind === "text" && input.content.blocks) input.content.text = documentText(input.content.blocks);
-    if (input.content.kind === "test_plan") {
+    if (input.content.kind === "test_plan" || input.content.kind === 'diagram') {
       for (const source of input.content.sources) {
         const [origin] = await tx.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.id, source.itemId), eq(schema.workspaceItems.workspaceId, workspaceId)));
         const [snapshot] = await tx.select({ id: schema.workspaceItemVersions.id }).from(schema.workspaceItemVersions).where(and(eq(schema.workspaceItemVersions.itemId, source.itemId), eq(schema.workspaceItemVersions.version, source.version)));
-        if (!origin || !snapshot || source.itemId === id) throw createError({ statusCode: 400, statusMessage: "Test plan source must reference an existing version in this workspace" });
+        if (!origin || !snapshot || source.itemId === id) throw createError({ statusCode: 400, statusMessage: "Source must reference an existing version in this workspace" });
       }
     }
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`item:${id}`}, 0))`);
@@ -101,15 +102,15 @@ export async function setItemDeleted(userId: string, workspaceId: string, itemId
   });
 }
 
-export async function saveFile(userId: string, workspaceId: string, name: string, mime: string, bytes: Buffer, threadId?: string) {
-  await requireWorkspace(userId, workspaceId);
+export async function saveFile(userId: string, workspaceId: string, name: string, mime: string, bytes: Buffer, threadId?: string, connection: WorkspaceDatabase = db) {
+  await requireWorkspace(userId, workspaceId, connection);
   if (!bytes.length || bytes.length > 4 * 1024 * 1024) throw createError({ statusCode: 413, statusMessage: "Files must be between 1 byte and 4 MB" });
   const filename = name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 150) || "file";
   const safeImage = ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(mime);
   const token = workspaceBlobToken();
   const blob = await put(`pat/workspaces/${workspaceId}/${crypto.randomUUID()}/${filename}`, bytes, { token, access: "private", contentType: mime, addRandomSuffix: true });
   try {
-    return await saveItem(userId, workspaceId, { title: filename, content: { kind: safeImage ? "image" : "file", filename, mime, size: bytes.length }, blobPath: blob.pathname, threadId });
+    return await saveItem(userId, workspaceId, { title: filename, content: { kind: safeImage ? "image" : "file", filename, mime, size: bytes.length }, blobPath: blob.pathname, threadId }, connection);
   }
   catch (error) { await del(blob.pathname, { token }).catch(() => {}); throw error; }
 }

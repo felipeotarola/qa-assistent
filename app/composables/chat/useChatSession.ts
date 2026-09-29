@@ -123,6 +123,9 @@ export function useChatSession(thread: ThreadRecord) {
   // A replay can accept one queued message through whenSendable. Blocking the
   // composer here made that path unreachable after opening an existing chat.
   const isBusy = computed(() => sending.value || status.value === "submitted" || status.value === "streaming");
+  const chatActivity = useState<Record<string, boolean>>('chat-activity', () => ({}));
+  watch(isBusy, value => { chatActivity.value[chatId] = value; }, { immediate: true });
+  onBeforeUnmount(() => { chatActivity.value = Object.fromEntries(Object.entries(chatActivity.value).filter(([id]) => id !== chatId)); });
 
   /** eve rejects sends while a session replays; wait rather than drop them. */
   async function whenSendable(text?: string) {

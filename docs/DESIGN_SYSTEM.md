@@ -88,6 +88,10 @@ Overview. `WorkspaceOverview` links to the same existing items, not copies.
 Test plans appear under Testing; other saved items appear under Material.
 The browser remains mounted across view changes and is available in both working
 views. Card controls and creation actions stay in their relevant view.
+An active browser also has a floating live preview across workspace views.
+It can be minimized without closing the session; opening it reveals the existing
+browser card. The Testing tab indicates an active agent turn with a browser
+session, not merely an idle open browser, and stops during human takeover.
 Plan readiness describes the definition only, never a test execution outcome.
 
 ## Accessibility and verification
@@ -104,3 +108,8 @@ typecheck for code changes. Documentation-only changes need link/path checks.
 New exceptions should have a concrete interaction requirement documented near
 the implementation. Routine decisions following these conventions do not need
 additional user approval.
+## Material diagrams
+
+Material supports a versioned `diagram` object rendered with Vue Flow and Dagre automatic layout. The canvas provides pan, zoom and fit controls; node positions are generated, not manually saved. Standard controls remain Nuxt UI. Nodes and relationships can be edited through the normal workspace editor or its agent quick task.
+
+Use solid relationships for verified links and dashed relationships for inferred structure. Verified edges require an evidence description; a URL list alone is not evidence of navigation. Diagrams retain source item IDs and exact versions and expose those snapshots through the shared source viewer. Limit each diagram to 150 nodes and 400 relationships; prefer focused maps for readability.

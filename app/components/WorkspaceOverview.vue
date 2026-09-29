@@ -14,7 +14,7 @@ function readiness(item: WorkspaceItem) {
   const ready = item.content.cases.filter(caseReady).length;
   return total ? `${total} testfall · ${ready} färdigbeskrivna` : 'Inga testfall ännu';
 }
-const kinds = { text: 'Dokument', table: 'Tabell', image: 'Bild', file: 'Fil', test_plan: 'Testplan' };
+const kinds = { diagram: 'Diagram', text: 'Dokument', table: 'Tabell', image: 'Bild', file: 'Fil', test_plan: 'Testplan' };
 </script>
 
 <template>
@@ -53,7 +53,7 @@ const kinds = { text: 'Dokument', table: 'Tabell', image: 'Bild', file: 'Fil', t
       </div>
       <div v-if="materials.length" class="grid gap-3 sm:grid-cols-2">
         <UButton v-for="item in materials.slice(0, 4)" :key="item.id" color="neutral" variant="outline" class="justify-start p-4 text-left" @click="$emit('open', item)">
-          <UIcon :name="item.content.kind === 'image' ? 'i-lucide-image' : item.content.kind === 'table' ? 'i-lucide-table-2' : 'i-lucide-file-text'" class="size-4 shrink-0 text-muted" />
+          <UIcon :name="item.content.kind === 'diagram' ? 'i-lucide-workflow' : item.content.kind === 'image' ? 'i-lucide-image' : item.content.kind === 'table' ? 'i-lucide-table-2' : 'i-lucide-file-text'" class="size-4 shrink-0 text-muted" />
           <span class="min-w-0"><span class="block truncate">{{ item.title }}</span><span class="mt-1 block text-xs font-normal text-muted">{{ kinds[item.content.kind] }} · version {{ item.version }}</span></span>
         </UButton>
       </div>

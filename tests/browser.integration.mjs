@@ -7,7 +7,7 @@ import { createServerClient } from "@supabase/ssr";
 import { Client } from "eve/client";
 import Browserbase from "@browserbasehq/sdk";
 
-if (process.env.RUN_BROWSERBASE_TESTS !== "1") throw new Error("Set RUN_BROWSERBASE_TESTS=1 to run this live integration test.");
+if (process.env.RUN_BROWSERBASE_TESTS !== "1" && process.env.RUN_VPS_BROWSER_TESTS !== '1') throw new Error("Enable the live browser integration test explicitly.");
 const origin = process.env.APP_URL || "http://localhost:3000";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const admin = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
@@ -38,18 +38,33 @@ async function action(input, id = userId) {
 try {
   const signIn = await client.auth.signInWithPassword({ email, password });
   assert.equal(signIn.error, null);
-  const thread = await api("/api/threads", { title: "Browser integration test" });
-  assert.equal(thread.status, 201);
+  const workspace = await api('/api/workspaces', { name: 'Temporary browser verification' });
+  const thread = await api("/api/threads", { title: "Browser integration test", workspaceId: workspace.payload.workspace.id });
+  assert.ok([200, 201].includes(thread.status));
   threadId = thread.payload.thread.id;
   assert.equal((await api(`/api/threads/${threadId}/browser`, undefined, false, true)).status, 401);
   assert.equal((await api("/api/internal/browser", { userId: randomUUID(), threadId, input: { action: "inspect" } }, true)).status, 404);
   console.log("PASS authenticated access and ownership isolation");
-  const opened = await action({ action: "open", url: "https://en.wikipedia.org/wiki/Software_testing" });
+  // Regression: workspace polling must not exhaust the DB pool while capture
+  // reads run inside the browser transaction (especially on the first session).
+  let polling = false;
+  const poll = setInterval(async () => {
+    if (polling) return;
+    polling = true;
+    try { await api(`/api/threads/${threadId}/browser`); } finally { polling = false; }
+  }, 300);
+  let opened;
+  try {
+    opened = await Promise.race([
+      action({ action: "open", url: "https://en.wikipedia.org/wiki/Software_testing" }),
+      new Promise((_, reject) => { const timer = setTimeout(() => reject(new Error('Browser/polling deadlock')), 45000); timer.unref(); }),
+    ]);
+  } finally { clearInterval(poll); }
   assert.equal(opened.status, "ready", `Open returned ${opened.status}`);
   assert.match(opened.title, /Software testing/);
   assert.ok(opened.controls.length > 0);
   const view = await api(`/api/threads/${threadId}/browser`);
-  assert.ok(view.payload.browser.liveUrl.startsWith("https://"));
+  assert.ok(view.payload.browser.liveUrl.startsWith(process.env.BROWSER_PROVIDER === 'vps' ? process.env.BROWSER_SERVICE_URL : 'https://'));
   assert.equal(view.payload.browser.connectUrl, undefined);
   const second = (await api("/api/threads", { title: "Shared workspace", workspaceId: thread.payload.thread.workspaceId })).payload.thread.id;
   const shared = (await api(`/api/threads/${second}/browser`)).payload.browser;

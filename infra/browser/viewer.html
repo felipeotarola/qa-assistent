@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="sv"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workspace-webbläsare</title>
+<style>html,body{margin:0;width:100%;height:100%;background:#fff;overflow:hidden;font:14px system-ui}img{display:block;width:100%;height:100%;object-fit:contain;object-position:top left}#status{position:fixed;left:16px;top:16px;background:#fff;padding:12px;border:1px solid #ddd;border-radius:8px}body:focus{outline:none}</style>
+<body tabindex="0" aria-label="Fjärrwebbläsare"><img alt="Webbläsarens livebild" draggable="false"><div id="status" role="status">Ansluter till webbläsaren…</div>
+<script>
+const [id, token] = location.hash.slice(1).split(':');
+history.replaceState(null, '', location.pathname);
+const img = document.querySelector('img'), status = document.querySelector('#status');
+let socket, human = false, retries = 0;
+function connect() {
+  if (!id || !token) { status.textContent = 'Webbläsarlänken saknas. Öppna den från workspace.'; return; }
+  socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/view/${id}?token=${token}`);
+  socket.onmessage = event => {
+    const frame = JSON.parse(event.data);
+    if (frame.type !== 'frame') return;
+    retries = 0; human = frame.control === 'human';
+    img.src = `data:image/jpeg;base64,${frame.image}`; status.hidden = true;
+  };
+  socket.onclose = () => {
+    human = false; status.hidden = false; status.textContent = 'Anslutningen bröts. Återansluter…';
+    if (retries++ < 5) setTimeout(connect, 1500);
+    else { status.textContent = 'Sessionen är stängd eller anslutningen är bruten. Öppna webbläsaren igen från chatten.'; parent.postMessage('workspace-browser-disconnected', '*'); }
+  };
+}
+function send(data) { if (human && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(data)); }
+img.onclick = e => {
+  document.body.focus();
+  const scale = Math.min(innerWidth / 1280, innerHeight / 900);
+  send({ type: 'click', x: e.clientX / scale, y: e.clientY / scale });
+};
+document.addEventListener('keydown', e => {
+  if (!human) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') return;
+  e.preventDefault();
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') send({ type: 'key', key: 'Control+a' });
+  else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) send({ type: 'text', text: e.key });
+  else send({ type: 'key', key: e.shiftKey && e.key === 'Tab' ? 'Shift+Tab' : e.key });
+});
+document.addEventListener('paste', e => { if (human) { e.preventDefault(); send({ type: 'text', text: e.clipboardData.getData('text').slice(0,10000) }); } });
+document.addEventListener('wheel', e => { if (human) { e.preventDefault(); send({ type: 'wheel', y: e.deltaY }); } }, { passive: false });
+connect();
+</script></body></html>

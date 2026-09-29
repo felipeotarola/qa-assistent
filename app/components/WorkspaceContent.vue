@@ -15,6 +15,7 @@ defineProps<{ content: EditableContent; workspaceId: string; preview?: boolean; 
     </template>
   </div>
   <WorkspaceTestPlan v-else-if="content.kind === 'test_plan'" :plan="content" :item="item" :preview="preview" />
+  <WorkspaceDiagram v-else-if="content.kind === 'diagram'" :diagram="content" :preview="preview" />
   <table v-else class="w-full border-collapse text-left">
     <thead><tr><th v-for="(column, c) in content.columns" :key="c" class="border border-default bg-muted p-2 font-medium">{{ column }}</th></tr></thead>
     <tbody><tr v-for="(row, r) in (preview ? content.rows.slice(0, 4) : content.rows)" :key="r"><td v-for="(cell, c) in row" :key="c" class="border border-default p-2 align-top">

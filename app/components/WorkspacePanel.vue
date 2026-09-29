@@ -48,6 +48,7 @@ let layoutRevision = 0;
 const draggingCard = ref<string | null>(null);
 const dropTarget = ref<string | null>(null);
 const browserPresent = ref(false);
+const browserWorking = ref(false);
 const visibleCardIds = computed(() => orderedCards.value.filter(card => inView(card.item) && (card.item || browserPresent.value)).map(card => card.id));
 function neighbor(id: string, direction: number) { return visibleCardIds.value[visibleCardIds.value.indexOf(id) + direction]; }
 function stepCard(id: string, direction: number) { const target = neighbor(id, direction); if (target) void moveCard(id, target); }
@@ -118,11 +119,11 @@ watch(trash, () => { loaded.value = false; items.value = []; error.value = ""; v
 async function poll() { await refresh(); if (!disposed) timer = setTimeout(poll, 3000); }
 onMounted(() => { void poll(); });
 onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
-async function create(kind: "text" | "table" | "test_plan") {
+async function create(kind: "text" | "table" | "test_plan" | "diagram") {
   if (!activeId.value) return;
   busy.value = true; error.value = "";
   try {
-    await $fetch(`/api/workspaces/${activeId.value}/items`, { method: "POST", body: { title: kind === "test_plan" ? "Ny testplan" : kind === "text" ? "Nytt dokument" : "Ny tabell", content: kind === "test_plan" ? { kind, summary: "", cases: [], sources: [] } : kind === "text" ? { kind, text: "" } : { kind, columns: ["Namn", "Beskrivning"], rows: [["", ""]] } } });
+    await $fetch(`/api/workspaces/${activeId.value}/items`, { method: "POST", body: { title: kind === "diagram" ? "Nytt diagram" : kind === "test_plan" ? "Ny testplan" : kind === "text" ? "Nytt dokument" : "Ny tabell", content: kind === "diagram" ? { kind, summary: "", direction: "LR", nodes: [], edges: [], sources: [] } : kind === "test_plan" ? { kind, summary: "", cases: [], sources: [] } : kind === "text" ? { kind, text: "" } : { kind, columns: ["Namn", "Beskrivning"], rows: [["", ""]] } } });
     await refresh();
     view.value = kind === 'test_plan' ? 'testing' : 'material';
   }
@@ -159,6 +160,7 @@ async function uploadFile(event: Event) {
       <template v-if="view === 'material'">
       <UButton icon="i-lucide-images" aria-label="Visa även använda bilder" title="Visa även använda bilder" :aria-pressed="showLibrary" color="neutral" :variant="showLibrary ? 'soft' : 'ghost'" @click="showLibrary = !showLibrary" />
       <UButton icon="i-lucide-file-plus" aria-label="Nytt dokument" title="Nytt dokument" color="neutral" variant="ghost" size="sm" :disabled="busy || !activeId" @click="create('text')" />
+      <UButton icon="i-lucide-workflow" label="Diagram" aria-label="Nytt diagram" color="neutral" variant="ghost" size="sm" :disabled="busy || !activeId" @click="create('diagram')" />
       <UButton icon="i-lucide-table-2" aria-label="Ny tabell" title="Ny tabell" color="neutral" variant="ghost" size="sm" :disabled="busy || !activeId" @click="create('table')" />
       <UButton icon="i-lucide-upload" label="Ladda upp" color="neutral" variant="soft" size="sm" :loading="busy" :disabled="!activeId" @click="upload?.click()" />
       <input ref="upload" type="file" class="hidden" aria-label="Ladda upp fil" @change="uploadFile">
@@ -166,7 +168,13 @@ async function uploadFile(event: Event) {
       <UButton v-if="view === 'testing'" icon="i-lucide-list-checks" label="Ny testplan" color="neutral" variant="soft" :disabled="busy || !activeId" @click="create('test_plan')" />
       </template>
     </header>
-    <UTabs v-show="!trash" v-model="view" :items="views" :content="false" variant="link" class="shrink-0 border-b border-default bg-default px-4" aria-label="Workspace-vyer" />
+    <UTabs v-show="!trash" v-model="view" :items="views" :content="false" variant="link" class="shrink-0 border-b border-default bg-default px-4" aria-label="Workspace-vyer">
+      <template #trailing="{ item }">
+        <span v-if="item.value === 'testing' && browserWorking" role="status" aria-label="Agenten arbetar i webbläsaren" class="inline-flex">
+          <UIcon name="i-lucide-loader-circle" class="size-3.5 animate-spin motion-reduce:animate-none text-primary" />
+        </span>
+      </template>
+    </UTabs>
     <p v-if="error" role="alert" class="px-4 py-2 text-xs text-error">{{ error }}</p>
     <div class="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
       <p v-if="!loaded && !error" role="status" class="py-8 text-center text-sm text-muted">Hämtar workspace…</p>
@@ -196,7 +204,7 @@ icon="i-lucide-grip-vertical" color="neutral" variant="ghost" size="xs" class="c
             <UButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="xs" aria-label="Flytta senare" title="Flytta senare" :disabled="ordering || !neighbor(card.id, 1)" @click="stepCard(card.id, 1)" />
           </div>
           <WorkspaceItemCard v-if="card.item" v-model:expanded="expandedItems[card.id]" :item="card.item" @saved="refresh" @insert-image="insertImage" />
-          <BrowserWorkspace v-else-if="threadId && activeId" :key="activeId" :thread-id="threadId" embedded @presence="browserPresent = $event" />
+          <BrowserWorkspace v-else-if="threadId && activeId" :key="activeId" :thread-id="threadId" embedded @presence="browserPresent = $event" @working="browserWorking = $event" @reveal="trash = false; view = 'testing'" />
         </div>
       </TransitionGroup>
       <div v-if="loaded && !trash && view !== 'overview' && !(view === 'testing' ? plans.length : materials.length)" class="mx-auto mt-12 max-w-64 text-center text-sm leading-relaxed text-dimmed">

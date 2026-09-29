@@ -20,6 +20,13 @@ cp .env.example .env
 
 On Vercel, set them on **both** the `web` and `eve` services — and add a database (see below).
 
+## Self-hosted browser (optional)
+
+`BROWSER_PROVIDER=vps`, `BROWSER_SERVICE_URL` and `BROWSER_SERVICE_KEY` select
+the private VPS browser. Keep these server-only. See
+[VPS browser setup and limitations](./SELF_HOSTED_BROWSER.md).
+Without this selector, the existing Browserbase configuration remains in use.
+
 ## Database
 
 ### `DATABASE_URL` (required everywhere)

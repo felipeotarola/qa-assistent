@@ -4,7 +4,17 @@ import type { BrowserView } from "#shared/browser";
 const props = defineProps<{ threadId: string; embedded?: boolean }>();
 const route = useRoute();
 const browser = shallowRef<BrowserView | null>(null);
-const emit = defineEmits<{ presence: [visible: boolean] }>();
+const emit = defineEmits<{ presence: [visible: boolean]; working: [active: boolean]; reveal: [] }>();
+const chatActivity = useState<Record<string, boolean>>('chat-activity', () => ({}));
+const working = computed(() => !!browser.value && !disconnected.value && browser.value.control === 'agent' && !!chatActivity.value[props.threadId]);
+const minimized = ref(false);
+watch(working, value => emit('working', value));
+async function reveal() {
+  await navigateTo({ path: route.path, query: { ...route.query, workspaceView: 'testing' } });
+  emit('reveal');
+  await nextTick();
+  expanded.value = true;
+}
 watch(browser, value => emit("presence", !!value), { immediate: true });
 const error = ref("");
 const busy = ref(false);
@@ -68,9 +78,10 @@ async function control(value: "human" | "agent" | "close") {
 let heartbeat: ReturnType<typeof setInterval> | undefined;
 function onMessage(event: MessageEvent) {
   if (!browser.value || event.origin !== new URL(browser.value.liveUrl).origin) return;
-  if (event.data === "browserbase-disconnected") disconnected.value = true;
+  if (event.data === "browserbase-disconnected" || event.data === "workspace-browser-disconnected") disconnected.value = true;
 }
-watch(() => browser.value?.sessionId, () => { loaded.value = false; disconnected.value = false; expanded.value = false; });
+watch(() => browser.value?.sessionId, () => { loaded.value = false; disconnected.value = false; expanded.value = false; minimized.value = false; });
+watch(() => route.query.workspaceView, () => { expanded.value = false; });
 onMounted(() => {
   void poll();
   window.addEventListener("message", onMessage);
@@ -86,6 +97,7 @@ onBeforeUnmount(() => {
   clearTimeout(timer);
   clearInterval(heartbeat);
   window.removeEventListener("message", onMessage);
+  emit('working', false);
 });
 
 const displayUrl = computed(() => {
@@ -95,6 +107,24 @@ const displayUrl = computed(() => {
 </script>
 
 <template>
+  <Teleport to="body">
+    <section v-if="browser && !expanded" aria-label="Flytande webbläsare" class="fixed bottom-4 right-4 z-40 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-default bg-default shadow-xl">
+      <header class="flex items-center gap-2 px-3 py-2">
+        <UIcon :name="working ? 'i-lucide-loader-circle' : 'i-lucide-globe-2'" class="size-4 shrink-0 text-primary" :class="{ 'animate-spin motion-reduce:animate-none': working }" />
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-xs font-medium">{{ disconnected ? 'Webbläsaren frånkopplad' : working ? 'Agenten arbetar' : browser.control === 'human' ? 'Du har kontrollen' : 'Webbläsaren är redo' }}</p>
+          <p class="truncate text-[10px] text-muted">{{ displayUrl }}</p>
+        </div>
+        <UButton :icon="minimized ? 'i-lucide-chevron-up' : 'i-lucide-minus'" :aria-label="minimized ? 'Visa liveförhandsvisning' : 'Minimera liveförhandsvisning'" color="neutral" variant="ghost" size="xs" @click="minimized = !minimized" />
+        <UButton icon="i-lucide-maximize-2" aria-label="Öppna webbläsaren i workspace" color="neutral" variant="ghost" size="xs" @click="reveal" />
+      </header>
+      <BrowserLivePreview v-if="!minimized && !disconnected" :url="browser.liveUrl" :session-id="browser.sessionId" @open="reveal" />
+      <div v-if="!minimized" class="flex items-center justify-between gap-2 border-t border-default px-3 py-2">
+        <span class="text-[10px] text-muted">{{ disconnected ? 'Öppna för att ansluta igen' : 'Live från workspace' }}</span>
+        <UButton label="Öppna" trailing-icon="i-lucide-arrow-up-right" color="neutral" variant="ghost" size="xs" @click="reveal" />
+      </div>
+    </section>
+  </Teleport>
   <div :class="embedded ? (browser ? 'w-full max-w-80' : 'hidden') : 'workspace-surface relative flex h-full min-h-0 flex-col overflow-hidden'">
     <div v-if="!embedded" class="flex h-12 shrink-0 items-center gap-2 px-5 text-xs text-muted">
       <UIcon name="i-lucide-layout-grid" class="size-3.5" /> Workspace

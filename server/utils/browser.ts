@@ -7,6 +7,7 @@ import type { BrowserAction, BrowserView } from "../../shared/browser";
 import { getThreadForUser } from "./threads";
 import { requireWorkspace } from "./workspaces";
 import { captureTestStep } from './test-captures';
+import { vpsBrowserRequest, type VpsBrowserSession } from './vps-browser';
 
 const IDLE_MS = 10 * 60 * 1000;
 type Row = typeof schema.workspaceBrowsers.$inferSelect;
@@ -68,7 +69,8 @@ async function patch(tx: Tx, row: Row, changes: Partial<Row>) {
 async function release(tx: Tx, row: Row) {
   if (row.sessionId && row.projectId) {
     try {
-      await provider().sessions.update(row.sessionId, { projectId: row.projectId, status: "REQUEST_RELEASE" });
+      if (row.projectId === 'self-hosted-v1') await vpsBrowserRequest(`/sessions/${row.sessionId}`, 'DELETE');
+      else await provider().sessions.update(row.sessionId, { projectId: row.projectId, status: "REQUEST_RELEASE" });
     }
     catch (error) {
       // An expired or already deleted session has nothing left to release.
@@ -101,7 +103,10 @@ export async function controlBrowser(userId: string, threadId: string, control: 
     if (control === "heartbeat") {
       if (row.control === "human") await patch(tx, row, { activeAt: new Date() });
     }
-    else await patch(tx, row, { control, activeAt: new Date() });
+    else {
+      if (row.projectId === 'self-hosted-v1') await vpsBrowserRequest(`/sessions/${row.sessionId}/${control}`, 'POST');
+      await patch(tx, row, { control, activeAt: new Date() });
+    }
     return view(row);
   });
 }
@@ -127,6 +132,17 @@ function webUrl(input?: string) {
 }
 
 async function start(tx: Tx, row: Row) {
+  if (process.env.BROWSER_PROVIDER === 'vps') {
+    const session = await vpsBrowserRequest<VpsBrowserSession>('/sessions', 'POST');
+    try {
+      await patch(tx, row, { sessionId: session.sessionId, projectId: 'self-hosted-v1', connectUrl: session.connectUrl, liveUrl: session.liveUrl, expiresAt: new Date(session.expiresAt), activeAt: new Date(), control: 'agent' });
+    }
+    catch (error) {
+      await vpsBrowserRequest(`/sessions/${session.sessionId}`, 'DELETE').catch(() => {});
+      throw error;
+    }
+    return;
+  }
   const bb = provider();
   const projects = process.env.BROWSERBASE_PROJECT_ID ? [{ id: process.env.BROWSERBASE_PROJECT_ID }] : await bb.projects.list();
   if (projects.length !== 1) throw createError({ statusCode: 503, statusMessage: "Set BROWSERBASE_PROJECT_ID to select a project" });
@@ -180,7 +196,12 @@ export async function browserAction(userId: string, threadId: string, input: Bro
       webUrl(input.url);
       await release(tx, row);
       try { await start(tx, row); }
-      catch { return { status: "session_start_failed", message: "Browserbase could not start the browser. Check available browser minutes and project settings. Retry once the issue is resolved." }; }
+      catch (error) {
+        const occupied = (error as { statusCode?: number }).statusCode === 409;
+        return { status: "session_start_failed", message: process.env.BROWSER_PROVIDER === 'vps'
+          ? occupied ? 'The VPS browser is occupied by another workspace. Close that session before starting another.' : 'The VPS browser service could not start a session. Check the service and Tailscale connection before retrying.'
+          : 'Browserbase could not start the browser. Check available browser minutes and project settings. Retry once the issue is resolved.' };
+      }
     }
     let browser;
     let phase = "connect";
@@ -217,7 +238,7 @@ export async function browserAction(userId: string, threadId: string, input: Bro
       // A screenshot failure must never turn a completed click into a failed
       // browser action (which might cause the agent to repeat a submission).
       let capture = {};
-      try { capture = await captureTestStep(userId, row.workspaceId, threadId, input.action, activePage, input.runId); }
+      try { capture = await captureTestStep(userId, row.workspaceId, threadId, input.action, activePage, input.runId, tx); }
       catch { capture = { captureWarning: 'Screenshot recording unavailable. Browser action completed; do not repeat it.' }; }
       return { status: "ready", ...result, ...capture };
     }
