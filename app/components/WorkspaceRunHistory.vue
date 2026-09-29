@@ -34,7 +34,7 @@ async function ask(task: string) {
         <WorkspaceRunReview :key="run.id" :run="run" />
         <p class="font-medium">Agentens ursprungliga bedömning: {{ runLabels[run.result.outcome] }}</p>
         <div><h5 class="text-sm font-medium">Förväntat vid körningen</h5><p class="whitespace-pre-wrap text-sm text-muted">{{ run.snapshot.expected }}</p></div>
-        <div class="rounded-lg border border-default bg-default p-4"><h5 class="mb-3 text-sm font-semibold">Faktiskt resultat</h5><div class="document-markdown break-words text-sm leading-relaxed"><ChatComark :value="runNarrative(run.result.actual)" /></div></div>
+        <div class="rounded-lg border border-default bg-default p-4"><h5 class="mb-3 text-sm font-semibold">Faktiskt resultat</h5><div class="readable-content document-markdown break-words text-sm leading-relaxed"><ChatComark :value="runNarrative(run.result.actual)" /></div></div>
         <div v-if="run.result.unverified" class="rounded-lg bg-warning/10 p-3"><h5 class="font-medium text-warning">Ej verifierat</h5><p class="whitespace-pre-wrap text-sm">{{ run.result.unverified }}</p></div>
         <p v-if="run.result.observations.length" class="text-xs text-muted">Observationer är underlag för bedömningen, inte automatiskt fel. Skapa bara ett felärende för en bekräftad avvikelse från kraven.</p>
         <div v-for="(observation, index) in run.result.observations" :key="index" class="rounded-lg border border-default p-3">

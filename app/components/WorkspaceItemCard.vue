@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { materialKinds } from "#shared/workspace-presentation";
 import type { WorkspaceItem, ItemContent, EditableContent } from "#shared/workspace";
 import WorkspaceTestPlanPublication from "./WorkspaceTestPlanPublication.vue";
 import WorkspaceTestPlanSources from "./WorkspaceTestPlanSources.vue";
@@ -85,8 +86,9 @@ async function history() {
 }
 </script>
 <template>
-  <WorkspaceCard v-model:expanded="expanded" :draggable="item.content.kind === 'image'" :class="imageOver ? 'ring-2 ring-primary' : ''" :title="item.title" :subtitle="`${item.content.kind === 'diagram' ? 'Diagram' : item.content.kind === 'test_plan' ? 'Testplan' : item.content.kind === 'text' ? 'Dokument' : item.content.kind === 'table' ? 'Tabell' : item.content.kind === 'image' ? 'Bild' : 'Fil'} · version ${item.version}`" :icon="item.content.kind === 'diagram' ? 'i-lucide-workflow' : item.content.kind === 'test_plan' ? 'i-lucide-list-checks' : item.content.kind === 'table' ? 'i-lucide-table-2' : item.content.kind === 'image' ? 'i-lucide-image' : 'i-lucide-file-text'" @dragstart="item.content.kind === 'image' && imageDrag($event)" @dragover="imageDragOver" @dragleave="imageOver = false" @drop="imageDrop">
+  <WorkspaceCard v-model:expanded="expanded" :draggable="item.content.kind === 'image'" :class="imageOver ? 'ring-2 ring-primary' : ''" :title="item.title" :subtitle="`${materialKinds[item.content.kind].label} · version ${item.version}`" :icon="materialKinds[item.content.kind].icon" @dragstart="item.content.kind === 'image' && imageDrag($event)" @dragover="imageDragOver" @dragleave="imageOver = false" @drop="imageDrop">
     <template #actions>
+      <MaterialId :id="item.id" compact />
       <UButton v-if="item.content.kind === 'image'" icon="i-lucide-image-plus" color="neutral" variant="ghost" aria-label="Infoga bilden i dokument eller tabell" title="Dra till ett dokument eller en tabell, eller klicka för att välja" draggable="true" @dragstart="imageDrag" @click="emit('insertImage', item.id)" />
       <UDropdownMenu :items="[...(['text', 'table'].includes(item.content.kind) ? [{ label: 'Skapa testplan', icon: 'i-lucide-list-checks', disabled: busy || editing, onSelect: createTestPlan }] : []), ...(item.content.kind === 'image' ? [{ label: 'Infoga i…', icon: 'i-lucide-image-plus', onSelect: () => emit('insertImage', item.id) }] : []), { label: 'Ta bort', icon: 'i-lucide-trash-2', color: 'error', disabled: busy || editing, onSelect: remove }]">
         <UButton icon="i-lucide-ellipsis" :aria-label="`Åtgärder för ${item.title}`" color="neutral" variant="ghost" :disabled="busy" />

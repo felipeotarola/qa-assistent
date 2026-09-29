@@ -13,6 +13,11 @@ export default defineAppConfig({
     twitter: "@hugorcd",
   },
   ui: {
+    modal: {
+      slots: { body: 'p-5 sm:p-6' },
+      variants: { fullscreen: { false: { content: 'w-[calc(100vw-2rem)] max-w-[var(--app-dialog-width)]' } } },
+    },
+    table: { slots: { th: 'bg-muted/60 text-xs font-semibold text-muted', td: 'py-4 border-b border-default/50', tr: 'hover:bg-muted/30' } },
     colors: {
       primary: "neutral",
       neutral: "neutral",

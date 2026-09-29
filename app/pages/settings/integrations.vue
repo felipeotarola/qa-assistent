@@ -26,7 +26,7 @@ const servicesDescription = computed(() => {
     </template>
 
     <template #body>
-      <div class="mx-auto w-full max-w-2xl px-6 py-8">
+      <div class="app-page">
         <header class="mb-8">
           <h1 class="mb-1 text-lg font-medium text-highlighted">
             Settings

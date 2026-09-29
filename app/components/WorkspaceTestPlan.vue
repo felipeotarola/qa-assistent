@@ -59,7 +59,7 @@ watch(selected, value => { if (!value) open.value = false; });
         </UTable>
         <div class="flex items-start gap-3 rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted"><UIcon name="i-lucide-info" class="mt-0.5 size-4 shrink-0" /><p>Beskrivet betyder att namn, steg och förväntat resultat finns. Det är inte ett godkänt testresultat. Eventuella observationer i anteckningarna är inte strukturerade körningsresultat.</p></div>
       </section>
-      <UModal v-model:open="open" :title="selected?.title || 'Testfall'" description="Testfallets definition och förväntningar." :ui="{ content: 'max-w-2xl' }">
+      <UModal v-model:open="open" :title="selected?.title || 'Testfall'" description="Testfallets definition och förväntningar.">
         <template #body><div v-if="selected" class="space-y-5">
           <WorkspaceTestRequirements v-if="item" :key="selected.id" :item="item" :case-id="selected.id" @open-material="open = false" />
           <WorkspaceRunHistory v-if="item" :key="`run:${selected.id}`" :item="item" :case-id="selected.id" />

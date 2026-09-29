@@ -8,10 +8,18 @@
 
 :root {
   --ui-primary: black;
-  --ui-container: var(--container-3xl);
+  --ui-container: 100%;
+  --app-dialog-width: 80rem;
+  --app-page-padding: clamp(1rem, 2vw, 2rem);
   --ui-radius: 0.15rem;
   overscroll-behavior-y: none;
 }
+
+.app-page { width: 100%; min-width: 0; padding: var(--app-page-padding); }
+.readable-content p + p { margin-top: 1rem; }
+.readable-content :is(ol, ul) { padding-left: 1.5rem; }
+.readable-content li + li { margin-top: .75rem; }
+.readable-content h3 { margin-top: 1.25rem; margin-bottom: .5rem; font-weight: 600; }
 
 .dark {
   --ui-primary: white;

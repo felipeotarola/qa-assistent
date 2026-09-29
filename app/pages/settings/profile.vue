@@ -76,7 +76,7 @@ function resetForm() {
     </template>
 
     <template #body>
-      <div class="mx-auto w-full max-w-2xl px-6 py-8">
+      <div class="app-page">
         <header class="mb-8">
           <h1 class="mb-1 text-lg font-medium text-highlighted">
             Settings
@@ -208,7 +208,7 @@ function resetForm() {
           v-if="isDirty && !pending"
           class="border-t border-default bg-elevated/95 backdrop-blur supports-[backdrop-filter]:bg-elevated/90"
         >
-          <div class="mx-auto w-full max-w-2xl px-6">
+          <div class="w-full px-6">
             <div class="flex items-center justify-between gap-4 py-3">
               <p class="text-sm text-muted">
                 You have unsaved changes

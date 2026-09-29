@@ -7,6 +7,7 @@ import '@vue-flow/core/dist/theme-default.css';
 
 const props = defineProps<{ diagram: DiagramContent; preview?: boolean }>();
 const selected = ref('');
+const summaryOpen = ref(false);
 const flow = shallowRef<VueFlowStore>();
 const selectedEdge = computed(() => props.diagram.edges.find(edge => edge.id === selected.value));
 const graph = computed(() => {
@@ -28,13 +29,16 @@ const edges = computed(() => props.diagram.edges.map(edge => ({
 
 <template>
   <div class="space-y-3">
-    <p v-if="!preview && diagram.summary" class="whitespace-pre-wrap text-sm text-muted">{{ diagram.summary }}</p>
+    <UCollapsible v-if="!preview && diagram.summary" v-model:open="summaryOpen" class="rounded-xl border border-default bg-default p-3">
+      <UButton label="Om diagrammet & avgränsningar" icon="i-lucide-info" trailing-icon="i-lucide-chevron-down" color="neutral" variant="ghost" class="w-full justify-between" />
+      <template #content><div class="readable-content break-words p-3 text-sm leading-relaxed text-muted"><ChatComark :value="diagram.summary.replace(/\s+(?=\(\d+\))/g, '\n\n')" /></div></template>
+    </UCollapsible>
     <div v-if="!diagram.nodes.length" class="rounded-xl border border-dashed border-default p-8 text-center text-muted">
       <UIcon name="i-lucide-workflow" class="mb-2 size-8" />
       <p>Lägg till sidor i Redigera eller be agenten skapa ett diagram från ert material.</p>
     </div>
-    <div v-else class="diagram-canvas overflow-hidden rounded-xl border border-default bg-muted" :class="preview ? 'h-52' : 'h-[480px]'">
-      <VueFlow :key="`${JSON.stringify(diagram)}-${preview}`" :nodes="graph" :edges="edges" fit-view-on-init :nodes-draggable="false" :nodes-connectable="false" :min-zoom="0.08" :max-zoom="2" :zoom-on-scroll="false" @init="flow = $event" @edge-click="selected = $event.edge.id">
+    <div v-else class="diagram-canvas overflow-hidden rounded-xl border border-default bg-muted" :class="preview ? 'h-52' : 'h-[clamp(20rem,55dvh,52rem)]'">
+      <VueFlow :key="String(preview)" :nodes="graph" :edges="edges" fit-view-on-init :nodes-draggable="false" :nodes-connectable="false" :min-zoom="0.08" :max-zoom="2" :zoom-on-scroll="false" @init="flow = $event" @edge-click="selected = $event.edge.id">
         <template #node-page="{ data }">
           <div class="h-[110px] w-[230px] rounded-xl border border-default bg-default p-3 shadow-sm">
             <Handle type="target" :position="diagram.direction === 'LR' ? Position.Left : Position.Top" />

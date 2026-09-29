@@ -76,7 +76,8 @@ export function useChatSession(thread: ThreadRecord) {
     try {
       const data = await $fetch<{ messages: ArchivedMessage[] }>(`/api/threads/${chatId}/history`);
       if (!disposed) {
-        archived.value = data.messages;
+        // Do not invalidate the full transcript for unchanged polling responses.
+        if (JSON.stringify(archived.value) !== JSON.stringify(data.messages)) archived.value = data.messages;
         if (persistenceError.value?.message === "Kunde inte uppdatera den gemensamma chatthistoriken.") persistenceError.value = undefined;
       }
     }

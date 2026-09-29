@@ -16,11 +16,15 @@ const view = computed({
   get: () => ['testing', 'material'].includes(String(route.query.workspaceView)) ? String(route.query.workspaceView) : 'overview',
   set: value => { void router.replace({ query: { ...route.query, workspaceView: value === 'overview' ? undefined : value } }); },
 });
+const materialMode = useCookie<'cards' | 'table'>('material-view', { default: () => 'cards', sameSite: 'lax' });
+const materialQuery = ref('');
+const tableMaterials = computed(() => orderedCards.value.flatMap(card => card.item && card.item.content.kind !== 'test_plan' && matchesMaterial(card.item) ? [card.item] : []));
+function matchesMaterial(item: WorkspaceItem) { return `${item.title} ${item.id}`.toLocaleLowerCase().includes(materialQuery.value.trim().toLocaleLowerCase()); }
 const expandedItems = ref<Record<string, boolean>>({});
 const plans = computed(() => items.value.filter(item => item.content.kind === 'test_plan'));
 const materials = computed(() => items.value.filter(item => item.content.kind !== 'test_plan'));
 function inView(item: WorkspaceItem | null) {
-  return item ? (view.value === 'testing' ? item.content.kind === 'test_plan' && !!expandedItems.value[item.id] : view.value === 'material' && item.content.kind !== 'test_plan') : view.value !== 'overview';
+  return item ? (view.value === 'testing' ? item.content.kind === 'test_plan' && !!expandedItems.value[item.id] : view.value === 'material' && item.content.kind !== 'test_plan' && (!!expandedItems.value[item.id] || (materialMode.value !== 'table' && matchesMaterial(item)))) : view.value !== 'overview';
 }
 function openItem(item: WorkspaceItem) {
   view.value = item.content.kind === 'test_plan' ? 'testing' : 'material';
@@ -97,11 +101,13 @@ const upload = useTemplateRef("upload");
 let timer: ReturnType<typeof setTimeout> | undefined;
 let disposed = false;
 let fetching = false;
+let refreshRequested = false;
 async function refresh() {
   const id = activeId.value;
   const deleted = trash.value;
   const revision = layoutRevision;
-  if (!id || fetching || ordering.value || draggingCard.value) return;
+  if (!id || disposed || ordering.value || draggingCard.value) return;
+  if (fetching) { refreshRequested = true; return; }
   fetching = true;
   try {
     const [result, layout, runData] = await Promise.all([
@@ -109,10 +115,15 @@ async function refresh() {
       $fetch<{ order: string[] }>(`/api/workspaces/${id}/layout`),
       $fetch<import("#shared/test-run").TestRun[]>(`/api/workspaces/${id}/runs`),
     ]);
-    if (!disposed && activeId.value === id && trash.value === deleted && revision === layoutRevision && !ordering.value && !draggingCard.value) { runs.value = runData; items.value = result.items; order.value = layout.order; loaded.value = true; error.value = ''; }
+    if (!disposed && activeId.value === id && trash.value === deleted && revision === layoutRevision && !ordering.value && !draggingCard.value) { runs.value = JSON.stringify(runs.value) === JSON.stringify(runData) ? runs.value : runData;
+      const existing = new Map(items.value.map(item => [item.id, item]));
+      items.value = result.items.map(item => JSON.stringify(existing.get(item.id)) === JSON.stringify(item) ? existing.get(item.id)! : item); order.value = layout.order; loaded.value = true; error.value = ''; }
   }
-  catch { if (!disposed) error.value = "Kunde inte läsa workspace."; }
-  finally { fetching = false; }
+  catch { if (!disposed && activeId.value === id && trash.value === deleted) error.value = "Kunde inte läsa workspace."; }
+  finally {
+    fetching = false;
+    if (refreshRequested && !disposed) { refreshRequested = false; void refresh(); }
+  }
 }
 watch(activeId, () => { loaded.value = false; runs.value = []; items.value = []; order.value = []; draggingCard.value = null; error.value = ""; void refresh(); });
 watch(trash, () => { loaded.value = false; items.value = []; error.value = ""; void refresh(); });
@@ -120,7 +131,7 @@ async function poll() { await refresh(); if (!disposed) timer = setTimeout(poll,
 onMounted(() => { void poll(); });
 onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
 async function create(kind: "text" | "table" | "test_plan" | "diagram") {
-  if (!activeId.value) return;
+  if (!activeId.value || busy.value) return;
   busy.value = true; error.value = "";
   try {
     await $fetch(`/api/workspaces/${activeId.value}/items`, { method: "POST", body: { title: kind === "diagram" ? "Nytt diagram" : kind === "test_plan" ? "Ny testplan" : kind === "text" ? "Nytt dokument" : "Ny tabell", content: kind === "diagram" ? { kind, summary: "", direction: "LR", nodes: [], edges: [], sources: [] } : kind === "test_plan" ? { kind, summary: "", cases: [], sources: [] } : kind === "text" ? { kind, text: "" } : { kind, columns: ["Namn", "Beskrivning"], rows: [["", ""]] } } });
@@ -189,14 +200,18 @@ async function uploadFile(event: Event) {
       <WorkspaceOverview v-if="loaded && !trash && view === 'overview'" :items="items" :browser-present="browserPresent" @open="openItem" @testing="view = 'testing'" @material="view = 'material'" />
       <WorkspaceTesting v-if="loaded && !trash && view === 'testing'" :items="plans" @open="openItem" />
       <div v-if="!trash && view === 'material'" class="mb-5">
-        <h2 class="text-lg font-semibold">Material</h2>
+        <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-lg font-semibold">Material</h2>
+          <div class="flex flex-wrap gap-2"><UInput v-model="materialQuery" icon="i-lucide-search" aria-label="Sök material" placeholder="Sök namn eller ID" />
+          <UFieldGroup><UButton icon="i-lucide-layout-grid" label="Kort" :aria-pressed="materialMode !== 'table'" :variant="materialMode !== 'table' ? 'solid' : 'outline'" color="neutral" @click="materialMode = 'cards'" /><UButton icon="i-lucide-list" label="Tabell" :aria-pressed="materialMode === 'table'" :variant="materialMode === 'table' ? 'solid' : 'outline'" color="neutral" @click="materialMode = 'table'" /></UFieldGroup></div></div>
         <p class="mt-1 text-sm text-muted">Gemensamma dokument, tabeller, bilder och filer för alla chattar.</p>
       </div>
+      <WorkspaceMaterialTable v-if="!trash && view === 'material' && materialMode === 'table'" :items="tableMaterials" @open="openItem" />
+      <p v-if="loaded && !trash && view === 'material' && materialMode !== 'table' && materialQuery.trim() && !tableMaterials.length" role="status" class="rounded-xl border border-default bg-default p-6 text-sm text-muted">Inget material matchar sökningen.</p>
       <TransitionGroup v-show="!trash && view !== 'overview'" name="cards" tag="div" class="flex flex-wrap items-start gap-4">
         <div
-v-for="card in orderedCards" v-show="inView(card.item) && (card.item || browserPresent)" :key="card.id" class="w-full max-w-80 rounded-2xl" :class="{ 'ring-2 ring-primary': dropTarget === card.id && draggingCard !== card.id, 'opacity-50': draggingCard === card.id }"
+v-for="card in orderedCards" v-show="inView(card.item) && (card.item || browserPresent)" :key="card.id" class="w-full max-w-80 rounded-2xl" :class="{ 'ring-2 ring-primary': dropTarget === card.id && draggingCard !== card.id, 'opacity-50': draggingCard === card.id, 'expanded-card-host': expandedItems[card.id] }"
           @dragover.prevent="dropTarget = card.id" @drop.prevent="dropCard(card.id)">
-          <div class="mb-1 flex items-center justify-end gap-1">
+          <div v-show="!expandedItems[card.id]" class="mb-1 flex items-center justify-end gap-1">
             <UButton
 icon="i-lucide-grip-vertical" color="neutral" variant="ghost" size="xs" class="cursor-grab active:cursor-grabbing" :draggable="!ordering" :disabled="ordering" :aria-label="`Dra ${card.item?.title || 'Webbläsare'} för att flytta`" title="Dra för att flytta"
               @dragstart="startCardDrag($event, card.id)" @dragend="draggingCard = null; dropTarget = null" />
@@ -218,7 +233,9 @@ icon="i-lucide-grip-vertical" color="neutral" variant="ghost" size="xs" class="c
 </template>
 <style scoped>
 .workspace-surface { background-image: radial-gradient(color-mix(in oklab, var(--ui-text-dimmed) 16%, transparent) 0.7px, transparent 0.7px); background-size: 20px 20px; }
+.expanded-card-host { transform: none !important; position: static; }
 .cards-move { transition: transform 220ms ease; }
-@media (prefers-reduced-motion: reduce) { .cards-move { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .expanded-card-host { transform: none !important; position: static; }
+.cards-move { transition: none; } }
 </style>
 

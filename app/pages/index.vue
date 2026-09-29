@@ -55,7 +55,7 @@ function onSubmit() {
   >
     <template #body>
       <div class="flex flex-1 bg-muted/35 px-5 py-12 sm:px-8 sm:py-16">
-        <div class="mx-auto my-auto flex w-full max-w-xl flex-col gap-8 sm:gap-10">
+        <div class="my-auto flex w-full flex-col gap-8 sm:gap-10">
           <div class="text-center">
             <div class="mx-auto mb-5 flex size-10 items-center justify-center rounded-xl border border-default bg-default shadow-sm">
               <AppLogo class="size-4 text-highlighted" />

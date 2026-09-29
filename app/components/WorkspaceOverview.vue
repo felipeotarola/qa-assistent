@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { materialKinds } from "#shared/workspace-presentation";
 import WorkspaceRunSummary from './WorkspaceRunSummary.vue';
 import type { WorkspaceItem } from '#shared/workspace';
 import { caseReady } from '#shared/test-plan';
@@ -14,11 +15,10 @@ function readiness(item: WorkspaceItem) {
   const ready = item.content.cases.filter(caseReady).length;
   return total ? `${total} testfall · ${ready} färdigbeskrivna` : 'Inga testfall ännu';
 }
-const kinds = { diagram: 'Diagram', text: 'Dokument', table: 'Tabell', image: 'Bild', file: 'Fil', test_plan: 'Testplan' };
 </script>
 
 <template>
-  <div class="mx-auto max-w-4xl space-y-8">
+  <div class="w-full space-y-8">
     <div>
       <h2 class="text-xl font-semibold text-highlighted">Fortsätt där ni var</h2>
       <p class="mt-2 text-sm text-muted">Testplaner och gemensamt underlag, samlat för detta workspace.</p>
@@ -53,8 +53,8 @@ const kinds = { diagram: 'Diagram', text: 'Dokument', table: 'Tabell', image: 'B
       </div>
       <div v-if="materials.length" class="grid gap-3 sm:grid-cols-2">
         <UButton v-for="item in materials.slice(0, 4)" :key="item.id" color="neutral" variant="outline" class="justify-start p-4 text-left" @click="$emit('open', item)">
-          <UIcon :name="item.content.kind === 'diagram' ? 'i-lucide-workflow' : item.content.kind === 'image' ? 'i-lucide-image' : item.content.kind === 'table' ? 'i-lucide-table-2' : 'i-lucide-file-text'" class="size-4 shrink-0 text-muted" />
-          <span class="min-w-0"><span class="block truncate">{{ item.title }}</span><span class="mt-1 block text-xs font-normal text-muted">{{ kinds[item.content.kind] }} · version {{ item.version }}</span></span>
+          <UIcon :name="materialKinds[item.content.kind].icon" class="size-4 shrink-0 text-muted" />
+          <span class="min-w-0"><span class="block truncate">{{ item.title }}</span><span class="mt-1 block text-xs font-normal text-muted">{{ materialKinds[item.content.kind].label }} · version {{ item.version }}</span></span>
         </UButton>
       </div>
       <p v-else class="text-sm text-muted">Dokument, tabeller och bilder som ni sparar finns under Material.</p>

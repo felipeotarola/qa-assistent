@@ -57,6 +57,18 @@ Current examples: `chat/ReasoningSelect.vue` and `WorkspaceSwitcher.vue` use
 
 ## Styling and layout rules
 
+Page content uses the available width (`--ui-container: 100%`). Settings sections
+use `.app-page` and `--app-page-padding`; do not reintroduce centered page max-widths.
+Inputs, small preview cards and authentication forms may retain their own widths.
+Dialogs share `--app-dialog-width` through the global Nuxt UI modal theme, with
+viewport gutters on small screens. Do not override individual dialog widths.
+Standard tables share their header and row styling through the Nuxt UI table theme.
+
+Material has persistent card/table presentation and a common title/ID search.
+Both presentations open the same workspace object and use `MaterialId` for copy
+feedback. `shared/workspace-presentation.ts` owns material labels and icons.
+Long diagram summaries are expandable so the canvas remains the primary content.
+
 1. Search for an existing component/pattern before adding markup. Reuse it, or
    extend its props/slots when the same behavior is needed elsewhere.
 2. Make app-wide control changes in `app.config.ts`. Avoid per-page changes to
