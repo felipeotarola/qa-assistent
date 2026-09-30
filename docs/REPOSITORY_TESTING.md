@@ -67,15 +67,22 @@ Dockerfile as `qa-repo-runner:node24`, install the supplied systemd service and 
 `systemctl enable --now qa-repo-runner`. Review the fixed bind IP in server.mjs for
 the target host. Run `pnpm db:migrate` for the app's repository tables.
 
-Current pilot binds to the VPS tailnet IP on port 8090. Local development can reach
-it over Tailscale. Vercel cannot use this private address directly: production needs
-a reachable authenticated HTTPS endpoint, production environment configuration and
-an app deployment. This feature has not yet been released to production.
+The runner binds to the VPS tailnet IP on port 8090. Local development reaches
+it over Tailscale. Production uses the authenticated HTTPS `/repository` route
+on the VPS Funnel endpoint, configured through the server environment variables.
+Never configure Vercel with the private tailnet address directly.
+
+Routine status and known commands use the main agent's repository tool directly;
+the specialist remains available for investigation. Agent responses include at
+most 2,000 log characters per run and 6,000 across a history response, with explicit
+truncation notices. Full saved logs remain available in Testing. A truncated log
+is not evidence about omitted checks.
 
 ## Verification
 
 - `node --test tests/repo-runner.test.mjs`
 - `node --test tests/repository-request.test.mjs`
+- `node --test tests/repository-context.test.mjs`
 - `pnpm lint`, `pnpm typecheck`, `pnpm build:agent`
 - Explicit integration opt-in: set `RUN_REPOSITORY_TESTS=1`, then run
   `node --env-file=.env tests/repositories.integration.mjs` against local Nuxt.
