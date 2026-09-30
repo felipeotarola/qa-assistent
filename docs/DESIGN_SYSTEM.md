@@ -68,6 +68,9 @@ viewport gutters on small screens. Do not override individual dialog widths.
 Standard tables share their header and row styling through the Nuxt UI table theme.
 
 Material has persistent card/table presentation and a common title/ID search.
+The card collection uses a fluid CSS grid: columns start at 20rem (or the available
+width on narrow panels) and share remaining space equally. Cards fill their grid
+track; do not add fixed maximum widths to cards or embedded browser wrappers.
 Both presentations open the same workspace object and use `MaterialId` for copy
 feedback. `shared/workspace-presentation.ts` owns material labels and icons.
 Long diagram summaries are expandable so the canvas remains the primary content.

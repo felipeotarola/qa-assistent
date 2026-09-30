@@ -219,9 +219,9 @@ async function uploadFile(event: Event) {
       </WorkspacePageHeader>
       <WorkspaceMaterialTable v-if="!trash && view === 'material' && materialMode === 'table'" :items="tableMaterials" @open="openItem" />
       <p v-if="loaded && !trash && view === 'material' && materialMode !== 'table' && materialQuery.trim() && !tableMaterials.length" role="status" class="rounded-xl border border-default bg-default p-6 text-sm text-muted">Inget material matchar sökningen.</p>
-      <TransitionGroup v-show="!trash && view !== 'overview'" name="cards" tag="div" class="flex flex-wrap items-start gap-4">
+      <TransitionGroup v-show="!trash && view !== 'overview'" name="cards" tag="div" class="workspace-card-grid">
         <div
-v-for="card in orderedCards" v-show="inView(card.item) && (card.item || browserPresent)" :key="card.id" class="w-full max-w-80 rounded-2xl" :class="{ 'ring-2 ring-primary': dropTarget === card.id && draggingCard !== card.id, 'opacity-50': draggingCard === card.id, 'expanded-card-host': expandedItems[card.id] }"
+v-for="card in orderedCards" v-show="inView(card.item) && (card.item || browserPresent)" :key="card.id" class="min-w-0 rounded-2xl" :class="{ 'ring-2 ring-primary': dropTarget === card.id && draggingCard !== card.id, 'opacity-50': draggingCard === card.id, 'expanded-card-host': expandedItems[card.id] }"
           @dragover.prevent="dropTarget = card.id" @drop.prevent="dropCard(card.id)">
           <div v-show="!expandedItems[card.id]" class="mb-1 flex items-center justify-end gap-1">
             <UButton
@@ -245,6 +245,7 @@ icon="i-lucide-grip-vertical" color="neutral" variant="ghost" size="xs" class="c
 </template>
 <style scoped>
 .workspace-surface { container-type: inline-size; }
+.workspace-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); align-items: start; gap: 1rem; }
 .expanded-card-host { transform: none !important; position: static; }
 .cards-move { transition: transform 220ms ease; }
 @media (prefers-reduced-motion: reduce) { .expanded-card-host { transform: none !important; position: static; }

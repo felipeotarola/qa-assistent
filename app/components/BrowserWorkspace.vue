@@ -125,7 +125,7 @@ const displayUrl = computed(() => {
       </div>
     </section>
   </Teleport>
-  <div :class="embedded ? (browser ? 'w-full max-w-80' : 'hidden') : 'workspace-surface relative flex h-full min-h-0 flex-col overflow-hidden'">
+  <div :class="embedded ? (browser ? 'w-full min-w-0' : 'hidden') : 'workspace-surface relative flex h-full min-h-0 flex-col overflow-hidden'">
     <div v-if="!embedded" class="flex h-12 shrink-0 items-center gap-2 px-5 text-xs text-muted">
       <UIcon name="i-lucide-layout-grid" class="size-3.5" /> Workspace
       <span v-if="browser" class="ml-auto text-[10px] text-dimmed">1 objekt</span>
