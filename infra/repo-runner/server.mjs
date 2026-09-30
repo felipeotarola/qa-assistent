@@ -3,7 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Runner, terminal } from './runner.mjs';
 const key = process.env.REPO_RUNNER_KEY;
 if (!key || key.length < 32) throw new Error('REPO_RUNNER_KEY required');
-const runner = new Runner({ directory: process.env.REPO_RUNNER_DATA || '/var/lib/qa-repo-runner', allowedRepos: (process.env.REPO_ALLOWED_REPOS || '').split(',').filter(Boolean) });
+const runner = new Runner({ directory: process.env.REPO_RUNNER_DATA || '/var/lib/qa-repo-runner' });
 await runner.init();
 const reply = (res, status, data) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(data)); };
 const server = http.createServer(async (req, res) => {

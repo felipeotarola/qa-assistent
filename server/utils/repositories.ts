@@ -8,7 +8,7 @@ import { repositoryActionSchema, repoTerminal, type RepoJob } from '../../shared
 export async function saveRepositoryJob(job: RepoJob) {
   const [run] = await db.select().from(repositoryRuns).where(eq(repositoryRuns.id, job.id));
   if (!run) throw createError({ statusCode: 404, statusMessage: 'Run not found' });
-  if (run.config.url !== job.url || run.config.ref !== job.ref || run.config.script !== job.script || run.config.mode !== job.mode) throw createError({ statusCode: 409, statusMessage: 'Run configuration mismatch' });
+  if (run.config.url !== job.url || run.config.ref !== job.ref || run.config.script !== job.script || run.config.mode !== job.mode || !isDeepStrictEqual(run.config.args || [], job.args || [])) throw createError({ statusCode: 409, statusMessage: 'Run configuration mismatch' });
   await db.update(repositoryRuns).set({ job }).where(and(eq(repositoryRuns.id, job.id), sql`coalesce(${repositoryRuns.job}->>'updatedAt', '') <= ${job.updatedAt}`));
 }
 async function runner<T>(path: string, body?: unknown) {
@@ -55,7 +55,7 @@ export async function repositoryAction(userId: string, workspaceId: string, raw:
   }
   const [repository] = await db.select().from(repositories).where(and(eq(repositories.id, value.repositoryId), eq(repositories.workspaceId, workspaceId)));
   if (!repository) throw createError({ statusCode: 404, statusMessage: 'Repository saknas.' });
-  const config = { url: repository.url, ref: repository.ref, script: repository.script, mode: value.mode };
+  const config = { url: repository.url, ref: repository.ref, script: repository.script, mode: value.mode, ...(value.args?.length ? { args: value.args } : {}) };
   await db.insert(repositoryRuns).values({ id: randomUUID(), workspaceId, repositoryId: repository.id, requestId: value.requestId, config }).onConflictDoNothing();
   const [run] = await db.select().from(repositoryRuns).where(and(eq(repositoryRuns.workspaceId, workspaceId), eq(repositoryRuns.requestId, value.requestId)));
   if (!run || run.repositoryId !== repository.id || !isDeepStrictEqual(run.config, config)) throw createError({ statusCode: 409, statusMessage: 'Begäran har redan använts för en annan körning.' });

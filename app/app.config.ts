@@ -48,6 +48,11 @@ export default defineAppConfig({
       },
       variants: { size: { md: { base: 'qaa-button-standard px-3.5 py-2 text-sm gap-2', leadingIcon: 'size-5', trailingIcon: 'size-4' }, lg: { base: 'qaa-button-standard' } } },
       compoundVariants: [
+        { square: true, size: 'xs', class: 'qaa-button-square qaa-button-square-xs' },
+        { square: true, size: 'sm', class: 'qaa-button-square qaa-button-square-sm' },
+        { square: true, size: 'md', class: 'qaa-button-square qaa-button-square-md' },
+        { square: true, size: 'lg', class: 'qaa-button-square qaa-button-square-lg' },
+        { square: true, size: 'xl', class: 'qaa-button-square qaa-button-square-xl' },
         { color: ['neutral', 'primary'], variant: 'solid', class: 'qaa-button-primary' },
         { color: ['neutral', 'primary'], variant: 'outline', class: 'qaa-button-outline' },
         { color: ['neutral', 'primary'], variant: ['soft', 'subtle'], class: 'qaa-button-secondary' },

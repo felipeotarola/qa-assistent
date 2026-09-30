@@ -13,6 +13,7 @@ async function harness(t, overrides = {}) {
   const calls = [];
   const execute = async (args, signal) => {
     calls.push(args);
+    if (args[0] === 'run' && overrides.launchFailure) return { code: 125, output: 'runtime unavailable' };
     if (args.includes('rev-parse')) return { code: 0, output: 'a'.repeat(40) };
     if (args.includes('-e') && args.includes('node')) return { code: 0, output: JSON.stringify({ scripts: { test: 'node --test' }, lock: !overrides.pnpm, pnpmLock: !!overrides.pnpm, packageManager: overrides.pnpm ? 'pnpm@10.33.4' : null }) };
     if (args.includes('ci') && overrides.installFailure) return { code: 1, output: 'Install failed' };
@@ -22,7 +23,7 @@ async function harness(t, overrides = {}) {
     }
     return { code: 0, output: '' };
   };
-  const runner = new Runner({ directory, allowedRepos: [url], execute, timeoutMs: overrides.timeoutMs || 1000 });
+  const runner = new Runner({ directory, execute, timeoutMs: overrides.timeoutMs || 1000 });
   await runner.init(); return { runner, calls };
 }
 async function finished(runner, id) {
@@ -37,6 +38,17 @@ test('rejects credentials, private URLs and command injection', () => {
   for (const bad of ['http://github.com/a/b', 'https://token@github.com/a/b', 'https://127.0.0.1/a/b', 'https://github.com/a/b?token=x']) assert.throws(() => validate({ ...input(), url: bad }));
   assert.throws(() => validate({ ...input(), script: 'test; whoami' }));
   assert.throws(() => validate({ ...input(), ref: '--upload-pack=bad' }));
+  assert.throws(() => validate({ ...input(), args: ['bad\0argument'] }));
+});
+
+test('test selection is forwarded as argv under a virtual display', async t => {
+  const { runner, calls } = await harness(t);
+  const request = { ...input(), args: ['--runInBand', 'literal;not-a-shell-command'] };
+  await runner.submit(request);
+  assert.equal((await finished(runner, request.id)).status, 'passed');
+  const command = calls.find(args => args.includes('xvfb-run'));
+  assert.deepEqual(command.slice(command.indexOf('xvfb-run')), ['xvfb-run', '-a', 'npm', '--ignore-scripts', 'run', 'test', '--', ...request.args]);
+  await assert.rejects(runner.submit({ ...request, args: ['different'] }));
 });
 test('idempotent start, exact commit and no privileged container access', async t => {
   const { runner, calls } = await harness(t); const request = input();
@@ -46,6 +58,10 @@ test('idempotent start, exact commit and no privileged container access', async 
   assert.equal(calls.filter(args => args[0] === 'run').length, 1);
   const launch = calls.find(args => args[0] === 'run');
   assert.ok(launch.includes('--read-only')); assert.ok(launch.includes('--cap-drop'));
+  assert.ok(launch.includes('--runtime=runsc'));
+  assert.ok(launch.includes('1000:1000'));
+  assert.deepEqual(launch.filter(arg => arg.startsWith('type=bind,')), ['type=bind,src=/opt/qa-repo-runner/resolv.conf,dst=/etc/resolv.conf,readonly']);
+  assert.ok(!launch.some(arg => /SECRET|TOKEN|KEY=/.test(arg)));
   assert.ok(!launch.includes('--privileged')); assert.ok(!launch.some(arg => arg.includes('docker.sock')));
   assert.ok(calls.some(args => args[0] === 'rm'));
   await assert.rejects(runner.submit({ ...request, script: 'other' }));
@@ -67,9 +83,12 @@ test('queued job can be cancelled while another runs', async t => {
   assert.equal((await finished(runner, second.id)).status, 'cancelled');
   assert.equal((await finished(runner, first.id)).status, 'cancelled');
 });
-test('unapproved repo never launches', async t => {
+test('unknown public repo launches only in gVisor', async t => {
   const { runner, calls } = await harness(t);
-  await assert.rejects(runner.submit({ ...input(), url: 'https://github.com/other/repo' })); assert.equal(calls.length, 0);
+  const request = { ...input(), url: 'https://github.com/other/repo' };
+  await runner.submit(request);
+  assert.equal((await finished(runner, request.id)).status, 'passed');
+  assert.ok(calls.find(args => args[0] === 'run').includes('--runtime=runsc'));
 });
 
 test('pnpm executes an explicit script without unsupported npm run flags', async t => {
@@ -80,4 +99,12 @@ test('pnpm executes an explicit script without unsupported npm run flags', async
   assert.ok(!run.includes('--ignore-scripts'));
   const launch = calls.find(args => args[0] === 'run');
   assert.ok(launch.some(arg => arg.startsWith('/workspace:rw,exec,nosuid,nodev,')));
+});
+
+test('missing isolated runtime blocks without cloning or executing repository code', async t => {
+  const { runner, calls } = await harness(t, { launchFailure: true }); const request = input();
+  await runner.submit(request);
+  assert.equal((await finished(runner, request.id)).status, 'blocked');
+  assert.ok(!calls.some(args => args.includes('clone')));
+  assert.ok(!calls.some(args => args.includes('ci')));
 });

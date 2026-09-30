@@ -7,12 +7,12 @@ export const repositorySchema = z.object({
 export const repositoryActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('list') }),
   z.object({ action: z.literal('connect'), ...repositorySchema.shape }),
-  z.object({ action: z.literal('start'), repositoryId: z.string().uuid(), requestId: z.string().uuid(), mode: z.enum(['inspect', 'test']) }),
+  z.object({ action: z.literal('start'), repositoryId: z.string().uuid(), requestId: z.string().uuid(), mode: z.enum(['inspect', 'test']), args: z.array(z.string().max(300)).max(20).optional() }),
   z.object({ action: z.literal('cancel'), runId: z.string().uuid() }),
 ]);
 export type RepositoryAction = z.infer<typeof repositoryActionSchema>;
 export interface RepoJob {
-  id: string; url: string; ref: string; script: string; mode: 'inspect' | 'test';
+  id: string; url: string; ref: string; script: string; mode: 'inspect' | 'test'; args?: string[];
   status: 'queued' | 'preparing' | 'installing' | 'running' | 'cleaning' | 'passed' | 'failed' | 'blocked' | 'cancelled' | 'review';
   message: string; logs: string; commit: string | null; testExitCode: number | null;
   package: { name?: string; scripts: Record<string, string>; packageManager: string | null; lock: boolean } | null;

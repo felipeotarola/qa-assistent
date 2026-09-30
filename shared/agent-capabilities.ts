@@ -16,7 +16,7 @@ export const agentCapabilities = [
   {
     id: 'repository', title: 'Repository & kodtester', icon: 'i-lucide-git-branch', summary: 'Undersök kod och kör projektets testkommandon.',
     description: 'Huvudagenten hanterar enkla repo-uppgifter direkt. Repo-agenten kan ta över undersökning och val av testkommando i ett eget sammanhang och lämna tillbaka resultatet.',
-    needs: 'Ett workspace och ett publikt GitHub-repo som administratören har godkänt för körning. Ange gärna branch och script. Piloten stöder npm- och pnpm-projekt med låsfil.',
+    needs: 'Ett workspace och ett publikt GitHub-repo. Ange gärna branch och script. Stöder npm samt pnpm@10.33.4 med låsfil. Publika repo-URL:er behöver ingen GitHub-koppling.',
     steps: ['Ge huvudagenten repo-URL och vad du vill undersöka eller testa.', 'Agenten använder ett känt kommando direkt eller delegerar undersökningen till repo-agenten.', 'Koden körs i en isolerad Docker-miljö på VPS:en. Resultatet sparas med körnings-ID, commit och kommando.'],
     result: 'Sammanfattning i chatten. Be agenten hämta den sparade körningen via dess körnings-ID för status och tillgängliga loggar.',
     boundary: 'Privata repos och installationsscript stöds inte i piloten. Ett lyckat kommando betyder inte automatiskt att alla testfall är verifierade. Agenternas modell körs via modellleverantören; VPS:en kör projektets kod.',

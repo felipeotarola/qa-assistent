@@ -21,10 +21,10 @@ workspaceId=(await api('/api/workspaces',{name:'Temporary repository verificatio
 const path=`/api/workspaces/${workspaceId}/repositories`;
 assert.equal((await api(path,undefined,true)).status,401);
 assert.equal((await api(`/api/workspaces/${randomUUID()}/repositories`)).status,404);
-const connected=await api(path,{action:'connect',url:'https://github.com/felipeotarola/surdeg',ref:'main',script:'typecheck'});
+const connected=await api(path,{action:'connect',url:process.env.REPO_TEST_URL || 'https://github.com/felipeotarola/surdeg',ref:process.env.REPO_TEST_REF || '',script:process.env.REPO_TEST_SCRIPT || 'typecheck'});
 assert.equal(connected.status,200,JSON.stringify(connected.body));
 assert.equal((await api(path)).body.available,true,'Runner must be configured');
-const start={action:'start',repositoryId:connected.body.id,requestId:randomUUID(),mode:'test'};
+const start={action:'start',repositoryId:connected.body.id,requestId:randomUUID(),mode:'test',...(process.env.REPO_TEST_ARGS ? {args:JSON.parse(process.env.REPO_TEST_ARGS)} : {})};
 const begun=await api(path,start); assert.equal(begun.status,200,JSON.stringify(begun.body)); runIds.push(begun.body.id);
 assert.equal((await api(path,start)).body.id,begun.body.id);
 console.log('PASS authenticated workspace access, repository link and idempotent start');
@@ -38,10 +38,19 @@ if(job?.finishedAt) break;
 await new Promise(r=>setTimeout(r,3000));
 }
 assert.ok(job?.finishedAt,'Run must terminate');
+console.log('Terminal status:', job.status, job.message, job.logs.slice(-1200));
 assert.match(job.commit,/^[a-f0-9]{40}$/);
 console.log(JSON.stringify({status:job.status,commit:job.commit,exitCode:job.testExitCode,logs:job.logs.slice(-4000)}));
 assert.ok(['passed','failed'].includes(job.status),'Expected a completed command, not infrastructure blockage');
 console.log('PASS persisted terminal result and exact commit; actual repo outcome above');
+const reportPath=`/api/workspaces/${workspaceId}/repository-material`;
+assert.equal((await api(reportPath,{runId:job.id},true)).status,401);
+const report=await api(reportPath,{runId:job.id});
+assert.equal(report.status,200,JSON.stringify(report.body));
+assert.equal((await api(reportPath,{runId:job.id})).body.item.id,report.body.item.id);
+assert.ok(report.body.item.content.text.includes(job.commit));
+assert.equal((await api(`/api/workspaces/${randomUUID()}/repository-material`,{runId:job.id})).status,404);
+console.log('PASS saved material report, retry deduplication and workspace authorization');
 } finally {
 if(workspaceId) for(const id of runIds) await api(`/api/workspaces/${workspaceId}/repositories`,{action:'cancel',runId:id}).catch(()=>{});
 const {default:postgres}=await import('postgres');const sql=postgres(process.env.DATABASE_URL,{prepare:false,max:1});

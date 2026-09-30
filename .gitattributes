@@ -4,3 +4,7 @@ pnpm-lock.yaml linguist-generated=true
 server/db/migrations/**/meta/** linguist-generated=true
 
 # The migration SQL itself stays visible: it is the schema contract.
+
+# VPS DNS and shell configuration must retain Unix line endings.
+infra/repo-runner/resolv.conf text eol=lf
+infra/repo-runner/*.sh text eol=lf

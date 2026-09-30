@@ -195,6 +195,7 @@ async function uploadFile(event: Event) {
     <p v-if="error" role="alert" class="px-4 py-2 text-xs text-error">{{ error }}</p>
     <div class="qaa-workspace-content min-h-0 flex-1 overflow-auto">
       <p v-if="!loaded && !error" role="status" class="py-8 text-center text-sm text-muted">Hämtar workspace…</p>
+      <RepositoryRuns v-show="!trash" :key="activeId || 'none'" @saved="refresh" />
       <div v-if="trash" class="space-y-2">
         <p class="mb-4 text-sm text-muted">Papperskorg — objekt och filer behålls tills vidare och kan återställas.</p>
         <div v-for="item in items" :key="item.id" class="flex items-center gap-3 rounded-lg border border-default bg-default p-3">

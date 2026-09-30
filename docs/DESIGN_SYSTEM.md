@@ -208,3 +208,12 @@ retries, including after reload. Deleted notes must be restored from trash.
 Material supports a versioned `diagram` object rendered with Vue Flow and Dagre automatic layout. The canvas provides pan, zoom and fit controls; node positions are generated, not manually saved. Standard controls remain Nuxt UI. Nodes and relationships can be edited through the normal workspace editor or its agent quick task.
 
 Use solid relationships for verified links and dashed relationships for inferred structure. Verified edges require an evidence description; a URL list alone is not evidence of navigation. Diagrams retain source item IDs and exact versions and expose those snapshots through the shared source viewer. Limit each diagram to 150 nodes and 400 relationships; prefer focused maps for readability.
+
+## Repository execution cards
+
+`RepositoryRuns` owns the workspace's four-second refresh and bounded history;
+`RepositoryRunCard` renders actual VPS job state, logs and cancellation across
+workspace views. Completed jobs can be saved to Material through the authenticated
+repository-material endpoint, which builds content from the persisted run and
+uses a durable receipt to deduplicate retries. Do not restore the old repository
+connection form under Testing. Request a repo URL and execution in chat.

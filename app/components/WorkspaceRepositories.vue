@@ -37,7 +37,7 @@ onBeforeUnmount(() => clearInterval(timer));
         <UButton label="Kör tester" icon="i-lucide-play" :disabled="busy || !data?.available" @click="start(repo.id, 'test')" />
       </div>
     </div>
-    <p class="text-xs text-muted">Körning är begränsad till repos som administratören har godkänt för piloten. Privata repos och installationsscript stöds ännu inte.</p>
+    <p class="text-xs text-muted">Publika GitHub-repon körs i en isolerad miljö på VPS:en. Privata repos och installationsscript stöds ännu inte.</p>
     <div v-for="run in data?.runs" :key="run.id" class="space-y-3 rounded-lg border border-default p-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <UBadge :color="run.job?.status === 'passed' ? 'success' : run.job?.status === 'failed' ? 'error' : run.job?.status === 'blocked' ? 'warning' : 'neutral'">{{ run.job ? repoStatusLabels[run.job.status] : 'Väntar på testserver' }}</UBadge>

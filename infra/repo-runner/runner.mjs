@@ -13,7 +13,8 @@ export function validate(input) {
   if (!/^[\w][\w:-]{0,79}$/.test(script)) throw new Error('Invalid npm script');
   const mode = input.mode === 'inspect' ? 'inspect' : input.mode === 'test' ? 'test' : null;
   if (!mode) throw new Error('Choose inspect or test');
-  return { id: input.id, url: `https://github.com${url.pathname.replace(/\/$/, '').replace(/\.git$/, '')}`, ref, script, mode };
+  if (input.args !== undefined && (!Array.isArray(input.args) || input.args.length > 20 || input.args.some(arg => typeof arg !== 'string' || arg.length > 300 || arg.includes('\0')))) throw new Error('Invalid test arguments');
+  return { ...(input.args?.length ? { args: input.args } : {}), id: input.id, url: `https://github.com${url.pathname.replace(/\/$/, '').replace(/\.git$/, '')}`, ref, script, mode };
 }
 const command = (args, signal, onData) => new Promise((resolve, reject) => {
   const child = spawn('docker', args, { signal, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -26,8 +27,8 @@ const command = (args, signal, onData) => new Promise((resolve, reject) => {
   child.on('close', code => resolve({ code, output }));
 });
 export class Runner {
-  constructor({ directory, allowedRepos = [], timeoutMs = 600000, execute = command, fixture = null }) {
-    this.directory = directory; this.allowedRepos = allowedRepos; this.timeoutMs = timeoutMs;
+  constructor({ directory, timeoutMs = 600000, execute = command, fixture = null }) {
+    this.directory = directory; this.timeoutMs = timeoutMs;
     this.execute = execute; this.fixture = fixture; this.jobs = new Map(); this.controllers = new Map(); this.busy = false;
   }
   async save(job) {
@@ -54,7 +55,6 @@ export class Runner {
     const fingerprint = createHash('sha256').update(JSON.stringify(config)).digest('hex');
     const previous = this.jobs.get(config.id);
     if (previous) { if (previous.fingerprint !== fingerprint) throw new Error('Run ID already used'); return previous; }
-    if (!this.allowedRepos.includes(config.url)) throw new Error('Repository is not approved for this pilot. Ask the workspace administrator to allow it.');
     if ([...this.jobs.values()].filter(j => !terminal(j.status)).length >= 20) throw new Error('Test queue is full');
     const job = { ...config, fingerprint, status: 'queued', message: 'Väntar på testmiljö', logs: '', commit: null, package: null, testExitCode: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), finishedAt: null };
     this.jobs.set(job.id, job);
@@ -84,16 +84,19 @@ export class Runner {
     const phase = async (status, message) => { job.status = status; job.message = message; await this.save(job); };
     const exec = async args => {
       abort.signal.throwIfAborted();
-      const result = await this.execute(args, abort.signal, text => { job.logs = (job.logs + text).slice(-64000); });
+      const result = await this.execute(args, abort.signal, text => { job.logs = (job.logs + text).slice(-64000); job.updatedAt = new Date().toISOString(); });
       job.logs = (job.logs + `\n[runner] Exit code: ${result.code}\n`).slice(-64000);
       if (abort.signal.aborted) throw new Error('Stopped');
       return result;
     };
-    const inside = args => exec(['exec', '-w', '/workspace/repo', name, ...args]);
+    const inside = args => {
+      job.logs = (job.logs + `\n$ ${args.map(arg => JSON.stringify(arg)).join(' ')}\n`).slice(-64000);
+      return exec(['exec', '-w', '/workspace/repo', name, ...args]);
+    };
     let outcome = 'blocked', message = '';
     try {
       await phase('preparing', 'Hämtar repository och identifierar projektet');
-      const launched = await exec(['run', '-d', '--name', name, '--label', 'qa.repository-run=true', '--init', '--network', 'qa-repo-net', '--memory', '3g', '--memory-swap', '3g', '--cpus', '1', '--pids-limit', '256', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', '1000:1000', '--tmpfs', '/workspace:rw,exec,nosuid,nodev,size=2147483648,uid=1000,gid=1000', '--tmpfs', '/tmp:rw,exec,nosuid,nodev,size=1073741824,uid=1000,gid=1000', '-e', 'HOME=/tmp', '-e', 'CI=true', '-e', 'GIT_TERMINAL_PROMPT=0', 'qa-repo-runner:node24', 'sleep', 'infinity']);
+      const launched = await exec(['run', '-d', '--runtime=runsc', '--name', name, '--label', 'qa.repository-run=true', '--init', '--network', 'qa-repo-net', '--dns', '1.1.1.1', '--dns', '8.8.8.8', '--mount', 'type=bind,src=/opt/qa-repo-runner/resolv.conf,dst=/etc/resolv.conf,readonly', '--memory', '3g', '--memory-swap', '3g', '--cpus', '1', '--pids-limit', '256', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', '1000:1000', '--tmpfs', '/workspace:rw,exec,nosuid,nodev,size=4294967296,uid=1000,gid=1000', '--tmpfs', '/tmp:rw,exec,nosuid,nodev,size=1073741824,uid=1000,gid=1000', '-e', 'HOME=/tmp', '-e', 'PLAYWRIGHT_BROWSERS_PATH=/workspace/browsers', '-e', 'CI=true', '-e', 'GIT_TERMINAL_PROMPT=0', 'qa-repo-runner:public', 'sleep', 'infinity']);
       if (launched.code !== 0) throw new Error('Testmiljön kunde inte startas');
       if (this.fixture) await this.fixture(name, exec);
       else {
@@ -109,14 +112,18 @@ export class Runner {
       if (job.mode === 'inspect') { outcome = 'review'; message = 'Repository analyserat. Välj ett testscript innan du kör tester.'; }
       else {
         const pnpm = job.package.packageManager === 'pnpm@10.33.4';
-        if (pnpm ? !job.package.pnpmLock : !job.package.lock || (job.package.packageManager && !job.package.packageManager.startsWith('npm@'))) throw new Error('Piloten behöver npm + package-lock.json eller pnpm@10.33.4 + pnpm-lock.yaml.');
+        if (pnpm ? !job.package.pnpmLock : (job.package.packageManager && !job.package.packageManager.startsWith('npm@'))) throw new Error('Stöder npm eller pnpm@10.33.4 med pnpm-lock.yaml.');
         const manager = pnpm ? 'pnpm' : 'npm';
         if (!Object.hasOwn(job.package.scripts, job.script)) throw new Error(`Testscriptet ${job.script} saknas. Välj ett befintligt script.`);
-        await phase('installing', 'Installerar låsta beroenden utan installationsscript');
-        const installed = await inside(pnpm ? ['pnpm', 'install', '--frozen-lockfile', '--ignore-scripts'] : ['npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund']);
+        await phase('installing', 'Installerar beroenden utan automatiska installationsscript');
+        const installed = await inside(pnpm ? ['pnpm', 'install', '--frozen-lockfile', '--ignore-scripts'] : ['npm', job.package.lock ? 'ci' : 'install', '--ignore-scripts', '--no-audit', '--no-fund']);
         if (installed.code !== 0) throw new Error('Beroenden kunde inte installeras. Läs loggen; inga tester har körts.');
+        if (!job.package.lock && !pnpm) job.logs += '\n[runner] Inget låsfil: beroendeversioner bestäms vid installation.\n';
+        const browserInstall = await inside(['node', '-e', "const fs=require('fs'); if(fs.existsSync('node_modules/playwright/cli.js')) { const r=require('child_process').spawnSync(process.execPath,['node_modules/playwright/cli.js','install'],{stdio:'inherit'});process.exit(r.status ?? 1) }"]);
+        if (browserInstall.code !== 0) throw new Error('Playwrights webbläsare kunde inte installeras. Se körloggen.');
         await phase('running', `Kör ${manager} run ${job.script}`);
-        const tested = await inside(pnpm ? ['pnpm', '--config.enable-pre-post-scripts=false', 'run', job.script] : ['npm', '--ignore-scripts', 'run', job.script]);
+        const testCommand = pnpm ? ['pnpm', '--config.enable-pre-post-scripts=false', 'run', job.script, ...(job.args || [])] : ['npm', '--ignore-scripts', 'run', job.script, '--', ...(job.args || [])];
+        const tested = await inside(['xvfb-run', '-a', ...testCommand]);
         job.testExitCode = tested.code;
         outcome = tested.code === 0 ? 'passed' : 'failed';
         message = tested.code === 0 ? 'Testkommandot slutfördes med exitkod 0. Se loggen för vilka tester som kördes.' : `Testkommandot misslyckades (exitkod ${tested.code}). Se loggen för resultat.`;
