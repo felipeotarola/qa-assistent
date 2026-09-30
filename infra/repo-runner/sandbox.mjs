@@ -91,9 +91,10 @@ export class Sandboxes {
             s.status = 'blocked'; s.message = 'Arbetsmiljön kunde inte startas. Kontrollera worker och kapacitet.'; await this.save(s); throw error;
           }
         }
-        if (seedFiles && s.seededTemplateKey !== input.templateKey) {
+        if (seedFiles && (s.seededTemplateKey !== input.templateKey || s.seedLayoutVersion !== 1)) {
           await exec(['node', '-e', seedTemplateCommand], JSON.stringify(seedFiles));
           s.seededTemplateKey = input.templateKey;
+          s.seedLayoutVersion = 1;
         }
         s.expiresAt = Date.now() + this.leaseMs; await this.save(s); return this.view(s);
       }

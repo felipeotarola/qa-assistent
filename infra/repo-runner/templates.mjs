@@ -44,7 +44,7 @@ export class SandboxTemplates {
 // Executed as the sandbox user. Retries never overwrite existing user files.
 export const seedTemplateCommand = `const fs=require('node:fs'),path=require('node:path');
 for(const seed of JSON.parse(fs.readFileSync(0,'utf8'))){
-  let dir='/workspace'; const parts=seed.path.split('/');
+  let dir='/workspace'; const relative=seed.path.startsWith('$HOME/')?seed.path.slice(6):seed.path; const parts=relative.split('/');
   for(const part of parts.slice(0,-1)){
     dir=path.join(dir,part); try{fs.mkdirSync(dir)}catch(e){if(e.code!=='EEXIST')throw e}
     const info=fs.lstatSync(dir); if(info.isSymbolicLink()||!info.isDirectory())throw Error('Unsafe seed directory');

@@ -8,7 +8,7 @@ import { SandboxTemplates } from '../infra/repo-runner/templates.mjs';
 import { Sandboxes } from '../infra/repo-runner/sandbox.mjs';
 import { ResourceBudget } from '../infra/execution/budget.mjs';
 
-const files = [{ path: '.agents/skills/repo/SKILL.md', data: Buffer.from('Inspect before cloning').toString('base64') }];
+const files = [{ path: '$HOME/.agents/skills/repo/SKILL.md', data: Buffer.from('Inspect before cloning').toString('base64') }];
 test('build seeds persist across worker instances and template keys cannot be overwritten', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'qa-templates-')); t.after(() => rm(directory, { recursive: true, force: true }));
   const store = new SandboxTemplates(directory);
