@@ -1,26 +1,26 @@
-/* QAA Platform theme.css semantic tokens. Vue/Nuxt bridge lives in main.css. */
+/* Apps SDK UI-inspired semantic palette; existing QAA names are compatibility aliases. Vue/Nuxt bridge lives in main.css. */
 :root {
   --radius: 0.625rem;
 }
 
 :root {
   color-scheme: light;
-  --background: #f9fafb;
-  --foreground: #181d27;
+  --background: #ffffff;
+  --foreground: #0d0d0d;
   --card: oklch(1 0 0);
-  --primary: #39465a;
-  --qaa-link: #43536b;
+  --primary: #181818;
+  --qaa-link: #303030;
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: #f4f5f7;
-  --muted: #eef0f3;
-  --muted-foreground: #535e70;
-  --accent: #e9edf2;
+  --secondary: #f9f9f9;
+  --muted: #f3f3f3;
+  --muted-foreground: #5d5d5d;
+  --accent: #ededed;
   --accent-foreground: var(--qaa-link);
-  --border: #d5d9e1;
-  --qaa-border-component: #b9c1cd;
-  --qaa-surface-interactive: #f9fafb;
-  --qaa-border-strong: #98a2b3;
-  --sidebar: #f4f5f7;
+  --border: #e5e5e5;
+  --qaa-border-component: #cdcdcd;
+  --qaa-surface-interactive: #ffffff;
+  --qaa-border-strong: #8f8f8f;
+  --sidebar: #f9f9f9;
   --qaa-success: #176346;
   --qaa-success-surface: #e7f5ed;
   --qaa-warning: #8a510c;
@@ -38,21 +38,21 @@
 
 :root.dark {
   color-scheme: dark;
-  --background: #15181e;
-  --foreground: #e7ebf2;
-  --card: #1e232c;
-  --primary: #bbc7d8;
-  --qaa-link: #c4cfdf;
-  --primary-foreground: #1b2533;
-  --secondary: #252c37;
-  --muted: #2b3340;
-  --muted-foreground: #a7b1c2;
-  --accent: #303b4b;
-  --border: #465161;
-  --qaa-border-component: #637186;
-  --qaa-surface-interactive: #252c37;
-  --qaa-border-strong: #69788d;
-  --sidebar: #1a1f28;
+  --background: #212121;
+  --foreground: #f3f3f3;
+  --card: #282828;
+  --primary: #f3f3f3;
+  --qaa-link: #ededed;
+  --primary-foreground: #181818;
+  --secondary: #303030;
+  --muted: #393939;
+  --muted-foreground: #afafaf;
+  --accent: #414141;
+  --border: #414141;
+  --qaa-border-component: #5d5d5d;
+  --qaa-surface-interactive: #303030;
+  --qaa-border-strong: #767676;
+  --sidebar: #181818;
   --qaa-success: #8edbb3;
   --qaa-success-surface: #193d2e;
   --qaa-warning: #f0c276;
@@ -91,17 +91,11 @@
   --qaa-code-foreground: #d6ede4;
   --qaa-code-muted: #9aafa9;
   --qaa-popover-shadow: var(--shadow-float);
-  /* Shared page depth: neutral, static and separate from content surfaces. */
-  --qaa-page-surface: color-mix(in srgb, var(--muted) 36%, var(--background));
-  --qaa-page-backdrop:
-    radial-gradient(ellipse 620px 760px at calc(100% + 290px) 85%,
-      transparent 59.5%, color-mix(in srgb, var(--primary) 8%, transparent) 59.7%, transparent 60%,
-      transparent 68.5%, color-mix(in srgb, var(--primary) 6%, transparent) 68.7%, transparent 69%,
-      transparent 77.5%, color-mix(in srgb, var(--primary) 4%, transparent) 77.7%, transparent 78%),
-    radial-gradient(ellipse 760px 800px at 105% 95%, color-mix(in srgb, var(--primary) 9%, transparent), transparent 75%),
-    radial-gradient(ellipse 1100px 480px at 25% 0%, color-mix(in srgb, var(--card) 65%, transparent), transparent 85%);
-  --shadow-composer: var(--shadow-card);
-  --shadow-composer-focus: 0 0 0 1px var(--ring), var(--shadow-card);
+  /* Plain surfaces keep content and controls prominent. */
+  --qaa-page-surface: var(--background);
+  --qaa-page-backdrop: none;
+  --shadow-composer: 0 4px 16px rgb(0 0 0 / 6%);
+  --shadow-composer-focus: 0 0 0 1px var(--qaa-border-strong), var(--shadow-composer);
   --shadow-inset: inset 0 1px 1px var(--border);
   --shadow-glow: 0 0 20px var(--accent);
   --font-sans: var(--font-qaa-sans);
@@ -120,14 +114,14 @@
   --qaa-space-7: 48px;
   --qaa-control-height: 40px;
   --qaa-control-padding: 9px 14px;
-  --qaa-control-radius: 8px;
-  --qaa-panel-radius: 12px;
+  --qaa-control-radius: 12px;
+  --qaa-panel-radius: 16px;
   --qaa-focus-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
   --qaa-workbench-list-width: clamp(240px, 28%, 360px);
   --qaa-detail-width: 760px;
   --qaa-card-min-width: 240px;
   --qaa-text-small: 12px;
-  --qaa-text-body: 14px;
+  --qaa-text-body: 15px;
   --qaa-text-title: 18px;
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);

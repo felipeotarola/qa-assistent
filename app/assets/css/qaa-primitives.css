@@ -1,7 +1,7 @@
-/* QAA Platform primitives adapted to Nuxt UI slots. Features own geometry only. */
+/* Shared Apps SDK UI-inspired appearance on Nuxt UI slots. Features own geometry only. */
 .qaa-button {
   border-radius: var(--qaa-control-radius);
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.4;
   transition: background-color 150ms, border-color 150ms, box-shadow 150ms;
 }
@@ -9,7 +9,7 @@
 .qaa-button-primary {
   color: var(--primary-foreground);
   background: var(--primary);
-  box-shadow: var(--qaa-shadow-control), inset 0 1px 0 color-mix(in srgb, var(--card) 12%, transparent);
+  box-shadow: none;
 }
 .qaa-button-outline {
   color: var(--foreground);
@@ -19,7 +19,7 @@
 .qaa-button-secondary {
   color: var(--foreground);
   background: var(--secondary);
-  box-shadow: inset 0 0 0 1px var(--border);
+  box-shadow: none;
 }
 .qaa-button-quiet { color: var(--qaa-link); }
 .qaa-button-outline:hover:not(:disabled), .qaa-button-secondary:hover:not(:disabled), .qaa-button-quiet:hover:not(:disabled) { background: var(--accent); }
@@ -33,33 +33,33 @@
 .qaa-field:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; box-shadow: var(--qaa-focus-shadow); }
 .qaa-field[aria-invalid=true] { outline-color: var(--qaa-danger); box-shadow: inset 0 0 0 1px var(--qaa-danger); }
 .qaa-field:disabled { background: var(--muted); opacity: .65; }
-.qaa-popup { background: var(--popover); border-radius: var(--qaa-control-radius); box-shadow: 0 0 0 1px var(--border), var(--shadow-float); }
+.qaa-popup { background: var(--popover); border-radius: var(--qaa-panel-radius); box-shadow: 0 0 0 1px var(--border), var(--shadow-float); }
 .qaa-panel, .workspace-card { border-radius: var(--qaa-panel-radius); background: var(--card); box-shadow: var(--qaa-panel-shadow); }
 .workspace-card-expanded { box-shadow: var(--shadow-float); }
 .qaa-modal { box-shadow: 0 0 0 1px var(--border), var(--shadow-float); }
-.qaa-composer { background: var(--card); border-radius: var(--qaa-panel-radius); box-shadow: 0 0 0 1px var(--qaa-border-component), var(--shadow-composer); }
+.qaa-composer { background: var(--card); border-radius: 24px; box-shadow: 0 0 0 1px var(--qaa-border-component), var(--shadow-composer); }
 .qaa-composer:focus-within { outline: none; box-shadow: var(--shadow-composer-focus); }
 .qaa-composer textarea { font-size: 16px; outline: none; box-shadow: none; }
 .qaa-shell, .workspace-surface { background-color: var(--qaa-page-surface); background-image: var(--qaa-page-backdrop); background-repeat: no-repeat; background-size: 100% 100%; }
 .qaa-sidebar { background: var(--sidebar); container-type: inline-size; }
-.qaa-nav-group { border-bottom: 1px solid var(--ui-border); padding: 4px 2px; }
+.qaa-nav-group { padding: 10px 2px; }
 .qaa-nav-group:last-child { border-bottom: 0; }
 .qaa-nav-group-toggle { font-size: 12px; font-weight: 600; color: var(--ui-text-muted); }
-.qaa-sidebar [data-slot="link"][data-active], .qaa-sidebar .qaa-chat-link[aria-current="page"] { background: color-mix(in srgb, var(--ui-primary) 10%, var(--sidebar)); color: var(--ui-text-highlighted); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 15%, transparent); font-weight: 600; }
+.qaa-sidebar [data-slot="link"][data-active], .qaa-sidebar .qaa-chat-link[aria-current="page"] { background: var(--accent); color: var(--ui-text-highlighted); box-shadow: none; font-weight: 600; }
 .qaa-sidebar [data-slot="link"] { min-width: 0; }
 .qaa-sidebar [data-slot="link-label"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qaa-sidebar-home { overflow: hidden; }
 @container (max-width: 230px) { .qaa-sidebar-caption { display: none; } }
 .qaa-sidebar-brand { flex-shrink: 0; }
-.qaa-chat-link { min-height: 38px; }
+.qaa-chat-link { min-height: 40px; font-size: 14px; border-radius: 10px; }
 @media (max-width: 1023px) { .qaa-chat-link { min-height: 44px; } }
 .qaa-navigation-drawer { width: min(320px, calc(100vw - 40px)); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); box-shadow: var(--shadow-float); }
 .qaa-navigation-drawer :is(button, [role=combobox]) { min-height: 44px; }
 .qaa-sidebar-brand { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: var(--primary); color: var(--primary-foreground); box-shadow: var(--qaa-shadow-control); }
-.qaa-page-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--qaa-space-4); margin-bottom: var(--qaa-space-5); padding-bottom: var(--qaa-space-5); border-bottom: 1px solid var(--border); }
+.qaa-page-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--qaa-space-4); margin-bottom: var(--qaa-space-5); padding-bottom: var(--qaa-space-3); }
 .qaa-page-header > div { min-width: 0; }
 .qaa-page-header h2 { font-size: clamp(22px, 2.5cqi, 28px); font-weight: 600; line-height: 1.25; letter-spacing: -.025em; overflow-wrap: anywhere; }
-.qaa-page-header p { margin-top: 8px; font-size: 14px; line-height: 1.6; color: var(--muted-foreground); }
+.qaa-page-header p { margin-top: 8px; font-size: 15px; line-height: 1.6; color: var(--muted-foreground); }
 .qaa-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .qaa-metric-strip { display: flex; flex-wrap: wrap; gap: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--qaa-panel-radius); background: color-mix(in srgb, var(--muted) 60%, var(--card)); }
 .qaa-metric-strip > div { flex: 1 1 140px; padding: 16px 20px; border-inline-end: 1px solid var(--border); }

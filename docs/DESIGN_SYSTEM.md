@@ -131,26 +131,29 @@ New exceptions should have a concrete interaction requirement documented near
 the implementation. Routine decisions following these conventions do not need
 additional user approval.
 
-## QAA visual identity
+## Visual identity
 
-The visual reference is QAA Platform (`C:/Projects/qaa-platform/src/frontend/chatbot`)
-and its live workspace at `https://qa.felipeotarola.com/workspace`. Semantic root
-tokens are copied from its `theme.css`; shared control appearance and the page
-header/metric strip patterns are adapted from `primitives.css` and
-`design-system.css`. Keep palette literals exclusively in `qaa-tokens.css`.
+The current visual reference is [OpenAI Apps SDK UI](https://openai.github.io/apps-sdk-ui/),
+particularly its neutral gray palette, semantic surfaces, rounded controls and
+restrained elevation. This is a Vue adaptation, not the React package or a copy
+of ChatGPT's application shell. Existing `qaa-*` names remain compatibility aliases.
+Keep palette literals exclusively in `qaa-tokens.css`.
 
-Import order is Tailwind, Nuxt UI, QAA tokens, QAA primitives, then the Nuxt
-semantic bridge in `main.css`. Named `qaa-*` slot classes implement shared
-appearance without replacing Nuxt/Reka keyboard, focus, popup or field behavior.
-Use the Nuxt UI size prop for intentional compact controls; standard actions are
-40px (44px on mobile), metadata is 12px and controls/body text are 14px. Status
-colors retain independent success, warning, error and info tokens in both modes.
+Import order is Tailwind, Nuxt UI, tokens, primitives, then the Nuxt semantic
+bridge in `main.css`. Shared slot classes preserve Nuxt/Reka keyboard, focus,
+popup and field behavior. Standard actions are 40px (44px on mobile), metadata
+is 12px, body text is 15px and navigation icons are 20px. Compact controls can
+use Nuxt UI size props. Controls have 12px corners, panels 16px, and the chat
+composer 24px. Status colors remain independently readable in both themes.
 
-Necessary framework/layout adaptations: this remains Vue/Nuxt UI and Vue Flow,
-not React/shadcn/React Flow. The existing resizable split, Nuxt sidebar drawer
-breakpoint (1024px), full-width pages and shared 80rem detail dialogs are retained.
-QAA's 720px chat and 760px detail limits do not override those agreed layouts.
-No test behavior, saved objects or agent integrations are changed by the theme.
+Use plain neutral page surfaces, subtle borders and elevation for overlays.
+Navigation uses a filled active surface without an extra outline. Do not bring
+back decorative page gradients or compensate for the browser's zoom with global
+CSS scaling. Verify at normal zoom as well as narrow viewport widths.
+
+The existing resizable split, Nuxt sidebar drawer breakpoint (1024px), full-width
+pages and shared 80rem detail dialogs remain the application layout contract.
+No test behavior, saved objects or agent integrations change with the theme.
 
 ## Global agent guide
 
