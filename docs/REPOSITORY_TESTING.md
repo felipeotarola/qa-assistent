@@ -144,6 +144,12 @@ processes and a five-minute renewable lease. Stop retains files until expiry;
 delete/expiry removes the disk. An expired environment is replaced with an explicitly
 empty generation. Commands and files are never silently replayed or restored.
 
+Eve's production prewarm uploads its seed files (including bundled skills) to the
+authenticated worker `/templates` endpoint. Templates are immutable, bounded and
+persist on the VPS; each environment receives them once without overwriting existing
+files. Deploy the worker before the Eve build. Command-based bootstrap is unsupported;
+reusable runtime tools belong in the worker image.
+
 The code budget is 3 GiB (at most two code environments). The browser reserve is
 another 3 GiB: two public sessions in a 2 GiB pool and one dedicated 1 GiB preview
 container. This leaves host headroom on the current 8 GB VPS, but is not a claim

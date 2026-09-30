@@ -75,6 +75,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/health') { const status = await health(); return reply(res, status.ready ? 200 : 503, { ...status, draining: runner.stopping, active: runner.controllers.size, queued: [...runner.jobs.values()].filter(job => job.status === 'queued').length, callbackConfigured, callbackProtocol, protocol: 1 }); }
     if (url.pathname === '/drain' && req.method === 'POST') { runner.stopping = true; return reply(res, 200, { draining: true }); }
+    if (url.pathname === '/templates' && req.method === 'POST') {
+      const input = await readJson(req, 3200000);
+      return reply(res, 200, await sandboxes.templates.put(input.templateKey, input.files));
+    }
     if (url.pathname === '/sandbox' && req.method === 'POST') {
       const input = await readJson(req, 34000000);
       if (input.action === 'ensure' && (runner.stopping || !(await health()).ready)) return reply(res, 503, { error: 'Worker is unavailable or draining' });

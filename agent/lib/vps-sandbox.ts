@@ -16,11 +16,19 @@ async function outputTail(stream: ReadableStream<Uint8Array>) {
 }
 export const vpsSandbox: SandboxBackend<Record<string, never>, Scope> = {
   name: 'qaa-vps-v1',
-  async prewarm({ bootstrap, seedFiles }) {
-    if (bootstrap || seedFiles.length) throw new Error('VPS sandbox templates are not supported. Put reusable tools in the worker image.');
-    return { reused: true };
+  async prewarm({ templateKey, bootstrap, seedFiles }) {
+    if (bootstrap) throw new Error('VPS command bootstrap is not supported. Put reusable tools in the worker image.');
+    const base = process.env.REPO_RUNNER_URL?.replace(/\/$/, ''), key = process.env.REPO_RUNNER_KEY;
+    if (!base || !key) throw new Error('VPS sandbox template provisioning requires REPO_RUNNER_URL and REPO_RUNNER_KEY.');
+    const response = await fetch(`${base}/templates`, {
+      method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ templateKey, files: seedFiles.map(file => ({ path: file.path, data: Buffer.from(file.content).toString('base64') })) }),
+      signal: AbortSignal.timeout(40000),
+    });
+    if (!response.ok) throw new Error(`VPS sandbox template provisioning failed (${response.status}). Update the worker before deploying Eve.`);
+    return response.json() as Promise<{ reused: boolean }>;
   },
-  async create({ sessionKey, existingMetadata }) {
+  async create({ sessionKey, templateKey, existingMetadata }) {
     let scope = existingMetadata?.scope as Scope | undefined;
     let generation = typeof existingMetadata?.generation === 'string' ? existingMetadata.generation : '';
     let stateLost = false;
@@ -38,7 +46,7 @@ export const vpsSandbox: SandboxBackend<Record<string, never>, Scope> = {
     async function ensure() {
       if (ready) return;
       for (let attempts = 0; attempts < 20; attempts++) {
-        try { await rpc({ action: 'ensure' }); ready = true; return; }
+        try { await rpc({ action: 'ensure', templateKey }); ready = true; return; }
         catch (error) {
           if (!(error instanceof Error) || !error.message.startsWith('Sandbox lease ended.')) throw error;
           const previous = await rpc<{ id: string }>({ action: 'status' });

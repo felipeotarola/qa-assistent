@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, readdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { validId } from '../execution/store.mjs';
 import { SandboxStorage } from '../execution/storage.mjs';
+import { SandboxTemplates, seedTemplateCommand } from './templates.mjs';
 
 const docker = (args, input) => new Promise((resolve, reject) => {
   const child = spawn('docker', args, { stdio: ['pipe', 'pipe', 'pipe'] });
@@ -22,6 +23,7 @@ export const sandboxPath = value => {
 export class Sandboxes {
   constructor({ directory, events, budget, execute = docker, leaseMs = 300000, storage = new SandboxStorage(`${directory}/disks`, 8) }) {
     Object.assign(this, { directory, events, budget, execute, leaseMs, storage }); this.sessions = new Map(); this.locks = new Map();
+    this.templates = new SandboxTemplates(`${directory}/templates`);
   }
   async serial(id, operation) {
     const pending = (this.locks.get(id) || Promise.resolve()).catch(() => {}).then(operation); this.locks.set(id, pending);
@@ -66,7 +68,9 @@ export class Sandboxes {
       const name = `qa-sandbox-${input.id}`;
       const exec = (args, stdin) => this.execute(['exec', '-i', name, ...args], stdin);
       if (input.action === 'ensure') {
+        const seedFiles = input.templateKey ? await this.templates.get(input.templateKey) : null;
         if (s && ['deleted', 'expired'].includes(s.status)) throw new Error('Sandbox lease ended. Files are unavailable. Delete the Eve sandbox handle before creating a new environment.');
+        if (s?.seededTemplateKey && input.templateKey && s.seededTemplateKey !== input.templateKey) throw new Error('Sandbox template changed; start a new environment');
         if (!s) {
           if ([...this.sessions.values()].filter(s => !['deleted', 'expired'].includes(s.status)).length >= 10) throw new Error('Sandbox storage capacity reached; close an unused environment');
           s = { id: input.id, workspaceId: input.workspaceId, owner: input.owner, status: 'starting', createdAt: new Date().toISOString(), processes: [], message: 'Startar isolerad arbetsmiljö', expiresAt: Date.now() + this.leaseMs }; this.sessions.set(s.id, s); await this.save(s);
@@ -86,6 +90,10 @@ export class Sandboxes {
             catch (cleanupError) { if (cleanupError.message.includes('No such container')) { s.containerCreated = false; this.budget.release(s.id); } else s.containerCreated = true; }
             s.status = 'blocked'; s.message = 'Arbetsmiljön kunde inte startas. Kontrollera worker och kapacitet.'; await this.save(s); throw error;
           }
+        }
+        if (seedFiles && s.seededTemplateKey !== input.templateKey) {
+          await exec(['node', '-e', seedTemplateCommand], JSON.stringify(seedFiles));
+          s.seededTemplateKey = input.templateKey;
         }
         s.expiresAt = Date.now() + this.leaseMs; await this.save(s); return this.view(s);
       }
