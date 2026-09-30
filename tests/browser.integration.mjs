@@ -22,6 +22,7 @@ const client = createServerClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_
   cookies: { getAll: () => [...cookies].map(([name, value]) => ({ name, value })), setAll: values => values.forEach(c => cookies.set(c.name, c.value)) },
 });
 let threadId;
+let parallelThreadId;
 async function api(path, body, internal = false, anonymous = false) {
   const headers = { "content-type": "application/json" };
   if (internal) headers.authorization = `Bearer ${process.env.INTERNAL_API_SECRET}`;
@@ -60,7 +61,7 @@ try {
       new Promise((_, reject) => { const timer = setTimeout(() => reject(new Error('Browser/polling deadlock')), 45000); timer.unref(); }),
     ]);
   } finally { clearInterval(poll); }
-  assert.equal(opened.status, "ready", `Open returned ${opened.status}`);
+  assert.equal(opened.status, "ready", `Open returned ${opened.status}: ${opened.message ?? ''}`);
   assert.match(opened.title, /Software testing/);
   assert.ok(opened.controls.length > 0);
   const view = await api(`/api/threads/${threadId}/browser`);
@@ -72,6 +73,15 @@ try {
   const separateWorkspace = (await api("/api/workspaces", { name: "Separate browser scope" })).payload.workspace.id;
   const separate = (await api("/api/threads", { title: "Isolated", workspaceId: separateWorkspace })).payload.thread.id;
   assert.equal((await api(`/api/threads/${separate}/browser`)).payload.browser, null);
+  if (process.env.TEST_PARALLEL_BROWSERS === '1') {
+    parallelThreadId = separate;
+    const parallel = await api('/api/internal/browser', { userId, threadId: separate, input: { action: 'open', url: 'https://en.wikipedia.org/wiki/Software_testing' } }, true);
+    assert.equal(parallel.payload?.status, 'ready', 'Second workspace must open its own browser');
+    const parallelView = (await api(`/api/threads/${separate}/browser`)).payload.browser;
+    assert.notEqual(parallelView.sessionId, view.payload.browser.sessionId);
+    assert.equal((await action({ action: 'inspect' })).status, 'ready', 'First browser must remain usable');
+    console.log('PASS two workspaces have simultaneously usable independent sessions');
+  }
   console.log("PASS browser shared across workspace chats and isolated from other workspaces");
   console.log("PASS real Chromium navigation, page reading and live view");
   const taken = await api(`/api/threads/${threadId}/browser`, { control: "human" });
@@ -85,6 +95,7 @@ try {
   assert.equal(inspected.status, "ready", JSON.stringify(inspected));
   assert.match(inspected.title, /Software testing/);
   const example = await action({ action: "open", url: "https://example.com" });
+  assert.equal(example.status, "ready", `Navigation returned ${example.status}: ${example.message ?? ''}`);
   const linked = example.controls.find(c => c.tag === "a");
   assert.ok(linked, "Expected a visible link on Example Domain");
   const clicked = await action({ action: "click", ref: linked.ref });
@@ -93,8 +104,13 @@ try {
   const back = await action({ action: "back" });
   assert.equal(back.status, "ready", JSON.stringify(back));
   console.log("PASS return control and reuse the same session");
-  await api(`/api/threads/${threadId}/browser`, { control: "close" });
-  assert.equal((await api(`/api/threads/${threadId}/browser`)).payload.browser, null);
+  const closed = await api(`/api/threads/${threadId}/browser`, { control: "close" });
+  assert.equal(closed.status, 200, `Close returned HTTP ${closed.status}: ${closed.payload?.statusMessage ?? ''}`);
+  assert.ok(!(await api(`/api/threads/${threadId}/browser`)).payload.browser, 'Live view must clear after closing');
+  if (parallelThreadId) {
+    const parallel = await api('/api/internal/browser', { userId, threadId: parallelThreadId, input: { action: 'inspect' } }, true);
+    assert.equal(parallel.payload?.status, 'ready', 'Closing first workspace must leave second usable');
+  }
   console.log("PASS session release and cleared live view");
   if (process.env.TEST_EVE_BROWSER === "1") {
     const eve = new Client({ host: origin, headers: {
@@ -113,6 +129,7 @@ try {
   }
 }
 finally {
+  if (parallelThreadId) await api(`/api/threads/${parallelThreadId}/browser`, { control: 'close' }).catch(() => {});
   if (threadId) await api(`/api/threads/${threadId}/browser`, { control: "close" }).catch(() => {});
   // Only remove the randomly named user and its app data created by this test.
   const { default: postgres } = await import("postgres");

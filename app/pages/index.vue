@@ -2,6 +2,7 @@
 import HomeRecentCard from "~/components/HomeRecentCard.vue";
 import { startChat } from "~/composables/chat/navigation";
 import { useThreadList } from "~/composables/chat/useThreads";
+import { DEFAULT_CHAT_MODEL, DEFAULT_REASONING } from '#shared/chat-models';
 
 const { profile } = useProfile();
 const { workspaces, activeId, pending: workspacesPending, error: workspacesError, refresh: refreshWorkspaces } = useWorkspaces();
@@ -25,6 +26,10 @@ onMounted(() => {
 const input = ref("");
 const selectedModel = useChatModel();
 const selectedReasoning = useChatReasoning();
+// A new composer starts inexpensive, even when the previous chat used Max.
+// Subsequent choices here are kept when the first message creates the thread.
+selectedModel.value = DEFAULT_CHAT_MODEL;
+selectedReasoning.value = DEFAULT_REASONING;
 
 const greeting = computed(() => {
   let timeGreeting = "God kväll";

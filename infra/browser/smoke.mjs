@@ -2,24 +2,49 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import WebSocket from 'ws';
-const base = 'http://127.0.0.1:8080';
+const base = process.env.BROWSER_TEST_URL || 'http://127.0.0.1:8080';
+const connectUrl = url => url.replace(/^wss?:\/\/[^/]+/, base.replace(/^http/, 'ws'));
 const request = (path, method = 'GET', auth = true) => fetch(base + path, { method, headers: auth ? { authorization: `Bearer ${process.env.BROWSER_SERVICE_KEY}` } : {} });
 assert.equal((await request('/health', 'GET', false)).status, 401);
 const created = await request('/sessions', 'POST');
 assert.equal(created.status, 201, await created.clone().text());
 const session = await created.json();
 let browser, viewer;
+const peers = [];
 try {
+  const health = await (await request('/health')).json();
+  assert.ok(health.maxSessions >= 2, 'Concurrency smoke requires at least two slots');
+  const createdPeers = await Promise.all(Array.from({ length: health.maxSessions - 1 }, () => request('/sessions', 'POST')));
+  for (const response of createdPeers) {
+    assert.equal(response.status, 201);
+    peers.push(await response.json());
+  }
   assert.equal((await request('/sessions', 'POST')).status, 409);
-  browser = await chromium.connectOverCDP(session.connectUrl.replace(new URL(session.connectUrl).host, '127.0.0.1:8080'));
+  const peerBrowser = await chromium.connectOverCDP(connectUrl(peers[0].connectUrl));
+  try {
+    const peerPage = peerBrowser.contexts()[0].pages()[0];
+    await peerPage.setContent('<h1>Independent session</h1>');
+    await peerBrowser.contexts()[0].addCookies([{ name: 'isolated', value: 'peer-only', domain: 'example.com', path: '/' }]);
+  } finally { await peerBrowser.close(); }
+  const wrongTokenUrl = new URL(connectUrl(peers[0].connectUrl));
+  wrongTokenUrl.searchParams.set('token', new URL(session.connectUrl).searchParams.get('token'));
+  const rejected = await new Promise(resolve => {
+    const socket = new WebSocket(wrongTokenUrl);
+    socket.on('error', () => resolve(true));
+    socket.on('open', () => { socket.close(); resolve(false); });
+  });
+  assert.ok(rejected, 'Another session token must not grant access');
+  browser = await chromium.connectOverCDP(connectUrl(session.connectUrl));
   const page = browser.contexts()[0].pages()[0];
+  assert.equal(await page.locator('h1').count(), 0);
+  assert.equal((await browser.contexts()[0].cookies()).length, 0);
   const privateProbe = await browser.contexts()[0].newPage();
   await assert.rejects(privateProbe.goto('http://127.0.0.1:8080/health'), /BLOCKED_BY_CLIENT|ERR_FAILED/);
   await privateProbe.close();
   await page.setContent('<h1>Browser pilot</h1><input aria-label="Test text"><button onclick="document.querySelector(\'h1\').textContent=\'Done\'">Save</button>');
   await page.locator('input').focus();
   const [id, token] = new URL(session.liveUrl).hash.slice(1).split(':');
-  viewer = new WebSocket(`ws://127.0.0.1:8080/view/${id}?token=${token}`, { origin: new URL(process.env.BROWSER_PUBLIC_URL).origin });
+  viewer = new WebSocket(`${base.replace(/^http/, 'ws')}/view/${id}?token=${token}`, { origin: new URL(process.env.BROWSER_PUBLIC_URL).origin });
   const frames = [];
   viewer.on('message', value => frames.push(JSON.parse(value.toString())));
   await new Promise((resolve, reject) => { viewer.once('open', resolve); viewer.once('error', reject); });
@@ -35,16 +60,23 @@ try {
   await page.getByText('Save', { exact: true }).click();
   assert.equal(await page.locator('h1').innerText(), 'Done');
   assert.ok((await page.screenshot()).length > 100);
-  console.log('PASS authenticated creation, single-session limit, CDP, live frames, takeover input, agent resume, screenshot');
+  const peer = await chromium.connectOverCDP(connectUrl(peers[0].connectUrl));
+  try { assert.equal(await peer.contexts()[0].pages()[0].locator('h1').innerText(), 'Independent session'); }
+  finally { await peer.close(); }
+  console.log('PASS concurrent isolated processes, capacity, cross-session token rejection, CDP, live frames, takeover input, agent resume, screenshot');
 } finally {
   viewer?.close();
   await browser?.close();
   assert.equal((await request(`/sessions/${session.sessionId}`, 'DELETE')).status, 200);
+  for (const peer of peers) {
+    assert.equal((await request(`/sessions/${peer.sessionId}/human`, 'POST')).status, 200, 'Closing one session must leave peers alive');
+    await request(`/sessions/${peer.sessionId}`, 'DELETE');
+  }
 }
 assert.equal((await request(`/sessions/${session.sessionId}/human`, 'POST')).status, 404);
 const fresh = await (await request('/sessions', 'POST')).json();
 try {
-  const browser = await chromium.connectOverCDP(fresh.connectUrl.replace(new URL(fresh.connectUrl).host, '127.0.0.1:8080'));
+  const browser = await chromium.connectOverCDP(connectUrl(fresh.connectUrl));
   assert.equal(browser.contexts()[0].pages()[0].url(), 'about:blank');
   assert.equal((await browser.contexts()[0].cookies()).length, 0);
   await browser.close();

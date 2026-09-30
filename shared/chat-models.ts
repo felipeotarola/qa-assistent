@@ -4,7 +4,7 @@ export const CHAT_MODELS = [
 ] as const;
 
 export type ChatModelId = typeof CHAT_MODELS[number]["id"];
-export const DEFAULT_CHAT_MODEL: ChatModelId = "glm-5.3";
+export const DEFAULT_CHAT_MODEL: ChatModelId = "glm-5.3-flash";
 export const CHAT_MODEL_HEADER = "x-pat-chat-model";
 
 export function resolveChatModel(value: unknown): ChatModelId {
@@ -13,7 +13,7 @@ export function resolveChatModel(value: unknown): ChatModelId {
 
 export const REASONING_LEVELS = ["low", "high", "max"] as const;
 export type ReasoningLevel = typeof REASONING_LEVELS[number];
-export const DEFAULT_REASONING: ReasoningLevel = "max";
+export const DEFAULT_REASONING: ReasoningLevel = "low";
 export const REASONING_HEADER = "x-pat-reasoning";
 
 export function resolveReasoning(value: unknown): ReasoningLevel {

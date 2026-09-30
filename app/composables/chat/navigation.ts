@@ -4,6 +4,7 @@ import type { ThreadRecord, ThreadSummary } from "#shared/types/thread";
 import { resetStreamLog } from "~/composables/chat/stream-log";
 import { truncateThreadTitle } from "#shared/types/thread";
 import { clearCachedPayloadData } from "~/utils/payload-cache";
+import { DEFAULT_CHAT_MODEL, DEFAULT_REASONING } from '#shared/chat-models';
 
 type PendingMessage = {
   chatId: string;
@@ -69,6 +70,8 @@ export function consumePendingMessage(chatId: string) {
 export async function startNewChat() {
   pendingMessage = null;
   resetStreamLog();
+  useChatModel().value = DEFAULT_CHAT_MODEL;
+  useChatReasoning().value = DEFAULT_REASONING;
   await navigateTo("/");
 }
 

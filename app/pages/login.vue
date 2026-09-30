@@ -5,8 +5,6 @@ definePageMeta({
   layout: false,
 });
 
-const site = useSite();
-
 const route = useRoute();
 const mode = ref<"sign-in" | "sign-up">("sign-in");
 const email = ref("");
@@ -15,14 +13,6 @@ const name = ref("");
 const error = ref(route.query.confirmation === "failed" ? "Confirmation link expired or invalid. Please sign in or request a new link." : "");
 const notice = ref("");
 const loading = ref(false);
-
-const highlights = [
-  { icon: "i-lucide-message-square", label: "Web chat" },
-  { icon: "i-lucide-smartphone", label: "iMessage" },
-  { icon: "i-simple-icons-slack", label: "Slack" },
-  { icon: "i-simple-icons-linear", label: "Linear" },
-  { icon: "i-lucide-brain", label: "Long-term memory" },
-];
 
 const redirectTo = computed(() => {
   const value = route.query.redirect;
@@ -76,8 +66,8 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="flex min-h-svh flex-col bg-default text-default lg:flex-row">
-    <section class="flex flex-1 items-center justify-center border-b border-default px-6 py-10 lg:border-b-0 lg:border-e lg:px-12 lg:py-8">
+  <div class="flex min-h-svh bg-default text-default">
+    <section class="flex flex-1 items-center justify-center px-6 py-10">
       <div class="w-full max-w-sm">
         <UCard class="w-full">
           <template #header>
@@ -163,78 +153,6 @@ async function handleSubmit() {
           </template>
         </UCard>
       </div>
-    </section>
-
-    <section class="relative flex flex-1 flex-col px-6 py-6 sm:px-8 lg:px-12 lg:py-8 hero-glow">
-      <header class="flex items-center justify-between">
-        <NuxtLink
-          to="https://vercel.com/eve"
-          target="_blank"
-          class="text-highlighted transition-opacity hover:opacity-80"
-          aria-label="Eve on Vercel"
-        >
-          <AppLogo class="h-[18px] w-auto text-highlighted" />
-        </NuxtLink>
-
-        <UColorModeButton
-          color="neutral"
-          variant="ghost"
-        />
-      </header>
-
-      <div class="flex flex-1 flex-col justify-center py-10 lg:py-16">
-        <div class="max-w-md space-y-5">
-          <div class="space-y-3">
-            <h1 class="text-3xl font-semibold tracking-tight text-highlighted sm:text-4xl">
-              V
-            </h1>
-            <p class="text-sm leading-relaxed text-muted sm:text-base">
-              A durable AI assistant with long-term memory. Chat on the web, Slack, or iMessage — query Linear and pick up where you left off.
-            </p>
-          </div>
-
-          <ul class="flex flex-wrap gap-x-5 gap-y-2">
-            <li
-              v-for="item in highlights"
-              :key="item.label"
-              class="flex items-center gap-1.5 text-xs text-toned"
-            >
-              <UIcon
-                :name="item.icon"
-                class="size-3.5 shrink-0"
-              />
-              {{ item.label }}
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <footer class="flex flex-wrap items-center gap-x-4 gap-y-3 pt-6">
-        <NuxtLink
-          :to="site.deployUrl"
-          target="_blank"
-          rel="noopener"
-        >
-          <img
-            src="https://vercel.com/button"
-            alt="Deploy with Vercel"
-            width="133"
-            height="32"
-          >
-        </NuxtLink>
-
-        <p class="text-xs text-dimmed">
-          Built with
-          <NuxtLink
-            to="https://vercel.com/eve"
-            target="_blank"
-            class="text-muted underline-offset-2 hover:text-highlighted hover:underline"
-          >
-            Eve
-          </NuxtLink>
-          on Vercel
-        </p>
-      </footer>
     </section>
   </div>
 </template>

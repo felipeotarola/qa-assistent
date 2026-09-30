@@ -1,8 +1,13 @@
 # VPS browser pilot
 
 The existing `browser` agent tool and Workspace browser card can use the VPS
-instead of Browserbase. This pilot supports **one active session across all
-workspaces**. Chromium runs as a non-root user with its sandbox enabled.
+instead of Browserbase. The service supports **three concurrent sessions by default**, configurable
+with `BROWSER_MAX_SESSIONS` in the VPS service environment. Every session has
+its own Chromium process, temporary profile, dynamically allocated loopback CDP
+port and separate viewer/CDP credentials. Chromium runs as a non-root user with
+its sandbox enabled. The processes share a resource-limited container; this is
+not VM or container isolation per session. Capacity includes starting and closing
+sessions; excess requests receive HTTP 409 without interrupting existing work.
 
 ## Local configuration
 
@@ -14,11 +19,19 @@ BROWSER_SERVICE_URL=http://100.122.229.15:8080
 BROWSER_SERVICE_KEY=<random secret shared with the VPS>
 ```
 
-Both the local app server and the user's browser must be on the Tailscale
-network. The iframe allows localhost:3000 only. This is **not yet a Vercel
-production connection**: that requires authenticated HTTPS access from the
-deployed server and a configured frame origin. Do not expose port 9222 or the
-Docker socket publicly. Leaving `BROWSER_PROVIDER` unset retains Browserbase.
+The private HTTP address requires Tailscale. The service also has a public
+HTTPS endpoint through Tailscale Funnel for production:
+`https://qaa-vps-1.tail22aa3b.ts.net`. Production uses this address for
+`BROWSER_SERVICE_URL`, and the VPS uses it for `BROWSER_PUBLIC_URL`, so live
+view and CDP connections use WSS. The iframe permits localhost:3000 and
+`https://qa-assistent.vercel.app`.
+
+Funnel is configured with
+`tailscale funnel --bg --yes http://100.122.229.15:8080`.
+The API still requires the shared service key; session sockets require their
+own tokens. Do not expose port 9222 or the Docker socket publicly.
+Leaving `BROWSER_PROVIDER` unset retains Browserbase. The separate `research`
+tool still uses Browserbase; this switch only affects the live browser.
 
 ## Deployment
 
@@ -39,6 +52,9 @@ screenshots and typed values. Do not enable protocol debug logging in normal use
 
 ## Session behavior
 
+- The app currently shares one browser per workspace. Independent workspaces
+  can run concurrently; multiple workers inside one workspace still need explicit
+  app-level session ownership and run-to-session mapping before parallel use.
 - Agent navigation uses the existing authenticated internal API and CDP.
 - The iframe receives JPEG live frames, roughly four per second; it is not video recording.
 - **Ta över** enables server-validated mouse clicks, scrolling, text/paste and basic keyboard input.
@@ -58,7 +74,7 @@ explicitly scoped network policy, not unrestricted browser access to the VPS.
 ## Verification
 
 Inside the container, `node /app/smoke.mjs` (copy the test there first) tests
-creation, auth, capacity, live frames, manual input, agent resume, screenshots,
+concurrent creation, auth, capacity, profile/token isolation, independent closure, live frames, manual input, agent resume, screenshots,
 closure and a fresh profile. It requires no active user session.
 
 From the repo with the local app running:
@@ -73,3 +89,5 @@ node --env-file=.env tests/test-runs.integration.mjs
 
 These use temporary users and remove their own fixtures. The browser test also
 polls the workspace during first-session creation to detect DB pool deadlocks.
+Set `APP_URL=https://qa-assistent.vercel.app` and use matching production
+credentials to verify production instead. Never commit those credentials.

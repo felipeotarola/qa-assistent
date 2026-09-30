@@ -206,8 +206,16 @@ async function uploadFile(event: Event) {
       <WorkspaceOverview v-if="loaded && !trash && view === 'overview'" :items="items" :browser-present="browserPresent" @open="openItem" @testing="view = 'testing'" @material="view = 'material'" />
       <WorkspaceTesting v-if="loaded && !trash && view === 'testing'" :items="plans" @open="openItem" />
       <WorkspacePageHeader v-if="!trash && view === 'material'" title="Material" description="Gemensamma dokument, tabeller, bilder och filer för alla chattar.">
-          <div class="flex flex-wrap gap-2"><UInput v-model="materialQuery" icon="i-lucide-search" aria-label="Sök material" placeholder="Sök namn eller ID" />
-          <UFieldGroup><UButton icon="i-lucide-layout-grid" label="Kort" :aria-pressed="materialMode !== 'table'" :variant="materialMode !== 'table' ? 'solid' : 'outline'" color="neutral" @click="materialMode = 'cards'" /><UButton icon="i-lucide-list" label="Tabell" :aria-pressed="materialMode === 'table'" :variant="materialMode === 'table' ? 'solid' : 'outline'" color="neutral" @click="materialMode = 'table'" /></UFieldGroup></div>
+        <template #title-action>
+          <UButton
+            :icon="materialMode === 'table' ? 'i-lucide-layout-grid' : 'i-lucide-table-2'"
+            :aria-label="materialMode === 'table' ? 'Visa som kort' : 'Visa som tabell'"
+            color="neutral"
+            variant="outline"
+            @click="materialMode = materialMode === 'table' ? 'cards' : 'table'"
+          />
+        </template>
+        <UInput v-model="materialQuery" icon="i-lucide-search" aria-label="Sök material" placeholder="Sök namn eller ID" />
       </WorkspacePageHeader>
       <WorkspaceMaterialTable v-if="!trash && view === 'material' && materialMode === 'table'" :items="tableMaterials" @open="openItem" />
       <p v-if="loaded && !trash && view === 'material' && materialMode !== 'table' && materialQuery.trim() && !tableMaterials.length" role="status" class="rounded-xl border border-default bg-default p-6 text-sm text-muted">Inget material matchar sökningen.</p>
