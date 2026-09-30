@@ -1,0 +1,17 @@
+[Unit]
+Description=QAA repository test runner (trusted pilot)
+After=docker.service tailscaled.service
+Requires=docker.service
+
+[Service]
+WorkingDirectory=/opt/qa-repo-runner
+EnvironmentFile=/opt/qa-repo-runner/service.env
+ExecStartPre=/bin/sh /opt/qa-repo-runner/network.sh
+ExecStart=/opt/qa-repo-runner/node /opt/qa-repo-runner/server.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

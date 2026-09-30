@@ -56,6 +56,7 @@ watch(() => snapshot.value?.threadId, () => { draft.value = undefined; saveError
     <UButton :icon="snapshot.busy ? 'i-lucide-loader-circle' : 'i-lucide-activity'" :label="heading" color="neutral" variant="soft" size="sm" :aria-expanded="drawerOpen" @click="open = !open" />
   </div>
   <AgentActivitySurface v-model:open="drawerOpen" :docked="docked" :can-pin="wide" @pin="togglePin">
+      <RepositoryActivity />
       <div v-if="snapshot" class="space-y-6">
         <div class="rounded-lg border border-default bg-muted p-4 space-y-2" role="status">
           <div class="flex items-center gap-2 font-semibold">
