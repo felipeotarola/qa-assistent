@@ -1,8 +1,9 @@
 # VPS browser pilot
 
 The existing `browser` agent tool and Workspace browser card can use the VPS
-instead of Browserbase. The service supports **three concurrent sessions by default**, configurable
-with `BROWSER_MAX_SESSIONS` in the VPS service environment. Every session has
+instead of Browserbase. The deployed public pool supports **two concurrent sessions** within 2 GiB.
+A separate 1 GiB slot is reserved for a dedicated local app-preview browser.
+`run.sh` fixes the public limit as part of the shared resource budget. Every session has
 its own Chromium process, temporary profile, dynamically allocated loopback CDP
 port and separate viewer/CDP credentials. Chromium runs as a non-root user with
 its sandbox enabled. The processes share a resource-limited container; this is
@@ -30,8 +31,9 @@ Funnel is configured with
 `tailscale funnel --bg --yes http://100.122.229.15:8080`.
 The API still requires the shared service key; session sockets require their
 own tokens. Do not expose port 9222 or the Docker socket publicly.
-Leaving `BROWSER_PROVIDER` unset retains Browserbase. The separate `research`
-tool still uses Browserbase; this switch only affects the live browser.
+Leaving `BROWSER_PROVIDER` unset retains Browserbase. With `BROWSER_PROVIDER=vps`, both live browsing and research use the VPS.
+Research releases its temporary session after capture and shares public capacity.
+There is no silent Browserbase fallback.
 
 ## Deployment
 
@@ -39,12 +41,18 @@ Source lives in `infra/browser`. The deployed copy is `/opt/qa-browser` on
 `root@100.122.229.15`. Docker and systemd run the service. `service.env` (0600)
 contains `BROWSER_SERVICE_KEY` and `BROWSER_PUBLIC_URL`; never commit it.
 
-Build `qa-browser:pilot` from the Dockerfile, copy the official Playwright
+Build from the **infra root** with
+`docker build -f browser/Dockerfile -t qa-browser:execution .` so common execution
+modules are included. Tag the verified image as `qa-browser:pilot` for the public
+service. Copy the official Playwright
 v1.63.0 `utils/docker/seccomp_profile.json` to `/opt/qa-browser/seccomp.json`,
 install `qa-browser.service` in `/etc/systemd/system`, then run
 `systemctl enable --now qa-browser`. `run.sh` restricts the published port to
 Tailscale, sets CPU/RAM/process limits and installs private-network egress rules.
-Service restarts close any active session; deploy only when it is unused.
+Service restarts close active sessions; deploy only when unused. `run.sh` loads
+br_netfilter and enables bridge firewall filtering. It sets the persistent state
+directory owner from the image's actual UID/GID instead of assuming UID 1000.
+Restricted event state is stored under `/var/lib/qa-browser`.
 
 Useful checks: `systemctl status qa-browser`, `docker logs qa-browser`.
 `GET /health` requires the bearer service key. Logs omit viewer tokens,
@@ -52,24 +60,29 @@ screenshots and typed values. Do not enable protocol debug logging in normal use
 
 ## Session behavior
 
-- The app currently shares one browser per workspace. Independent workspaces
-  can run concurrently; multiple workers inside one workspace still need explicit
-  app-level session ownership and run-to-session mapping before parallel use.
+- Browsers are assigned per workspace, chat and agent. Migration 0014 adds explicit
+  assignments; the first main assignment adopts the old workspace session once.
+  The workspace selector supports multiple sessions. Controls/resume carry a
+  session ID and the server validates workspace access.
 - Agent navigation uses the existing authenticated internal API and CDP.
-- The iframe receives JPEG live frames, roughly four per second; it is not video recording.
+- One capture loop per session distributes JPEG frames to viewers, with hidden-viewer throttling; this is not video recording.
 - **Ta över** enables server-validated mouse clicks, scrolling, text/paste and basic keyboard input.
 - **Lämna tillbaka** disables manual input and resumes the existing agent flow.
 - Closing destroys Chromium and its temporary profile. Each new session starts logged out.
 - App idle expiry is ten minutes; the VPS also enforces a thirty-minute lifetime.
 - Run screenshots still use the existing private Blob evidence pipeline with password masking.
-- Viewer credentials are separate from CDP credentials and cannot create sessions.
+- Read-only viewer, rotating human-control and CDP tokens have distinct scopes.
+  Stale queued inputs are rejected by control epoch; CDP is blocked during takeover.
+  Compatibility mode remains for old clients; the new app requests scoped tokens.
 - Existing DB `projectId = self-hosted-v1` identifies VPS sessions for cleanup;
   Browserbase context IDs remain intact for a future switch back.
 
 This first viewer does not support file upload dialogs, drag gestures, audio,
 downloads or a tab-selection toolbar. Public web pages are supported; access to
-private networks is blocked. Future local/backend test runners need a separate,
-explicitly scoped network policy, not unrestricted browser access to the VPS.
+private networks is blocked. Local app preview uses a dedicated browser
+container with an exact sandbox IP/port rule, a 30-minute cap and teardown coupled
+to the parent environment. Its authenticated gateway is under `/repository/preview`.
+See [sandbox operations](REPOSITORY_TESTING.md).
 
 ## Verification
 

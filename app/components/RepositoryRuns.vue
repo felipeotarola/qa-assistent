@@ -1,22 +1,27 @@
 <script setup lang="ts">
 import { repoTerminal } from '#shared/repository';
 const emit = defineEmits<{ saved: [] }>();
-const { data, refresh, activeId } = useRepositoryRuns();
+const { data, refresh } = useRepositoryRuns();
 const history = ref(false);
+const minimized = ref(false);
+const latestId = computed(() => data.value?.runs[0]?.id);
+const working = computed(() => data.value?.runs.some(run => !run.job || !repoTerminal(run.job.status)));
+watch(latestId, (id, previous) => { if (id && id !== previous) minimized.value = false; });
 const runs = computed(() => history.value ? data.value?.runs : data.value?.runs.filter((run, index) => index === 0 || !run.job || !repoTerminal(run.job.status)));
-let timer: ReturnType<typeof setInterval> | undefined;
-let polling = false;
-onMounted(() => { timer = setInterval(async () => {
-  if (!activeId.value || polling || document.hidden) return;
-  polling = true;
-  try { await refresh(); } finally { polling = false; }
-}, 4000); });
-onBeforeUnmount(() => clearInterval(timer));
 </script>
 <template>
-  <section v-if="data?.runs.length" class="mb-6 space-y-3" aria-label="Körningar på VPS">
-    <div class="flex items-center justify-between gap-3"><h2 class="font-semibold">Körningar på VPS</h2><UButton v-if="data.runs.length > 1" :label="history ? 'Visa senaste' : `Historik (${data.runs.length})`" variant="ghost" @click="history = !history" /></div>
-    <p v-if="data.syncError" role="status" class="text-sm text-warning">{{ data.syncError }}</p>
-    <RepositoryRunCard v-for="run in runs" :key="run.id" :run="run" @changed="refresh()" @saved="emit('saved')" />
-  </section>
+  <ClientOnly><Teleport defer to="#floating-work-panels">
+    <section v-if="data?.runs.length" class="pointer-events-auto w-[28rem] max-w-full shrink-0 overflow-hidden rounded-xl border border-default bg-default shadow-xl" aria-label="Körningar på VPS" @keydown.esc="minimized = true">
+      <header class="flex items-center gap-2 px-3 py-2">
+        <UIcon :name="working ? 'i-lucide-loader-circle' : 'i-lucide-terminal'" class="size-4 shrink-0" :class="{ 'motion-safe:animate-spin': working }" />
+        <div class="min-w-0 flex-1"><h2 class="text-sm font-semibold">{{ working ? 'Arbetar på VPS' : 'VPS-körningar' }}</h2><p class="truncate text-xs text-muted">{{ data.runs[0]?.job?.url.split('/').slice(-2).join('/') }}</p></div>
+        <UButton :icon="minimized ? 'i-lucide-chevron-up' : 'i-lucide-minus'" :aria-label="minimized ? 'Visa VPS-körningar' : 'Minimera VPS-körningar'" :aria-expanded="!minimized" color="neutral" variant="ghost" size="xs" @click="minimized = !minimized" />
+      </header>
+      <div v-show="!minimized" class="max-h-[min(65dvh,36rem)] space-y-3 overflow-auto border-t border-default p-3">
+        <UButton v-if="data.runs.length > 1" :label="history ? 'Visa senaste' : `Historik (${data.runs.length})`" variant="ghost" size="sm" @click="history = !history" />
+        <p v-if="data.syncError" role="status" class="text-sm text-warning">{{ data.syncError }}</p>
+        <RepositoryRunCard v-for="run in runs" :key="run.id" :run="run" @changed="refresh()" @saved="emit('saved')" />
+      </div>
+    </section>
+  </Teleport></ClientOnly>
 </template>

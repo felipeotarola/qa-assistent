@@ -49,6 +49,7 @@ const report=await api(reportPath,{runId:job.id});
 assert.equal(report.status,200,JSON.stringify(report.body));
 assert.equal((await api(reportPath,{runId:job.id})).body.item.id,report.body.item.id);
 assert.ok(report.body.item.content.text.includes(job.commit));
+if (job.selectedScript) assert.ok(report.body.item.content.text.includes(`Script: ${job.selectedScript}`));
 assert.equal((await api(`/api/workspaces/${randomUUID()}/repository-material`,{runId:job.id})).status,404);
 console.log('PASS saved material report, retry deduplication and workspace authorization');
 } finally {

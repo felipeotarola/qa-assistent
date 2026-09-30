@@ -25,4 +25,6 @@ test('short outputs, missing jobs and error responses retain their meaning', () 
   assert.equal(result.logs, 'ok');
   assert.equal(result.logsTruncated, false);
   assert.equal(result.package.scripts.test, 'vitest');
+  assert.match(result.executionNotice, /not app startup/);
+  assert.match(result.executionNotice, /not shared/);
 });

@@ -1,14 +1,7 @@
 <script setup lang="ts">
 import { repoStatusLabels, repoTerminal } from '#shared/repository';
-const { data, refresh, activeId } = useRepositoryRuns();
+const { data } = useRepositoryRuns();
 const running = computed(() => data.value?.runs.filter(run => !run.job || !repoTerminal(run.job.status)) ?? []);
-let timer: ReturnType<typeof setInterval> | undefined;
-let polling = false;
-onMounted(() => { timer = setInterval(async () => {
-  if (!activeId.value || polling) return;
-  polling = true; try { await refresh(); } finally { polling = false; }
-}, 5000); });
-onBeforeUnmount(() => clearInterval(timer));
 </script>
 <template>
   <div v-if="running.length" class="mb-4 space-y-2 rounded-lg border border-default p-3" role="status">

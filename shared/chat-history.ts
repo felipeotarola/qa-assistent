@@ -2,6 +2,10 @@ import { defaultMessageReducer } from "eve/client";
 import type { MessageStreamEvent, EveMessage } from "eve/client";
 
 export interface ArchivedMessage { sessionId: string; at: string; message: EveMessage }
+export interface ChatHistorySnapshot {
+  messages: ArchivedMessage[];
+  cursors: { sessionId: string; eventId: string }[];
+}
 export const archivedEventTypes = new Set([
   "session.started", "turn.started", "message.received", "message.completed", "reasoning.completed",
   "actions.requested", "action.result", "step.started", "step.completed", "step.failed",
@@ -16,6 +20,9 @@ export function projectChatHistory(rows: { sessionId: string; event: MessageStre
   }
   const result: ArchivedMessage[] = [];
   for (const [sessionId, events] of sessions) {
+    // Older root-agent copies inherited the archive hook. Preserve the records
+    // but never project their private delegation prompts as user chat turns.
+    if (events.some(event => event.type === 'session.started' && event.data.invocation?.kind === 'subagent')) continue;
     const reducer = defaultMessageReducer();
     let data = reducer.initial();
     const times = new Map<string, string>();

@@ -7,14 +7,18 @@
 const [id, token] = location.hash.slice(1).split(':');
 history.replaceState(null, '', location.pathname);
 const img = document.querySelector('img'), status = document.querySelector('#status');
-let socket, human = false, retries = 0;
+let socket, human = false, retries = 0, controlEpoch = 0;
+function visibility() { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'visibility', visible: !document.hidden })); }
+document.addEventListener('visibilitychange', visibility);
 function connect() {
   if (!id || !token) { status.textContent = 'Webbläsarlänken saknas. Öppna den från workspace.'; return; }
-  socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/view/${id}?token=${token}`);
+  const prefix = location.pathname.replace(/\/viewer$/, '');
+  socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${prefix}/view/${id}?token=${token}`);
+  socket.onopen = visibility;
   socket.onmessage = event => {
     const frame = JSON.parse(event.data);
     if (frame.type !== 'frame') return;
-    retries = 0; human = frame.control === 'human';
+    retries = 0; human = frame.control === 'human'; controlEpoch = frame.controlEpoch;
     img.src = `data:image/jpeg;base64,${frame.image}`; status.hidden = true;
   };
   socket.onclose = () => {
@@ -23,7 +27,7 @@ function connect() {
     else { status.textContent = 'Sessionen är stängd eller anslutningen är bruten. Öppna webbläsaren igen från chatten.'; parent.postMessage('workspace-browser-disconnected', '*'); }
   };
 }
-function send(data) { if (human && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(data)); }
+function send(data) { if (human && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ ...data, controlEpoch })); }
 img.onclick = e => {
   document.body.focus();
   const scale = Math.min(innerWidth / 1280, innerHeight / 900);

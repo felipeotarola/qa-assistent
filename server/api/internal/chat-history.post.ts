@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { MessageStreamEvent } from "eve/client";
 import { requireInternalRequest } from "../../utils/internal-api";
-import { chatHistory, saveChatEvents } from "../../utils/chat-history";
+import { chatHistory, isChatRoot, saveChatEvents } from "../../utils/chat-history";
 
 export default defineEventHandler(async event => {
   requireInternalRequest(event);
@@ -10,6 +10,7 @@ export default defineEventHandler(async event => {
     await saveChatEvents(body.userId, body.threadId, body.sessionId, body.events as MessageStreamEvent[], body.runtime);
     return { saved: true };
   }
+  if (!await isChatRoot(body.userId, body.threadId, body.sessionId)) return { context: '[]', truncated: false };
   const history = await chatHistory(body.userId, body.threadId);
   // Previous turns in this runtime already live in Eve's own model history.
   const messages = history.filter(m => m.sessionId !== body.sessionId).map(m => ({ role: m.message.role, text: m.message.parts.filter(p => p.type === "text").map(p => "text" in p ? p.text : "").join("\n") })).filter(m => m.text);

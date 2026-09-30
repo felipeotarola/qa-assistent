@@ -19,7 +19,7 @@ export async function adoptLegacyChat(event: H3Event, userId: string, threadId: 
     const client = new Client({ host, headers: { cookie: getHeader(event, "cookie") || "", "x-pat-browser-thread": threadId } });
     try {
       const snapshot = await client.sessions.attach(thread.sessionId).snapshot({ signal: AbortSignal.timeout(15000) });
-      for (let i = 0; i < snapshot.events.length; i += 100) await saveChatEvents(userId, threadId, thread.sessionId, snapshot.events.slice(i, i + 100));
+      for (let i = 0; i < snapshot.events.length; i += 100) await saveChatEvents(userId, threadId, thread.sessionId, snapshot.events.slice(i, i + 100), runtime);
       sessionId = thread.sessionId;
     }
     catch (error) {

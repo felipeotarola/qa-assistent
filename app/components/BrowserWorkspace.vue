@@ -1,16 +1,29 @@
 <script setup lang="ts">
 import type { BrowserView } from "#shared/browser";
+import type { ExecutionEvent } from '#shared/execution';
 
 const props = defineProps<{ threadId: string; embedded?: boolean }>();
 const route = useRoute();
 const browser = shallowRef<BrowserView | null>(null);
+const browsers = shallowRef<BrowserView[]>([]);
+const selectedId = ref<string>();
+const browserOptions = computed(() => browsers.value.map(item => ({ value: item.sessionId, label: `${item.agentId === 'main' ? 'Huvudagent' : 'Repoagent'} · ${item.title || item.url || 'Webbläsare'}` })));
+const liveEvent = useState<ExecutionEvent | null>('execution-browser', () => null);
+const browserId = useState<string | null>('execution-browser-id', () => null);
+watch(() => browser.value?.sessionId, id => { browserId.value = id || null; });
+watch(liveEvent, event => {
+  if (!event || browser.value?.sessionId !== event.executionId) return;
+  const snapshot = event.snapshot as { status: string; control: 'human' | 'agent' };
+  if (snapshot.status === 'closed') { browser.value = null; disconnected.value = true; }
+  else if (browser.value && ['human', 'agent'].includes(snapshot.control)) browser.value = { ...browser.value, control: snapshot.control };
+});
 const emit = defineEmits<{ presence: [visible: boolean]; working: [active: boolean]; reveal: [] }>();
 const chatActivity = useState<Record<string, boolean>>('chat-activity', () => ({}));
-const working = computed(() => !!browser.value && !disconnected.value && browser.value.control === 'agent' && !!chatActivity.value[props.threadId]);
+const working = computed(() => !!browser.value && !disconnected.value && browser.value.control === 'agent' && !!chatActivity.value[browser.value.threadId || props.threadId]);
 const minimized = ref(false);
 watch(working, value => emit('working', value));
 async function reveal() {
-  await navigateTo({ path: route.path, query: { ...route.query, workspaceView: 'testing' } });
+  await navigateTo({ path: route.path, query: { ...route.query, workspaceView: 'material' } });
   emit('reveal');
   await nextTick();
   expanded.value = true;
@@ -32,7 +45,7 @@ watch(preview, (element) => {
   });
   previewObserver.observe(element);
 });
-const browserResume = useState<string | null>("browser-resume", () => null);
+const browserResume = useState<{ threadId: string; sessionId: string } | null>("browser-resume", () => null);
 let timer: ReturnType<typeof setTimeout> | undefined;
 let disposed = false;
 let polling = false;
@@ -43,10 +56,19 @@ async function refresh() {
   polling = true;
   const currentRevision = revision;
   try {
-    const result = await $fetch<{ browser: BrowserView | null }>(`/api/threads/${props.threadId}/browser`);
-    if (!disposed && currentRevision === revision) { browser.value = result.browser; error.value = ""; }
+    const result = await $fetch<{ browser: BrowserView | null; browsers: BrowserView[] }>(`/api/threads/${props.threadId}/browser`, { query: selectedId.value ? { sessionId: selectedId.value } : undefined });
+    if (!disposed && currentRevision === revision) {
+      browsers.value = result.browsers;
+      browser.value = result.browser || result.browsers[0] || null;
+      selectedId.value = browser.value?.sessionId;
+      error.value = "";
+    }
   }
-  catch { if (!disposed) error.value = "Kunde inte ansluta till webbläsaren. Försöker igen…"; }
+  catch (cause) {
+    if (currentRevision !== revision || disposed) return;
+    if ((cause as { statusCode?: number }).statusCode === 404) { selectedId.value = undefined; browser.value = null; }
+    error.value = "Kunde inte ansluta till webbläsaren. Försöker igen…";
+  }
   finally { polling = false; }
 }
 
@@ -56,25 +78,34 @@ async function poll() {
 }
 
 async function control(value: "human" | "agent" | "close") {
-  if (busy.value) return;
+  if (busy.value || !browser.value) return;
   busy.value = true;
   revision++;
   error.value = "";
   try {
-    const result = await $fetch<{ browser: BrowserView | null }>(`/api/threads/${props.threadId}/browser`, { method: "POST", body: { control: value } });
+    const result = await $fetch<{ browser: BrowserView | null }>(`/api/threads/${props.threadId}/browser`, { method: "POST", body: { control: value, sessionId: browser.value.sessionId } });
     if (disposed) return;
     browser.value = result.browser;
+    selectedId.value = result.browser?.sessionId;
     if (value === "agent" && result.browser) {
-      if (route.path === "/") await navigateTo(`/chat/${props.threadId}`);
-      browserResume.value = props.threadId;
+      const ownerThread = result.browser.threadId || props.threadId;
+      if (route.path !== `/chat/${ownerThread}`) await navigateTo(`/chat/${ownerThread}`);
+      browserResume.value = { threadId: ownerThread, sessionId: result.browser.sessionId };
     }
   }
   catch { error.value = "Det gick inte att ändra kontrollen. Försök igen."; }
   finally { busy.value = false; }
 }
 
-// Cross-origin iframe activity cannot be read. While the user has focused the
-// live browser, explicitly renew its idle lease; the provider's hard cap remains.
+function selectBrowser(id: string) {
+  if (busy.value) return;
+  revision++;
+  selectedId.value = id;
+  browser.value = browsers.value.find(item => item.sessionId === id) || null;
+}
+
+// A visible app preview needs its sandbox even under agent control. Ordinary
+// websites only renew when the user focuses the live browser. Hard caps remain.
 let heartbeat: ReturnType<typeof setInterval> | undefined;
 function onMessage(event: MessageEvent) {
   if (!browser.value || event.origin !== new URL(browser.value.liveUrl).origin) return;
@@ -86,8 +117,10 @@ onMounted(() => {
   void poll();
   window.addEventListener("message", onMessage);
   heartbeat = setInterval(() => {
-    if (expanded.value && browser.value?.control === "human" && document.visibilityState === "visible" && document.activeElement?.tagName === "IFRAME") {
-      void $fetch(`/api/threads/${props.threadId}/browser`, { method: "POST", body: { control: "heartbeat" } }).catch(() => {});
+    const watchingPreview = browser.value?.preview && !disconnected.value && (expanded.value || !minimized.value || working.value);
+    const interacting = expanded.value && browser.value?.control === 'human' && document.activeElement?.tagName === 'IFRAME';
+    if (browser.value && document.visibilityState === 'visible' && (watchingPreview || interacting)) {
+      void $fetch(`/api/threads/${props.threadId}/browser`, { method: "POST", body: { control: "heartbeat", sessionId: browser.value.sessionId } }).catch(() => {});
     }
   }, 30000);
 });
@@ -107,24 +140,25 @@ const displayUrl = computed(() => {
 </script>
 
 <template>
-  <Teleport to="body">
-    <section v-if="browser && !expanded" aria-label="Flytande webbläsare" class="fixed bottom-4 right-4 z-40 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-default bg-default shadow-xl">
+  <ClientOnly><Teleport defer to="#floating-work-panels">
+    <section v-if="browser && !expanded" aria-label="Flytande webbläsare" class="pointer-events-auto w-80 max-w-full shrink-0 overflow-hidden rounded-xl border border-default bg-default shadow-xl">
       <header class="flex items-center gap-2 px-3 py-2">
         <UIcon :name="working ? 'i-lucide-loader-circle' : 'i-lucide-globe-2'" class="size-4 shrink-0 text-primary" :class="{ 'animate-spin motion-reduce:animate-none': working }" />
         <div class="min-w-0 flex-1">
-          <p class="truncate text-xs font-medium">{{ disconnected ? 'Webbläsaren frånkopplad' : working ? 'Agenten arbetar' : browser.control === 'human' ? 'Du har kontrollen' : 'Webbläsaren är redo' }}</p>
+          <p class="truncate text-xs font-medium">{{ error ? 'Kontrollerar anslutningen…' : disconnected ? 'Webbläsaren frånkopplad' : working ? 'Agenten arbetar' : browser.control === 'human' ? 'Du har kontrollen' : 'Webbläsaren är redo' }}</p>
           <p class="truncate text-[10px] text-muted">{{ displayUrl }}</p>
         </div>
         <UButton :icon="minimized ? 'i-lucide-chevron-up' : 'i-lucide-minus'" :aria-label="minimized ? 'Visa liveförhandsvisning' : 'Minimera liveförhandsvisning'" color="neutral" variant="ghost" size="xs" @click="minimized = !minimized" />
         <UButton icon="i-lucide-maximize-2" aria-label="Öppna webbläsaren i workspace" color="neutral" variant="ghost" size="xs" @click="reveal" />
       </header>
+      <USelect v-if="browsers.length > 1" :model-value="selectedId" :items="browserOptions" aria-label="Välj webbläsarsession" :disabled="busy" class="mx-3 mb-2 w-[calc(100%-1.5rem)]" @update:model-value="selectBrowser" />
       <BrowserLivePreview v-if="!minimized && !disconnected" :url="browser.liveUrl" :session-id="browser.sessionId" @open="reveal" />
       <div v-if="!minimized" class="flex items-center justify-between gap-2 border-t border-default px-3 py-2">
         <span class="text-[10px] text-muted">{{ disconnected ? 'Öppna för att ansluta igen' : 'Live från workspace' }}</span>
         <UButton label="Öppna" trailing-icon="i-lucide-arrow-up-right" color="neutral" variant="ghost" size="xs" @click="reveal" />
       </div>
     </section>
-  </Teleport>
+  </Teleport></ClientOnly>
   <div :class="embedded ? (browser ? 'w-full min-w-0' : 'hidden') : 'workspace-surface relative flex h-full min-h-0 flex-col overflow-hidden'">
     <div v-if="!embedded" class="flex h-12 shrink-0 items-center gap-2 px-5 text-xs text-muted">
       <UIcon name="i-lucide-layout-grid" class="size-3.5" /> Workspace
@@ -133,6 +167,9 @@ const displayUrl = computed(() => {
     <div v-if="browser" :class="embedded ? '' : 'min-h-0 flex-1 overflow-auto px-5 pb-5'">
     <WorkspaceCard v-model:expanded="expanded" :title="browser.title || 'Webbläsare'" :subtitle="displayUrl" icon="i-lucide-globe-2">
       <template #toolbar>
+      <div v-if="browsers.length > 1" class="border-b border-default p-3">
+        <USelect :model-value="selectedId" :items="browserOptions" aria-label="Välj webbläsarsession" :disabled="busy" class="w-full" @update:model-value="selectBrowser" />
+      </div>
       <div class="flex shrink-0 flex-wrap items-center gap-2 border-b border-default p-3">
         <div class="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-default bg-muted px-3 py-2">
           <UIcon name="i-lucide-globe-2" class="size-4 shrink-0 text-muted" />
@@ -155,7 +192,7 @@ const displayUrl = computed(() => {
       <template #default>
       <div ref="preview" class="relative h-full min-h-0 overflow-hidden bg-white">
         <iframe
-          :key="browser.sessionId" :src="browser.liveUrl" title="Live Chromium"
+          :key="browser.liveUrl" :src="browser.liveUrl" title="Live Chromium"
           class="origin-top-left border-0" :class="{ 'pointer-events-none': !expanded || browser.control !== 'human' || busy }"
           :style="expanded ? { width: '100%', height: '100%' } : { width: '1280px', height: '900px', transform: `scale(${previewWidth / 1280})` }"
           :tabindex="expanded && browser.control === 'human' && !busy ? 0 : -1"

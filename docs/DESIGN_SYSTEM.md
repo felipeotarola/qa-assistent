@@ -111,8 +111,8 @@ use the shared sidebar styling, including chat rows and their activity spinners.
 view is addressable through `workspaceView=testing|material`; absence means
 Overview. `WorkspaceOverview` links to the same existing items, not copies.
 Test plans appear under Testing; other saved items appear under Material.
-The browser remains mounted across view changes and is available in both working
-views. Card controls and creation actions stay in their relevant view.
+The browser remains mounted across view changes, but its inline card is shown
+only in Material. Testing lists test plans, never standalone material or browser cards. Card controls and creation actions stay in their relevant view.
 An active browser also has a floating live preview across workspace views.
 It can be minimized without closing the session; opening it reveals the existing
 browser card. The Testing tab indicates an active agent turn with a browser
@@ -180,6 +180,14 @@ runtime status. No agent is started by interacting with the map.
 
 ## Agent activity
 
+Follow-up buttons use the existing `ChatSuggestions` component. They appear below
+the final assistant message after a successful turn and fill the composer without
+submitting it or replacing the user's existing draft. `latestChatSuggestions`
+reads the latest suggestion output across the current user turn, including when
+the tool result and final answer are separate messages. A new user turn, error,
+incomplete output or explicit empty suggestion list hides older choices. Do not
+invent generic fallback actions when the agent has not supplied suggestions.
+
 `AgentActivityPanel` is mounted once in the default layout. It follows the open
 chat across workspace tabs and can be closed without cancelling work.
 The pin action docks it as a separate right-hand column in the shared layout
@@ -192,7 +200,11 @@ on a new busy transition, not on every tool event. `shared/agent-activity.ts`
 projects the latest user task from durable chat messages with stable tool-call
 IDs. No separate result store, guessed plan, progress percentage or fictional
 workers are introduced. The actor/parent identity fields form the extension
-boundary for future orchestration; child-session subscriptions are not implemented.
+boundary for orchestration. `AgentWorkerActivity` follows real child-session
+streams discovered through `subagent.called`, with at most eight subscriptions.
+Replayed calls deduplicate by child ID, and a new parent turn clears old workers.
+Child reasoning and raw tool payloads are not rendered; their internal messages
+must not become user turns in the main conversation.
 Switching chats clears the previous projection; reopening a chat rebuilds it.
 This is not a monitor of unopened chats or background child sessions.
 
@@ -211,9 +223,21 @@ Use solid relationships for verified links and dashed relationships for inferred
 
 ## Repository execution cards
 
-`RepositoryRuns` owns the workspace's four-second refresh and bounded history;
+`useExecutionFeed` owns the workspace's shared SSE subscription and four-second
+fallback refresh (backoff up to 30 seconds on errors). `RepositoryRuns` consumes
+this state and bounded history;
+it appears in a minimizable floating panel, automatically expanded for a new run.
+The layout's `floating-work-panels` host stacks it with the browser preview so
+the panels do not overlap each other and remain available across workspace tabs.
 `RepositoryRunCard` renders actual VPS job state, logs and cancellation across
 workspace views. Completed jobs can be saved to Material through the authenticated
 repository-material endpoint, which builds content from the persisted run and
 uses a durable receipt to deduplicate retries. Do not restore the old repository
 connection form under Testing. Request a repo URL and execution in chat.
+
+`SandboxRuns` shares the floating host and shows real sandbox status, observed
+process output and stop controls. A completed shell command does not mean a
+background app it started has exited. `BrowserWorkspace` selects explicit
+sessions, including child-agent previews; takeover and return target that ID.
+All controls keep their Nuxt UI styles and keyboard labels. No percentages or
+worker counts are invented from model narration.

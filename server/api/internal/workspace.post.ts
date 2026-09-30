@@ -12,6 +12,7 @@ import { captureWorkspaceBrowser } from "../../utils/browser";
 const inputSchema = z.object({
   action: z.enum(["list", "read", "create", "update", "save_file", "screenshot", "link", "evidence"]),
   evidence: evidenceInputSchema.optional(),
+  sessionId: z.string().min(1).max(200).optional(),
   version: z.number().int().positive().optional(),
   itemId: z.string().uuid().optional(), title: z.string().min(1).max(200).optional(),
   content: contentSchema.optional(), expectedVersion: z.number().int().positive().optional(),
@@ -19,7 +20,7 @@ const inputSchema = z.object({
 });
 export default defineEventHandler(async (event) => {
   requireInternalRequest(event);
-  const { userId, threadId, input } = await readValidatedBody(event, z.object({ userId: z.string().uuid(), threadId: z.string().uuid(), input: inputSchema }).parse);
+  const { userId, threadId, agentId, input } = await readValidatedBody(event, z.object({ userId: z.string().uuid(), threadId: z.string().uuid(), agentId: z.string().min(1).max(200).default('main'), input: inputSchema }).parse);
   const thread = await getThreadForUser(userId, threadId);
   if (!thread?.workspaceId) throw createError({ statusCode: 404, statusMessage: "Workspace not found" });
   const workspaceId = thread.workspaceId;
@@ -49,7 +50,7 @@ export default defineEventHandler(async (event) => {
       return { item: await saveFile(userId, workspaceId, input.filename, "text/plain", Buffer.from(input.text), threadId) };
     }
     case "screenshot": {
-      const bytes = await captureWorkspaceBrowser(userId, threadId);
+      const bytes = await captureWorkspaceBrowser(userId, threadId, { agentId, sessionId: input.sessionId });
       return { item: await saveFile(userId, workspaceId, `${input.title || "Skärmbild"}.png`, "image/png", bytes, threadId) };
     }
   }

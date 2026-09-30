@@ -15,7 +15,7 @@ async function harness(t, overrides = {}) {
     calls.push(args);
     if (args[0] === 'run' && overrides.launchFailure) return { code: 125, output: 'runtime unavailable' };
     if (args.includes('rev-parse')) return { code: 0, output: 'a'.repeat(40) };
-    if (args.includes('-e') && args.includes('node')) return { code: 0, output: JSON.stringify({ scripts: { test: 'node --test' }, lock: !overrides.pnpm, pnpmLock: !!overrides.pnpm, packageManager: overrides.pnpm ? 'pnpm@10.33.4' : null }) };
+    if (args.includes('-e') && args.includes('node')) return { code: 0, output: JSON.stringify({ scripts: overrides.scripts || { test: 'node --test' }, nextVersion: overrides.nextVersion, lock: !overrides.pnpm, pnpmLock: !!overrides.pnpm, packageManager: overrides.pnpm ? 'pnpm@10.33.4' : null }) };
     if (args.includes('ci') && overrides.installFailure) return { code: 1, output: 'Install failed' };
     if (args.includes('run') && args.includes('test')) {
       if (overrides.hang) await new Promise((resolve, reject) => { signal.addEventListener('abort', () => reject(new Error('Aborted')), { once: true }); });
@@ -107,4 +107,80 @@ test('missing isolated runtime blocks without cloning or executing repository co
   assert.equal((await finished(runner, request.id)).status, 'blocked');
   assert.ok(!calls.some(args => args.includes('clone')));
   assert.ok(!calls.some(args => args.includes('ci')));
+});
+
+test('auto selects actual scripts and describes static checks honestly', async t => {
+  for (const [scripts, selected] of [
+    [{ test: 'jest', typecheck: 'tsc' }, 'test'],
+    [{ 'test:unit': 'vitest run', lint: 'eslint .' }, 'test:unit'],
+    [{ typecheck: 'tsc', lint: 'eslint .' }, 'typecheck'],
+    [{ lint: 'eslint .' }, 'lint'],
+  ]) {
+    const { runner, calls } = await harness(t, { scripts });
+    const request = { ...input(), script: 'auto' };
+    await runner.submit(request);
+    const job = await finished(runner, request.id);
+    assert.equal(job.selectedScript, selected);
+    assert.equal(job.script, 'auto');
+    assert.equal(job.status, 'passed');
+    assert.ok(calls.some(args => args.includes('xvfb-run') && args.includes(selected)));
+    if (['lint', 'typecheck'].includes(selected)) assert.match(job.message, /funktionella tester har inte verifierats/);
+  }
+});
+
+test('explicit missing scripts and unsupported auto choices never silently execute another command', async t => {
+  for (const script of ['test', 'auto']) {
+    const { runner, calls } = await harness(t, { scripts: { dev: 'serve', format: 'prettier --write .' } });
+    const request = { ...input(), script };
+    await runner.submit(request);
+    const job = await finished(runner, request.id);
+    assert.equal(job.status, 'blocked');
+    assert.match(job.message, /dev, format/);
+    assert.ok(!calls.some(args => args.includes('xvfb-run')));
+  }
+});
+
+test('removed Next lint is a configuration blockage with cleanup and no install', async t => {
+  const { runner, calls } = await harness(t, { scripts: { lint: 'next lint', dev: 'next dev', build: 'next build' }, nextVersion: '^16.0.3' });
+  const request = { ...input(), script: 'auto' };
+  await runner.submit(request);
+  const job = await finished(runner, request.id);
+  assert.equal(job.status, 'blocked');
+  assert.equal(job.telemetry.failureKind, 'configuration');
+  assert.equal(job.testExitCode, null);
+  assert.match(job.message, /next lint som togs bort/);
+  assert.ok(!calls.some(args => args.includes('ci') || args.includes('xvfb-run')));
+  assert.ok(calls.some(args => args[0] === 'rm'));
+});
+
+test('restart interrupts an active attempt without replaying commands; queued work survives', async t => {
+  const { runner, calls } = await harness(t);
+  runner.stopping = true;
+  const active = await runner.submit(input()), queued = await runner.submit(input());
+  active.status = 'running'; await runner.save(active);
+  const recovered = new Runner({ directory: runner.directory, execute: runner.execute });
+  await recovered.init();
+  assert.equal(recovered.jobs.get(active.id).telemetry.failureKind, 'interrupted');
+  assert.equal(recovered.jobs.get(queued.id).status, 'queued');
+  assert.ok(calls.some(args => args[0] === 'rm' && args.includes(`qa-repo-${active.id}`)));
+  assert.ok(!calls.some(args => args[0] === 'run'));
+});
+
+test('cleanup failures disable restart admission until the container is removed', async t => {
+  const { runner } = await harness(t); runner.stopping = true;
+  const job = await runner.submit(input());
+  job.status = 'blocked'; job.telemetry = { failureKind: 'cleanup' }; await runner.save(job);
+  const recovered = new Runner({ directory: runner.directory, execute: async () => ({ code: 1, output: 'Docker unavailable' }) });
+  await assert.rejects(recovered.init(), /admission remains disabled/);
+});
+
+test('repository queue rotates between workspaces without losing FIFO within one workspace', async t => {
+  const { runner } = await harness(t); runner.stopping = true;
+  const firstWorkspace = randomUUID(), secondWorkspace = randomUUID();
+  const requests = [firstWorkspace, firstWorkspace, secondWorkspace].map(workspaceId => ({ ...input(), workspaceId }));
+  for (const request of requests) await runner.submit(request);
+  const order = [];
+  runner.run = async job => { order.push(job.id); job.status = 'review'; };
+  runner.stopping = false; await runner.drain();
+  assert.deepEqual(order, [requests[0].id, requests[2].id, requests[1].id]);
 });

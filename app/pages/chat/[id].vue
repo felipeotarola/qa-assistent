@@ -7,6 +7,7 @@ import { useChatSession } from "~/composables/chat/useChatSession";
 import { chatFailureMessage, draftKey } from "#shared/chat-recovery";
 import { cardTaskPrompt } from "#shared/card-task";
 import { projectActivity } from '#shared/agent-activity';
+import { latestChatSuggestions } from '#shared/chat-suggestions';
 
 const route = useRoute();
 const chatId = computed(() => route.params.id as string);
@@ -43,6 +44,7 @@ const {
   savedText,
   dismissSavedText,
 } = useChatSession(thread.value);
+const suggestions = computed(() => savedText.value || chatError.value ? [] : latestChatSuggestions(messages.value, status.value));
 
 const activity = useAgentActivity();
 watchEffect(() => {
@@ -89,7 +91,7 @@ function restoreSavedText() {
 }
 const promptRef = useTemplateRef("promptRef");
 function selectSuggestion(prompt: string) {
-  if (isBusy.value) return;
+  if (isBusy.value || savedText.value || chatError.value) return;
   input.value = input.value.trim() ? `${input.value.trim()}\n${prompt}` : prompt;
   nextTick(() => promptRef.value?.textareaRef?.focus());
 }
@@ -165,6 +167,7 @@ function handleInputResponses(responses: Parameters<typeof respond>[0]) {
                 :status="status"
                 :is-last="message.id === messages.at(-1)?.id"
                 :can-respond="!isBusy"
+                :suggestions="message.id === messages.at(-1)?.id ? suggestions : []"
                 @input-responses="handleInputResponses"
                 @suggestion="selectSuggestion"
               />

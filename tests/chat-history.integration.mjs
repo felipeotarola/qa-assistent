@@ -40,6 +40,14 @@ try {
   assert.ok(initial.history.some(row => row.message.parts.some(p => p.type === "text" && p.text.includes(marker))));
   assert.ok(initial.history.some(row => row.message.role === "assistant" && row.message.parts.some(p => p.type === "text" && p.text.includes(workspaceName))), "Agent receives the current workspace name without being told in the user message");
   const count = initial.history.length;
+  const childId = `child-${randomUUID()}`;
+  const rootEvents = await sql`select event from pat_chat_events where thread_id = ${thread.id} limit 5`;
+  const internal = async body => fetch(`${local}/api/internal/chat-history`, { method: 'POST', headers: { authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`, 'content-type': 'application/json' }, body: JSON.stringify({ userId, threadId: thread.id, sessionId: childId, ...body }) });
+  const [binding] = await sql`select runtime from pat_chat_runtimes where thread_id = ${thread.id}`;
+  assert.ok((await internal({ runtime: binding.runtime, events: rootEvents.map(row => row.event) })).ok);
+  assert.equal((await api(local, `/api/threads/${thread.id}`)).thread.history.length, count, 'Child hook replay cannot append to the root transcript');
+  assert.deepEqual(await (await internal({})).json(), { context: '[]', truncated: false }, 'Child instructions cannot import the root archive');
+  assert.equal(Number((await sql`select count(*) from pat_chat_events where session_id = ${childId}`)[0].count), 0);
   if (secondOrigin === local) {
     // Simulate the first session belonging to another runtime without changing
     // application configuration or touching any real user's rows.

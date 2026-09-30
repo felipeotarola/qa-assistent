@@ -34,3 +34,14 @@ export const workspaceBrowsers = pgTable("pat_workspace_browsers", {
   control: text("control").notNull().default("agent"), url: text("url").notNull().default(""), title: text("title").notNull().default(""),
   expiresAt: timestamp("expires_at"), activeAt: timestamp("active_at").notNull().defaultNow(),
 }).enableRLS();
+
+// The legacy workspace browser stays readable while deployments migrate.
+export const browserAssignments = pgTable('pat_browser_assignments', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  threadId: text('thread_id').notNull(), agentId: text('agent_id').notNull().default('main'),
+  contextId: text('context_id'), sessionId: text('session_id'), projectId: text('project_id'), connectUrl: text('connect_url'), liveUrl: text('live_url'),
+  control: text('control').notNull().default('agent'), url: text('url').notNull().default(''), title: text('title').notNull().default(''),
+  expiresAt: timestamp('expires_at'), activeAt: timestamp('active_at').notNull().defaultNow(),
+}, t => [uniqueIndex('pat_browser_assignment_scope').on(t.workspaceId, t.threadId, t.agentId)]).enableRLS();

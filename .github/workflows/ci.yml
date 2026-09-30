@@ -46,6 +46,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Unit and execution contract tests
+        run: pnpm test:unit
+
       # Covers app/, server/ and shared/ (nuxt typecheck) plus agent/ (tsc).
       - name: Typecheck
         run: pnpm typecheck

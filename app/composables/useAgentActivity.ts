@@ -4,5 +4,6 @@ export function useAgentActivity() {
   const snapshot = useState<ActivitySnapshot | null>('agent-activity-snapshot', () => null);
   const open = useState('agent-activity-open', () => false);
   const requestedItem = useState<{ workspaceId: string; itemId: string } | null>('activity-open-item', () => null);
-  return { snapshot, open, requestedItem };
+  const workers = useState<{ threadId: string; sessionId: string; name: string; callId: string }[]>('agent-activity-workers', () => []);
+  return { snapshot, open, requestedItem, workers };
 }

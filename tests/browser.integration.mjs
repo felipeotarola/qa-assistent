@@ -1,4 +1,4 @@
-// Explicit integration test: creates a temporary Supabase user and Browserbase
+// Explicit integration test: creates a temporary Supabase user and browser
 // session, exercises the real HTTP API, then removes its own fixtures.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -65,11 +65,12 @@ try {
   assert.match(opened.title, /Software testing/);
   assert.ok(opened.controls.length > 0);
   const view = await api(`/api/threads/${threadId}/browser`);
-  assert.ok(view.payload.browser.liveUrl.startsWith(process.env.BROWSER_PROVIDER === 'vps' ? process.env.BROWSER_SERVICE_URL : 'https://'));
+  assert.equal(new URL(view.payload.browser.liveUrl).protocol, 'https:', 'Public viewer URL must use TLS, even when the server API uses Tailscale');
   assert.equal(view.payload.browser.connectUrl, undefined);
   const second = (await api("/api/threads", { title: "Shared workspace", workspaceId: thread.payload.thread.workspaceId })).payload.thread.id;
-  const shared = (await api(`/api/threads/${second}/browser`)).payload.browser;
-  assert.equal(shared.liveUrl, view.payload.browser.liveUrl);
+  const shared = (await api(`/api/threads/${second}/browser`)).payload;
+  assert.equal(shared.browser, null, 'Another chat does not silently inherit browser control');
+  assert.equal(shared.browsers[0].sessionId, view.payload.browser.sessionId, 'Workspace viewers can explicitly select another chat browser');
   const separateWorkspace = (await api("/api/workspaces", { name: "Separate browser scope" })).payload.workspace.id;
   const separate = (await api("/api/threads", { title: "Isolated", workspaceId: separateWorkspace })).payload.thread.id;
   assert.equal((await api(`/api/threads/${separate}/browser`)).payload.browser, null);
@@ -82,7 +83,7 @@ try {
     assert.equal((await action({ action: 'inspect' })).status, 'ready', 'First browser must remain usable');
     console.log('PASS two workspaces have simultaneously usable independent sessions');
   }
-  console.log("PASS browser shared across workspace chats and isolated from other workspaces");
+  console.log("PASS explicit browser ownership and workspace-scoped session discovery");
   console.log("PASS real Chromium navigation, page reading and live view");
   const taken = await api(`/api/threads/${threadId}/browser`, { control: "human" });
   assert.equal(taken.payload.browser.control, "human");

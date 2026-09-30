@@ -24,7 +24,7 @@ export default defineEventHandler(async event => {
       if (!item || item.deletedAt) throw createError({ statusCode: 409, statusMessage: 'Rapporten finns i papperskorgen. Återställ den där.' });
       return { item: publicItem(item) };
     }
-    const text = [`Repository: ${job.url}`, `Körning: ${runId}`, `Commit: ${job.commit || 'Ej hämtad'}`, `Script: ${job.script} ${(job.args || []).join(" ")}`, `Status: ${repoStatusLabels[job.status]}`, `Exitkod: ${job.testExitCode ?? 'Ingen'}`, job.message, 'Ett lyckat kommando bekräftar inte enskilda testfall.', 'Körlogg (senaste 64 000 tecken):', job.logs].join('\n\n');
+    const text = [`Repository: ${job.url}`, `Körning: ${runId}`, `Commit: ${job.commit || 'Ej hämtad'}`, `Script: ${job.selectedScript || job.script} ${(job.args || []).join(" ")}`, `Status: ${repoStatusLabels[job.status]}`, `Exitkod: ${job.testExitCode ?? 'Ingen'}`, job.message, 'Ett lyckat kommando bekräftar inte enskilda testfall.', 'Körlogg (senaste 64 000 tecken):', job.logs].join('\n\n');
     const item = await saveItem(userId, workspaceId, { title: `Repositorykörning · ${job.url.split('/').at(-1)} · ${runId.slice(0, 8)}`, content: { kind: 'text', text } }, tx);
     await tx.insert(schema.workspaceEvidence).values({ id: receipt, workspaceId, itemId: item.id, itemVersion: item.version, kind: 'origin', label: `VPS-körning ${runId}` });
     return { item };

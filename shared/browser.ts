@@ -8,9 +8,14 @@ export const browserActionSchema = z.object({
   text: z.string().max(10000).optional(),
   direction: z.enum(["up", "down"]).optional(),
   runId: z.string().uuid().optional(),
+  sessionId: z.string().uuid().optional().describe('Only when resuming an explicitly selected browser session in this workspace.'),
 });
 export type BrowserAction = z.infer<typeof browserActionSchema>;
 export interface BrowserView {
+  assignmentId?: string;
+  threadId?: string;
+  agentId?: string;
+  preview?: boolean;
   sessionId: string;
   liveUrl: string;
   url: string;

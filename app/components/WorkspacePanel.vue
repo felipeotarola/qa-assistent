@@ -24,7 +24,7 @@ const expandedItems = ref<Record<string, boolean>>({});
 const plans = computed(() => items.value.filter(item => item.content.kind === 'test_plan'));
 const materials = computed(() => items.value.filter(item => item.content.kind !== 'test_plan'));
 function inView(item: WorkspaceItem | null) {
-  return item ? (view.value === 'testing' ? item.content.kind === 'test_plan' && !!expandedItems.value[item.id] : view.value === 'material' && item.content.kind !== 'test_plan' && (!!expandedItems.value[item.id] || (materialMode.value !== 'table' && matchesMaterial(item)))) : view.value !== 'overview';
+  return item ? (view.value === 'testing' ? item.content.kind === 'test_plan' && !!expandedItems.value[item.id] : view.value === 'material' && item.content.kind !== 'test_plan' && (!!expandedItems.value[item.id] || (materialMode.value !== 'table' && matchesMaterial(item)))) : view.value === 'material';
 }
 function openItem(item: WorkspaceItem) {
   view.value = item.content.kind === 'test_plan' ? 'testing' : 'material';
@@ -195,7 +195,7 @@ async function uploadFile(event: Event) {
     <p v-if="error" role="alert" class="px-4 py-2 text-xs text-error">{{ error }}</p>
     <div class="qaa-workspace-content min-h-0 flex-1 overflow-auto">
       <p v-if="!loaded && !error" role="status" class="py-8 text-center text-sm text-muted">Hämtar workspace…</p>
-      <RepositoryRuns v-show="!trash" :key="activeId || 'none'" @saved="refresh" />
+      <RepositoryRuns :key="activeId || 'none'" @saved="refresh" />
       <div v-if="trash" class="space-y-2">
         <p class="mb-4 text-sm text-muted">Papperskorg — objekt och filer behålls tills vidare och kan återställas.</p>
         <div v-for="item in items" :key="item.id" class="flex items-center gap-3 rounded-lg border border-default bg-default p-3">
@@ -232,7 +232,7 @@ icon="i-lucide-grip-vertical" color="neutral" variant="ghost" size="xs" class="c
             <UButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="xs" aria-label="Flytta senare" title="Flytta senare" :disabled="ordering || !neighbor(card.id, 1)" @click="stepCard(card.id, 1)" />
           </div>
           <WorkspaceItemCard v-if="card.item" v-model:expanded="expandedItems[card.id]" :item="card.item" @saved="refresh" @insert-image="insertImage" />
-          <BrowserWorkspace v-else-if="threadId && activeId" :key="activeId" :thread-id="threadId" embedded @presence="browserPresent = $event" @working="browserWorking = $event" @reveal="trash = false; view = 'testing'" />
+          <BrowserWorkspace v-else-if="threadId && activeId" :key="activeId" :thread-id="threadId" embedded @presence="browserPresent = $event" @working="browserWorking = $event" @reveal="trash = false; view = 'material'" />
         </div>
       </TransitionGroup>
       <div v-if="loaded && !trash && view !== 'overview' && !(view === 'testing' ? plans.length : materials.length)" class="mx-auto mt-12 max-w-64 text-center text-sm leading-relaxed text-dimmed">

@@ -8,7 +8,7 @@ import { recordStreamEvent } from "~/composables/chat/stream-log";
 import { clearTurnFailure, recordTurnFailure, turnFailure } from "~/composables/chat/turn-errors";
 import { CHAT_MODEL_HEADER, REASONING_HEADER } from "#shared/chat-models";
 import { BROWSER_THREAD_HEADER } from "#shared/browser";
-import type { ArchivedMessage } from "#shared/chat-history";
+import type { ArchivedMessage, ChatHistorySnapshot } from "#shared/chat-history";
 import { draftKey } from "#shared/chat-recovery";
 
 /** The four statuses the Nuxt UI chat components understand. */
@@ -37,6 +37,9 @@ export function useChatSession(thread: ThreadRecord) {
   }
   onMounted(() => { try { savedText.value = sessionStorage.getItem(draftKey(chatId, "outgoing")) ?? ""; } catch { /* Storage may be disabled. */ } });
   let boundSession = thread.sessionId;
+  const { workers } = useAgentActivity();
+  workers.value = [];
+  onBeforeUnmount(() => { workers.value = workers.value.filter(worker => worker.threadId !== chatId); });
 
   const agent = useEveAgent({
     ...initial,
@@ -53,6 +56,10 @@ export function useChatSession(thread: ThreadRecord) {
       }
     },
     onEvent: (event) => {
+      if (event.type === 'turn.started') workers.value = [];
+      if (event.type === 'subagent.called' && event.data.childSessionId && !workers.value.some(worker => worker.sessionId === event.data.childSessionId) && workers.value.length < 8) {
+        workers.value.push({ threadId: chatId, sessionId: event.data.childSessionId, name: event.data.toolName, callId: event.data.callId });
+      }
       if (event.type === "authorization.required" || event.type === "authorization.completed") {
         recordAuthorizationEvent(event);
       }
@@ -71,14 +78,24 @@ export function useChatSession(thread: ThreadRecord) {
   const queued = ref<string>();
 
   let disposed = false;
+  let reconnecting = false;
   let historyTimer: ReturnType<typeof setTimeout> | undefined;
   async function refreshHistory() {
     try {
-      const data = await $fetch<{ messages: ArchivedMessage[] }>(`/api/threads/${chatId}/history`);
+      const data = await $fetch<ChatHistorySnapshot>(`/api/threads/${chatId}/history`);
       if (!disposed) {
         // Do not invalidate the full transcript for unchanged polling responses.
         if (JSON.stringify(archived.value) !== JSON.stringify(data.messages)) archived.value = data.messages;
         if (persistenceError.value?.message === "Kunde inte uppdatera den gemensamma chatthistoriken.") persistenceError.value = undefined;
+        // A settled stream can miss a later turn started in another tab, or
+        // during a reconnect. Catch up from Eve; never resend the user's action.
+        const sessionId = agent.session.value?.sessionId;
+        const cursor = data.cursors.find(item => item.sessionId === sessionId);
+        const lastEvent = agent.events.value.at(-1)?.meta.id;
+        if (!reconnecting && !sending.value && agent.status.value === 'ready' && cursor && (!lastEvent || cursor.eventId > lastEvent)) {
+          reconnecting = true;
+          void agent.resume().catch(() => { /* Eve exposes the transport error. */ }).finally(() => { reconnecting = false; });
+        }
       }
     }
     catch { if (!disposed) persistenceError.value = new Error("Kunde inte uppdatera den gemensamma chatthistoriken."); }
@@ -186,11 +203,11 @@ export function useChatSession(thread: ThreadRecord) {
     catch (cause) { actionError.value = cause instanceof Error ? cause : new Error("Kunde inte bekräfta att agenten stoppats"); }
   }
 
-  const browserResume = useState<string | null>("browser-resume", () => null);
-  watch([browserResume, status], ([threadId, currentStatus]) => {
-    if (threadId !== chatId || !["ready", "error"].includes(currentStatus)) return;
+  const browserResume = useState<{ threadId: string; sessionId: string } | null>("browser-resume", () => null);
+  watch([browserResume, status], ([resume, currentStatus]) => {
+    if (!resume || resume.threadId !== chatId || !["ready", "error"].includes(currentStatus)) return;
     browserResume.value = null;
-    void send("Jag har lämnat tillbaka kontrollen över webbläsaren. Läs av sidan igen och fortsätt med uppgiften.");
+    void send(`Jag har lämnat tillbaka kontrollen över webbläsarsession ${resume.sessionId}. Läs av just den sessionen med browser sessionId och fortsätt med uppgiften.`);
   });
 
   return {

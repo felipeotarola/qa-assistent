@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SandboxRuns from '~/components/SandboxRuns.vue';
 import { startNewChat } from "~/composables/chat/navigation";
 import { useThreadList } from "~/composables/chat/useThreads";
 import AgentActivityPanel from '~/components/AgentActivityPanel.vue';
@@ -19,6 +20,7 @@ watch(() => route.fullPath, () => {
 
 const { threads, pending, refresh } = useThreadList();
 const { activeId } = useWorkspaces();
+useExecutionFeed();
 const workspaceThreads = computed(() => threads.value.filter(t => t.workspaceId === activeId.value));
 async function openWorkspaceView(view: 'overview' | 'testing' | 'material') {
   await navigateTo({ path: route.path.startsWith('/chat/') ? route.path : '/', query: { workspaceView: view } });
@@ -72,6 +74,10 @@ defineShortcuts({
 
 <template>
   <UDashboardGroup unit="rem" class="qaa-shell">
+    <Teleport to="body">
+    <div id="floating-work-panels" class="pointer-events-none fixed bottom-4 right-4 z-40 flex max-h-[calc(100dvh-2rem)] w-[28rem] max-w-[calc(100vw-2rem)] flex-col items-end gap-3 overflow-y-auto" />
+    </Teleport>
+    <SandboxRuns />
     <UDashboardSidebar
       id="default"
       v-model:open="sidebarOpen"

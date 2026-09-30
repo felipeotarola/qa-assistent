@@ -1,5 +1,8 @@
 #!/bin/sh
 set -eu
+modprobe br_netfilter
+sysctl -w net.bridge.bridge-nf-call-iptables=1
+sysctl -w net.bridge.bridge-nf-call-ip6tables=1
 docker network inspect qa-repo-net >/dev/null 2>&1 || docker network create --subnet 172.30.0.0/24 qa-repo-net
 iptables -N QA_REPO_EGRESS 2>/dev/null || true
 iptables -F QA_REPO_EGRESS

@@ -2,8 +2,9 @@
 import type { ActivityStep } from '#shared/agent-activity';
 import type { WorkspaceItem } from '#shared/workspace';
 import AgentActivitySurface from './AgentActivitySurface.vue';
+import AgentWorkerActivity from './AgentWorkerActivity.vue';
 
-const { snapshot, open, requestedItem } = useAgentActivity();
+const { snapshot, open, requestedItem, workers } = useAgentActivity();
 const pinned = useCookie<boolean>('agent-activity-pinned', { default: () => false, sameSite: 'lax' });
 const wide = ref(false);
 onMounted(() => {
@@ -57,6 +58,7 @@ watch(() => snapshot.value?.threadId, () => { draft.value = undefined; saveError
   </div>
   <AgentActivitySurface v-model:open="drawerOpen" :docked="docked" :can-pin="wide" @pin="togglePin">
       <RepositoryActivity />
+      <AgentWorkerActivity v-for="worker in workers.filter(worker => worker.threadId === snapshot?.threadId)" :key="worker.sessionId" :thread-id="worker.threadId" :session-id="worker.sessionId" :name="worker.name" />
       <div v-if="snapshot" class="space-y-6">
         <div class="rounded-lg border border-default bg-muted p-4 space-y-2" role="status">
           <div class="flex items-center gap-2 font-semibold">

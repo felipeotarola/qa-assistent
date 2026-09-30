@@ -22,7 +22,7 @@ function record(value: unknown): Record<string, unknown> {
 }
 const names: Record<string, string> = { bash: 'Kommandokörning', browser: 'Webbläsare', workspace: 'Material', research: 'Undersökning', web_search: 'Webbsökning', test_run: 'Testkörning', test_plan: 'Testplan', test_requirement: 'Krav', ask_question: 'Fråga till dig' };
 const actions: Record<string, string> = { read: 'Läser', list: 'Hämtar lista', create: 'Skapar', update: 'Uppdaterar', screenshot: 'Tar skärmbild', save_file: 'Sparar fil', start: 'Startar', finish: 'Registrerar resultat', open: 'Öppnar', inspect: 'Inspekterar', click: 'Klickar', navigate: 'Navigerar' };
-export function projectActivity(messages: { id: string; role: string; parts: unknown[] }[], busy: boolean): Pick<ActivitySnapshot, 'turnId' | 'steps' | 'texts'> {
+export function projectActivity(messages: readonly { id: string; role: string; parts: readonly unknown[] }[], busy: boolean): Pick<ActivitySnapshot, 'turnId' | 'steps' | 'texts'> {
   const start = messages.findLastIndex(message => message.role === 'user');
   const current = messages.slice(Math.max(0, start));
   const steps = new Map<string, ActivityStep>();
