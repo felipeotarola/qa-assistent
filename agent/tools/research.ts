@@ -9,7 +9,9 @@ export default defineTool({
     const threadId = auth?.attributes.browserThreadId;
     if (auth?.authenticator !== "app" || typeof threadId !== "string") return { error: "Research requires a web chat." };
     const response = await fetch(`${appOrigin()}/api/internal/research`, { method: "POST", headers: internalHeaders(), body: JSON.stringify({ userId: auth.principalId, threadId, input }), signal: ctx.abortSignal });
-    if (!response.ok) return { error: `Research failed (${response.status}). Do not claim content or images were collected. Check URL, Browserbase quota and storage before retrying.` };
+    if (!response.ok) return { error: response.status === 409
+      ? 'Research browser capacity is full. Wait for a session to finish; do not close another workspace browser.'
+      : `Research failed (${response.status}). Do not claim content or images were collected. Check the URL, configured browser service and storage. This response alone does not establish a quota problem.` };
     return response.json();
   },
 });

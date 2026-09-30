@@ -12,7 +12,6 @@ const cases = computed(() => plans.value.flatMap(item => item.content.kind === '
 <template>
   <section aria-label="Testplansbibliotek" class="space-y-6">
     <WorkspacePageHeader title="Era testplaner" description="Från krav och testidéer till tydliga testfall." />
-    <WorkspaceRepositories />
     <div class="qaa-metric-strip"><div><p>{{ plans.length }}</p><p class="text-xs text-muted">Testplaner</p></div><div><p>{{ cases.length }}</p><p class="text-xs text-muted">Testfall</p></div><div><p :class="cases.some(c => !caseReady(c)) ? 'text-warning' : ''">{{ cases.filter(c => !caseReady(c)).length }}</p><p class="text-xs text-muted">Behöver beskrivas</p></div></div>
     <UInput v-model="query" icon="i-lucide-search" placeholder="Hitta en testplan…" aria-label="Sök testplaner" class="w-full sm:max-w-sm" />
     <div class="space-y-3">

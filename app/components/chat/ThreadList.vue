@@ -16,6 +16,7 @@ const emit = defineEmits<{
 const route = useRoute();
 const threadsRef = toRef(props, "threads");
 const { groups } = useThreadGroups(threadsRef);
+const chatActivity = useState<Record<string, boolean>>('chat-activity', () => ({}));
 
 const deletingId = ref<string | null>(null);
 const confirmOpen = ref(false);
@@ -103,6 +104,10 @@ async function confirmDelete() {
                 : 'text-muted hover:bg-linear-to-r hover:from-elevated hover:to-elevated/0'"
             >
               <span class="truncate">{{ thread.title }}</span>
+              <span v-if="chatActivity[thread.id]" class="ml-auto flex shrink-0 items-center" role="status">
+                <UIcon name="i-lucide-loader-circle" class="size-3.5 text-primary motion-safe:animate-spin" aria-hidden="true" />
+                <span class="sr-only">Agenten arbetar</span>
+              </span>
             </NuxtLink>
           </UContextMenu>
         </template>

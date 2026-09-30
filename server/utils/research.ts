@@ -6,6 +6,23 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { getThreadForUser } from "./threads";
 import { requireWorkspace, saveFile, workspaceBlobToken } from "./workspaces";
+import { vpsBrowserRequest, type VpsBrowserSession } from './vps-browser';
+
+async function researchSession() {
+  if (process.env.BROWSER_PROVIDER === 'vps') {
+    // Always allocate a fresh session; never borrow the live browser's cookies
+    // or interrupt a user's human-control session.
+    const session = await vpsBrowserRequest<VpsBrowserSession>('/sessions', 'POST');
+    return { connectUrl: session.connectUrl, release: () => vpsBrowserRequest(`/sessions/${session.sessionId}`, 'DELETE') };
+  }
+  if (!process.env.BROWSERBASE_API_KEY) throw createError({ statusCode: 503, statusMessage: 'Research browser is not configured' });
+  const bb = new Browserbase({ apiKey: process.env.BROWSERBASE_API_KEY, timeout: 20000, maxRetries: 0 });
+  const projects = process.env.BROWSERBASE_PROJECT_ID ? [{ id: process.env.BROWSERBASE_PROJECT_ID }] : await bb.projects.list();
+  if (projects.length !== 1) throw createError({ statusCode: 503, statusMessage: 'Select a Browserbase project' });
+  const projectId = projects[0]!.id;
+  const session = await bb.sessions.create({ projectId, keepAlive: false, api_timeout: 120, region: 'eu-central-1', browserSettings: { viewport: { width: 1280, height: 900 }, recordSession: false, logSession: false } });
+  return { connectUrl: session.connectUrl, release: () => bb.sessions.update(session.id, { projectId, status: 'REQUEST_RELEASE' }) };
+}
 
 const blocked = new BlockList();
 for (const [ip, prefix] of [["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.168.0.0", 16], ["198.18.0.0", 15], ["224.0.0.0", 4], ["240.0.0.0", 4]] as const) blocked.addSubnet(ip, prefix);
@@ -25,13 +42,8 @@ export async function researchPage(userId: string, threadId: string, input: { ur
   try { url = await publicUrl(input.url); }
   catch { throw createError({ statusCode: 400, statusMessage: "Provide a public website URL without credentials" }); }
   if (input.screenshot) workspaceBlobToken();
-  if (!process.env.BROWSERBASE_API_KEY) throw createError({ statusCode: 503, statusMessage: "Browserbase is not configured" });
-  const bb = new Browserbase({ apiKey: process.env.BROWSERBASE_API_KEY, timeout: 20000, maxRetries: 0 });
-  const projects = process.env.BROWSERBASE_PROJECT_ID ? [{ id: process.env.BROWSERBASE_PROJECT_ID }] : await bb.projects.list();
-  if (projects.length !== 1) throw createError({ statusCode: 503, statusMessage: "Select a Browserbase project" });
-  const projectId = projects[0]!.id;
   // No persistent context or shared cookies with the live browser.
-  const session = await bb.sessions.create({ projectId, keepAlive: false, api_timeout: 120, region: "eu-central-1", browserSettings: { viewport: { width: 1280, height: 900 }, recordSession: false, logSession: false } });
+  const session = await researchSession();
   let browser: Browser | undefined;
   try {
     browser = await chromium.connectOverCDP(session.connectUrl, { timeout: 15000 });
@@ -61,6 +73,6 @@ export async function researchPage(userId: string, threadId: string, input: { ur
   }
   finally {
     await browser?.close().catch(() => {});
-    await bb.sessions.update(session.id, { projectId, status: "REQUEST_RELEASE" }).catch(() => {});
+    await session.release().catch(() => {});
   }
 }

@@ -8,6 +8,8 @@ export default defineEventHandler(async event => {
   try { return await researchPage(userId, threadId, input); }
   catch (error) {
     const status = (error as { statusCode?: number }).statusCode;
-    throw createError({ statusCode: status && [400, 404, 503].includes(status) ? status : 502, statusMessage: "Research failed. Check the public URL, browser quota and private file storage. No result should be assumed." });
+    throw createError({ statusCode: status && [400, 404, 409, 503].includes(status) ? status : 502, statusMessage: status === 409
+      ? 'Research browser capacity is full. Wait for a session to finish; do not close another workspace browser.'
+      : 'Research failed. Check the public URL, configured browser service and private file storage. No result should be assumed.' });
   }
 });
