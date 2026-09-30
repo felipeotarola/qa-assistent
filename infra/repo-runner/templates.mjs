@@ -6,7 +6,12 @@ export class SandboxTemplates {
   constructor(directory) { this.directory = directory; }
   path(key) {
     if (typeof key !== 'string' || !/^[\w.-]{1,160}$/.test(key)) throw new Error('Invalid sandbox template key');
-    return `${this.directory}/${createHash('sha256').update(key).digest('hex')}.json`;
+    // Eve 0.47.3 scopes custom backends by the local artifact path. Vercel's
+    // build path and workflow bundle path differ. Keep Eve's content/version
+    // digest; discard only that host-local scope within this app's worker.
+    const eve = key.match(/^eve-sbx-tpl-qaa-vps-v1-[a-f0-9]{16}-([a-f0-9]{20})$/);
+    const stableKey = eve ? `eve-qaa-vps-v1-${eve[1]}` : key;
+    return `${this.directory}/${createHash('sha256').update(stableKey).digest('hex')}.json`;
   }
   async get(key) {
     try { return JSON.parse(await readFile(this.path(key), 'utf8')); }

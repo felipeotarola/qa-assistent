@@ -149,6 +149,10 @@ authenticated worker `/templates` endpoint. Templates are immutable, bounded and
 persist on the VPS; each environment receives them once without overwriting existing
 files. Deploy the worker before the Eve build. Command-based bootstrap is unsupported;
 reusable runtime tools belong in the worker image.
+The adapter is pinned to Eve 0.47.3: worker template lookup preserves Eve's content
+version while removing its host-local artifact-path scope, which differs between
+Vercel build containers and workflow bundles. Different content never falls back
+to another template version.
 
 The code budget is 3 GiB (at most two code environments). The browser reserve is
 another 3 GiB: two public sessions in a 2 GiB pool and one dedicated 1 GiB preview
