@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { startNewChat } from "~/composables/chat/navigation";
 import { useThreadList } from "~/composables/chat/useThreads";
+import AgentActivityPanel from '~/components/AgentActivityPanel.vue';
 
 const sidebarOpen = ref(false);
 provideWorkspaceAgent();
@@ -9,6 +10,8 @@ const { container: splitContainer, width: chatWidth, dragging, start, move, fini
 const route = useRoute();
 const hasWorkspace = computed(() => !!activeId.value && (route.path === "/" || route.path.startsWith("/chat/")));
 const mobilePane = ref<"chat" | "workspace">("chat");
+const { requestedItem } = useAgentActivity();
+watch(requestedItem, request => { if (request) mobilePane.value = 'workspace'; });
 watch(() => route.path, () => { mobilePane.value = "chat"; });
 
 const { threads, pending, refresh } = useThreadList();
@@ -195,6 +198,7 @@ defineShortcuts({
         />
       </div>
     </div>
+    <ClientOnly><AgentActivityPanel /></ClientOnly>
   </UDashboardGroup>
 </template>
 

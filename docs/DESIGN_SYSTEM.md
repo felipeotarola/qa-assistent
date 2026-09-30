@@ -156,6 +156,31 @@ to the existing integration settings. It never starts a test or publishes an iss
 when selecting a capability or copying an example. Do not invent specialist agents,
 running-task counts, browser availability or workspace destination readiness here.
 
+## Agent activity
+
+`AgentActivityPanel` is mounted once in the default layout. It follows the open
+chat across workspace tabs and can be closed without cancelling work.
+The pin action docks it as a separate right-hand column in the shared layout
+at viewport widths of 1280px and above. The preference is stored in a cookie;
+narrower screens use the drawer without clearing that preference. Docked content
+has its own scroll area and never overlays the workspace. `AgentActivitySurface`
+owns the dock/drawer presentation while the panel retains its feature state.
+It opens
+on a new busy transition, not on every tool event. `shared/agent-activity.ts`
+projects the latest user task from durable chat messages with stable tool-call
+IDs. No separate result store, guessed plan, progress percentage or fictional
+workers are introduced. The actor/parent identity fields form the extension
+boundary for future orchestration; child-session subscriptions are not implemented.
+Switching chats clears the previous projection; reopening a chat rebuilds it.
+This is not a monitor of unopened chats or background child sessions.
+
+Tool success is separate from test success. Incomplete calls are unconfirmed,
+not green. The panel does not render raw tool payloads or reasoning. Workspace
+write receipts link to existing objects; selected assistant text is explicitly
+saved as a new material note with source-chat evidence. The authenticated
+activity-material endpoint uses a transactional source receipt to deduplicate
+retries, including after reload. Deleted notes must be restored from trash.
+
 ## Material diagrams
 
 Material supports a versioned `diagram` object rendered with Vue Flow and Dagre automatic layout. The canvas provides pan, zoom and fit controls; node positions are generated, not manually saved. Standard controls remain Nuxt UI. Nodes and relationships can be edited through the normal workspace editor or its agent quick task.

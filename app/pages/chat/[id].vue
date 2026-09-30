@@ -6,6 +6,7 @@ import { useStreamLog } from "~/composables/chat/stream-log";
 import { useChatSession } from "~/composables/chat/useChatSession";
 import { chatFailureMessage, draftKey } from "#shared/chat-recovery";
 import { cardTaskPrompt } from "#shared/card-task";
+import { projectActivity } from '#shared/agent-activity';
 
 const route = useRoute();
 const chatId = computed(() => route.params.id as string);
@@ -42,6 +43,23 @@ const {
   savedText,
   dismissSavedText,
 } = useChatSession(thread.value);
+
+const activity = useAgentActivity();
+watchEffect(() => {
+  const latestUser = messages.value.findLast(message => message.role === 'user');
+  const latestText = latestUser?.parts.filter(part => part.type === 'text').map(part => part.text).join('');
+  // A failed send may never enter durable history. Do not display the previous
+  // task's completed steps as if they belonged to that unconfirmed request.
+  const activityMessages = savedText.value && latestText !== savedText.value
+    ? [...messages.value, { id: `outgoing:${thread.value.id}`, role: 'user', parts: [] }]
+    : messages.value;
+  activity.snapshot.value = { ...projectActivity(activityMessages, isBusy.value), threadId: thread.value.id,
+    workspaceId: thread.value.workspaceId, busy: isBusy.value, connected: true, failed: !!chatError.value || (!!savedText.value && !isBusy.value) };
+});
+watch(isBusy, (busy, previous) => { if (busy && !previous) activity.open.value = true; });
+onBeforeUnmount(() => {
+  if (activity.snapshot.value?.threadId === thread.value.id) activity.snapshot.value = null;
+});
 
 const cardAgent = useWorkspaceAgent();
 const cardRunner = async (item: Parameters<typeof cardTaskPrompt>[0], text: string) => {

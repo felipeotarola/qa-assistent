@@ -40,6 +40,12 @@ provide('workspace-test-runs', runs);
 provide('workspace-items', items);
 provide('workspace-open-item', (id: string) => { const item = items.value.find(i => i.id === id); if (item) openItem(item); });
 const loaded = ref(false);
+const activity = useAgentActivity();
+watch([activity.requestedItem, items], ([request]) => {
+  if (!request || request.workspaceId !== activeId.value) return;
+  const item = items.value.find(item => item.id === request.itemId);
+  if (item) { openItem(item); activity.requestedItem.value = null; }
+});
 const imageInsertion = ref<{ image: WorkspaceItem; targetId?: string }>();
 function insertImage(imageId: string, targetId?: string) {
   const image = items.value.find(item => item.id === imageId && item.content.kind === "image");
