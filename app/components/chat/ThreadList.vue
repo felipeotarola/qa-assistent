@@ -64,14 +64,14 @@ async function confirmDelete() {
       v-if="pending && !threads.length"
       class="px-3 py-1 text-sm text-muted"
     >
-      Loading…
+      Hämtar chattar…
     </div>
 
     <p
       v-else-if="!threads.length"
       class="px-3 py-1 text-sm text-muted"
     >
-      No chats yet.
+      Inga chattar här ännu.
     </p>
 
     <UScrollArea
@@ -98,11 +98,13 @@ async function confirmDelete() {
           >
             <NuxtLink
               :to="`/chat/${thread.id}`"
-              class="flex items-center gap-1.5 overflow-hidden rounded-md px-2 py-1 text-sm transition-colors"
+              class="qaa-chat-link flex items-center gap-2 overflow-hidden rounded-lg px-3 py-2 text-sm transition-colors"
+              :aria-current="isActive(thread.id) ? 'page' : undefined"
               :class="isActive(thread.id)
-                ? 'bg-linear-to-r from-elevated to-elevated/0 text-highlighted brightness-125'
-                : 'text-muted hover:bg-linear-to-r hover:from-elevated hover:to-elevated/0'"
+                ? 'bg-elevated text-highlighted font-medium'
+                : 'text-muted hover:bg-elevated hover:text-highlighted'"
             >
+              <UIcon name="i-lucide-message-square" class="size-3.5 shrink-0" />
               <span class="truncate">{{ thread.title }}</span>
               <span v-if="chatActivity[thread.id]" class="ml-auto flex shrink-0 items-center" role="status">
                 <UIcon name="i-lucide-loader-circle" class="size-3.5 text-primary motion-safe:animate-spin" aria-hidden="true" />

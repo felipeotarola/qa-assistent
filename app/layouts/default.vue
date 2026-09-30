@@ -2,6 +2,7 @@
 import { startNewChat } from "~/composables/chat/navigation";
 import { useThreadList } from "~/composables/chat/useThreads";
 import AgentActivityPanel from '~/components/AgentActivityPanel.vue';
+import SidebarNavigationGroup from '~/components/SidebarNavigationGroup.vue';
 
 const sidebarOpen = ref(false);
 provideWorkspaceAgent();
@@ -12,11 +13,24 @@ const hasWorkspace = computed(() => !!activeId.value && (route.path === "/" || r
 const mobilePane = ref<"chat" | "workspace">("chat");
 const { requestedItem } = useAgentActivity();
 watch(requestedItem, request => { if (request) mobilePane.value = 'workspace'; });
-watch(() => route.path, () => { mobilePane.value = "chat"; });
+watch(() => route.fullPath, () => {
+  mobilePane.value = ['overview', 'testing', 'material'].includes(String(route.query.workspaceView)) ? 'workspace' : 'chat';
+}, { immediate: true });
 
 const { threads, pending, refresh } = useThreadList();
 const { activeId } = useWorkspaces();
 const workspaceThreads = computed(() => threads.value.filter(t => t.workspaceId === activeId.value));
+async function openWorkspaceView(view: 'overview' | 'testing' | 'material') {
+  await navigateTo({ path: route.path.startsWith('/chat/') ? route.path : '/', query: { workspaceView: view } });
+  mobilePane.value = 'workspace';
+  sidebarOpen.value = false;
+}
+const workspaceNavigation = computed(() => [
+  { label: 'Översikt', icon: 'i-lucide-house', view: 'overview' as const },
+  { label: 'Testning', icon: 'i-lucide-list-checks', view: 'testing' as const },
+  { label: 'Material', icon: 'i-lucide-folder-open', view: 'material' as const },
+].map(item => ({ ...item, disabled: !activeId.value, active: hasWorkspace.value && route.query.view !== 'workspaces' && (route.query.workspaceView || 'overview') === item.view, onSelect: () => openWorkspaceView(item.view) })));
+watch(() => route.fullPath, () => { sidebarOpen.value = false; });
 const headerTitle = computed(() => route.path === "/"
   ? "New chat"
   : threads.value.find(thread => thread.id === route.params.id)?.title ?? "Chat");
@@ -61,8 +75,8 @@ defineShortcuts({
     <UDashboardSidebar
       id="default"
       v-model:open="sidebarOpen"
-      :min-size="12"
-      :default-size="14.75"
+      :min-size="14"
+      :default-size="17"
       collapsible
       resizable
       :menu="{ inset: false, title: 'Navigation', description: 'Välj workspace eller chatt' }"
@@ -71,35 +85,39 @@ defineShortcuts({
       <template #header="{ collapsed }">
         <NuxtLink
           to="/?view=workspaces"
-          class="flex items-center gap-2 min-w-0"
+          aria-label="QA Workspace"
+          class="qaa-sidebar-home flex min-w-0 flex-1 items-center gap-2.5"
           :class="collapsed ? 'mx-auto' : ''"
         >
           <span class="qaa-sidebar-brand"><AppLogo class="size-3.5" /></span>
-          <span v-if="!collapsed" class="text-sm font-semibold">Workspace</span>
+          <span v-if="!collapsed" class="min-w-0"><span class="block truncate text-sm font-semibold tracking-tight">QA Workspace</span><span class="qaa-sidebar-caption block truncate text-xs text-muted">Agenter & testning</span></span>
         </NuxtLink>
 
         <UDashboardSidebarCollapse
           v-if="!collapsed"
-          class="ms-auto"
+          class="ms-auto shrink-0"
         />
       </template>
 
       <template #default="{ collapsed }">
-        <div class="border-b border-default pb-3">
-          <p v-if="!collapsed" class="px-2 pb-2 text-xs font-semibold text-muted">Globalt</p>
-          <UNavigationMenu :items="[{ label: 'Agenten', icon: 'i-lucide-bot', to: '/agents' }]" :collapsed="collapsed" orientation="vertical" />
-        </div>
-        <WorkspaceSwitcher v-if="!collapsed" />
+        <SidebarNavigationGroup name="global" label="Globalt" :collapsed="collapsed">
+          <UNavigationMenu :items="[{ label: 'Alla workspaces', icon: 'i-lucide-layout-grid', to: '/?view=workspaces', active: route.path === '/' && route.query.view === 'workspaces' }, { label: 'Agenter', icon: 'i-lucide-bot', to: '/agents', active: route.path === '/agents', exact: true }, { label: 'Integrationer', icon: 'i-lucide-plug', to: '/settings/integrations', active: route.path === '/settings/integrations', exact: true }]" :collapsed="collapsed" orientation="vertical" />
+        </SidebarNavigationGroup>
+        <SidebarNavigationGroup name="workspace" label="Workspace" :collapsed="collapsed">
+          <WorkspaceSwitcher v-if="!collapsed" />
+          <UNavigationMenu :items="workspaceNavigation" :collapsed="collapsed" orientation="vertical" />
+        </SidebarNavigationGroup>
+        <SidebarNavigationGroup name="chats" label="Chattar" :summary="String(workspaceThreads.length)" :collapsed="collapsed">
         <UNavigationMenu
           :items="[
             {
-              label: 'New chat',
+              label: 'Ny chatt',
               icon: 'i-lucide-circle-plus',
               kbds: ['meta', 'o'],
               onSelect: () => startNewChat(),
             },
             {
-              label: 'Search',
+              label: 'Sök chattar',
               icon: 'i-lucide-search',
               kbds: ['meta', 'k'],
               onSelect: () => {
@@ -129,14 +147,17 @@ defineShortcuts({
 
         <ChatThreadList
           v-if="!collapsed"
-          class="mt-3 min-h-0 flex-1 border-t border-default pt-4"
+          class="mt-3"
           :threads="workspaceThreads"
           :pending="pending"
           @refresh="refresh()"
         />
+        </SidebarNavigationGroup>
       </template>
 
-      <template #footer />
+      <template #footer="{ collapsed }">
+        <UNavigationMenu class="w-full" :items="[{ label: 'Inställningar', icon: 'i-lucide-settings', to: '/settings/profile' }]" :collapsed="collapsed" orientation="vertical" />
+      </template>
     </UDashboardSidebar>
 
     <UDashboardSearch

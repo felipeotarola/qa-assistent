@@ -51,10 +51,10 @@ export function useThreadGroups(threads: Ref<ThreadSummary[]> | ComputedRef<Thre
 
     const result: ThreadGroup[] = [];
 
-    if (today.length) result.push({ id: "today", label: "Today", items: today });
-    if (yesterday.length) result.push({ id: "yesterday", label: "Yesterday", items: yesterday });
-    if (lastWeek.length) result.push({ id: "last-week", label: "Last week", items: lastWeek });
-    if (lastMonth.length) result.push({ id: "last-month", label: "Last month", items: lastMonth });
+    if (today.length) result.push({ id: "today", label: "Idag", items: today });
+    if (yesterday.length) result.push({ id: "yesterday", label: "Igår", items: yesterday });
+    if (lastWeek.length) result.push({ id: "last-week", label: "Senaste veckan", items: lastWeek });
+    if (lastMonth.length) result.push({ id: "last-month", label: "Senaste månaden", items: lastMonth });
 
     for (const label of Object.keys(older).sort((a, b) => b.localeCompare(a))) {
       const items = older[label];

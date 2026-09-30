@@ -1,5 +1,27 @@
+import { agent } from './agent';
+
+export const mainAgentGuide = {
+  id: 'main', title: `${agent.name} · Huvudagent`, icon: agent.avatar.icon,
+  summary: 'Ditt mål, ett gemensamt sammanhang.',
+  description: 'Din kontakt i chatten. Huvudagenten samordnar uppdraget, använder verktygen och tar hjälp av repo-agenten när en undersökning behöver ett eget sammanhang.',
+  needs: 'Beskriv målet i en chatt och välj det workspace vars material och krav ska användas.',
+  steps: ['Förstå målet och läs relevant underlag.', 'Använd verktyg direkt för enkla uppgifter; delegera repo-undersökningar vid behov.', 'Sammanfatta resultat, begränsningar och vad som sparats.'],
+  result: 'Chatten, aktivitetspanelen och de material eller testresultat som uppdraget skapar.',
+  boundary: 'Agenterna använder Eve och chattens modell- och resonemangsval. Modellen körs hos modellleverantören; repo-kod körs isolerat på VPS:en.',
+  example: 'Läs vårt underlag och föreslå vad vi behöver verifiera härnäst.', related: ['repository', 'testing', 'material'],
+};
+
 /** Product guide to the implemented tools, not a runtime health or permission report. */
 export const agentCapabilities = [
+  {
+    id: 'repository', title: 'Repository & kodtester', icon: 'i-lucide-git-branch', summary: 'Undersök kod och kör projektets testkommandon.',
+    description: 'Huvudagenten hanterar enkla repo-uppgifter direkt. Repo-agenten kan ta över undersökning och val av testkommando i ett eget sammanhang och lämna tillbaka resultatet.',
+    needs: 'Ett workspace och ett publikt GitHub-repo som administratören har godkänt för körning. Ange gärna branch och script. Piloten stöder npm- och pnpm-projekt med låsfil.',
+    steps: ['Ge huvudagenten repo-URL och vad du vill undersöka eller testa.', 'Agenten använder ett känt kommando direkt eller delegerar undersökningen till repo-agenten.', 'Koden körs i en isolerad Docker-miljö på VPS:en. Resultatet sparas med körnings-ID, commit och kommando.'],
+    result: 'Sammanfattning i chatten. Be agenten hämta den sparade körningen via dess körnings-ID för status och tillgängliga loggar.',
+    boundary: 'Privata repos och installationsscript stöds inte i piloten. Ett lyckat kommando betyder inte automatiskt att alla testfall är verifierade. Agenternas modell körs via modellleverantören; VPS:en kör projektets kod.',
+    example: 'Undersök https://github.com/felipeotarola/surdeg och ta reda på vilket script vi kan använda för att verifiera projektet. Kör det och sammanfatta resultatet.', related: ['testing', 'integrations'],
+  },
   {
     id: 'testing', title: 'Testning', icon: 'i-lucide-clipboard-check', summary: 'Från testfall till spårbara resultat.',
     description: 'Agenten läser testfallet och dess krav, startar en körning och sparar det som faktiskt observerades separat från testplanen.',

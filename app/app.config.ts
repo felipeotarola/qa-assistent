@@ -26,7 +26,7 @@ export default defineAppConfig({
     popover: { slots: { content: 'qaa-popup' } },
     card: { slots: { root: 'qaa-panel' } },
     chatPrompt: { slots: { root: 'qaa-composer p-4', base: 'text-base', footer: 'pt-2' } },
-    dashboardSidebar: { slots: { root: 'qaa-sidebar', header: 'border-b border-default px-4', body: 'px-3 py-3', content: 'qaa-sidebar qaa-navigation-drawer', overlay: 'bg-[var(--qaa-overlay)]' } },
+    dashboardSidebar: { slots: { root: 'qaa-sidebar', header: 'border-b border-default px-4', body: 'px-2 py-2 gap-1', footer: 'border-t border-default p-2', content: 'qaa-sidebar qaa-navigation-drawer', overlay: 'bg-[var(--qaa-overlay)]' } },
     navigationMenu: { slots: { link: 'min-h-10 rounded-lg text-sm font-medium', linkLeadingIcon: 'size-4' } },
     badge: {
       slots: { base: 'qaa-badge' },

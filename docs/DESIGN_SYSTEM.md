@@ -97,6 +97,13 @@ and density. This document does not claim a complete UI migration has happened.
 
 ## Workspace views
 
+The shared sidebar groups global navigation, workspace selection/tools, and chats
+with `SidebarNavigationGroup` (Nuxt UI Collapsible). Group choices survive route
+changes and mobile drawer remounts. Workspace shortcuts select the existing
+Overview / Testing / Material views; no separate copies of these pages exist.
+The header and settings footer stay fixed while navigation scrolls. Active links
+use the shared sidebar styling, including chat rows and their activity spinners.
+
 `WorkspacePanel` owns the Overview / Testing / Material navigation. The selected
 view is addressable through `workspaceView=testing|material`; absence means
 Overview. `WorkspaceOverview` links to the same existing items, not copies.
@@ -153,8 +160,17 @@ prerequisites, result locations and related capabilities. Update this catalog wh
 tool behavior changes; it is product guidance, not runtime health or permissions.
 The page uses `useConnectors()` for account-specific Linear/GitHub status and links
 to the existing integration settings. It never starts a test or publishes an issue
-when selecting a capability or copying an example. Do not invent specialist agents,
+when selecting a capability or copying an example. The guide distinguishes the
+main agent from the implemented Eve repo specialist, explaining delegation and
+the separate VPS code runner. Only show implemented agent roles; do not invent
 running-task counts, browser availability or workspace destination readiness here.
+
+`AgentTeamMap.client.vue` renders the guide with the existing Vue Flow dependency.
+Nodes select the shared capability content in an adjacent detail panel (stacked on
+narrow screens). Animated edges illustrate relationships only, with an explicit
+pause control and automatic reduced-motion support. Keep node buttons and the
+Nuxt UI selector keyboard accessible; do not turn illustrative motion into fake
+runtime status. No agent is started by interacting with the map.
 
 ## Agent activity
 
