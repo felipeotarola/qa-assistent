@@ -95,11 +95,11 @@ async function history() {
       </UDropdownMenu>
     </template>
     <template #toolbar>
-      <div class="flex flex-wrap gap-2 border-b border-default p-3">
+      <div class="flex flex-wrap items-center gap-1 border-b border-default px-3 py-1.5">
         <template v-if="isEditable">
-          <UButton v-if="!editing" label="Redigera" variant="soft" color="neutral" @click="edit()" />
+          <UButton v-if="!editing" label="Redigera" size="sm" variant="soft" color="neutral" @click="edit()" />
           <template v-else><UButton label="Spara" :loading="busy" @click="save" /><UButton label="Avbryt" variant="ghost" color="neutral" @click="editing = false" /></template>
-          <UButton label="Historik" icon="i-lucide-history" variant="ghost" color="neutral" @click="history" />
+          <UButton label="Historik" size="sm" icon="i-lucide-history" variant="ghost" color="neutral" @click="history" />
           <USelect v-if="versions.length" placeholder="Återställ version…" :items="versions.map(v => ({ label: `Version ${v.version}`, value: v.version }))" aria-label="Återställ version" @update:model-value="value => { const v = versions.find(v => v.version === value); if (v) edit(v.content, v.title); }" />
         </template>
         <a v-else :href="`${base}/file`" target="_blank" rel="noopener" class="text-sm underline">{{ item.content.kind === 'image' ? 'Öppna bild' : 'Ladda ner fil' }}</a>

@@ -63,14 +63,14 @@ const edges = computed(() => props.diagram.edges.map(edge => ({
 </script>
 
 <template>
-  <div class="space-y-3">
+  <div class="space-y-2">
     <div v-if="diagram.repository" class="flex flex-wrap items-center gap-2 text-xs text-muted">
       <UIcon name="i-lucide-git-branch" /><span>{{ diagram.repository.url.replace('https://github.com/', '') }}</span>
       <a :href="`${diagram.repository.url}/tree/${diagram.repository.commit}`" target="_blank" rel="noopener noreferrer" class="underline">Commit {{ diagram.repository.commit.slice(0, 8) }}</a>
       <span>Kodanalys · inte funktionstest</span>
     </div>
-    <UCollapsible v-if="!preview && diagram.summary" v-model:open="summaryOpen" class="rounded-xl border border-default bg-default p-3">
-      <UButton label="Om diagrammet & avgränsningar" icon="i-lucide-info" trailing-icon="i-lucide-chevron-down" color="neutral" variant="ghost" class="w-full justify-between" />
+    <UCollapsible v-if="!preview && diagram.summary" v-model:open="summaryOpen" class="border-b border-default bg-default">
+      <UButton size="sm" label="Om diagrammet & avgränsningar" icon="i-lucide-info" trailing-icon="i-lucide-chevron-down" color="neutral" variant="ghost" class="w-full justify-start" :ui="{ trailingIcon: 'ms-auto' }" />
       <template #content><div class="readable-content break-words p-3 text-sm leading-relaxed text-muted"><ChatComark :value="diagram.summary.replace(/\s+(?=\(\d+\))/g, '\n\n')" /></div></template>
     </UCollapsible>
     <div v-if="!diagram.nodes.length" class="rounded-xl border border-dashed border-default p-8 text-center text-muted">
@@ -78,12 +78,12 @@ const edges = computed(() => props.diagram.edges.map(edge => ({
       <p>Lägg till sidor i Redigera eller be agenten skapa ett diagram från ert material.</p>
     </div>
     <div v-else class="diagram-explorer overflow-hidden rounded-xl border border-default">
-    <div v-if="!preview" class="space-y-2 border-b border-default p-3">
-      <div class="flex gap-2">
-        <USelect ref="componentSelect" v-model="nodeId" :items="diagram.nodes.map(n => ({ label: n.label, value: n.id }))" placeholder="Utforska en komponent…" aria-label="Välj komponent" class="min-w-0 flex-1" @update:model-value="selected = ''; notice = ''" />
-        <UButton v-if="nodeId" label="Visa alla" variant="ghost" color="neutral" @click="nodeId = ''" />
+    <div v-if="!preview" class="diagram-toolbar grid gap-2 border-b border-default p-2">
+      <div class="flex min-w-0 gap-1">
+        <USelect ref="componentSelect" v-model="nodeId" size="sm" :items="diagram.nodes.map(n => ({ label: n.label, value: n.id }))" placeholder="Utforska en komponent…" aria-label="Välj komponent" class="min-w-0 flex-1" @update:model-value="selected = ''; notice = ''" />
+        <UButton v-if="nodeId" label="Visa alla" size="sm" variant="ghost" color="neutral" @click="nodeId = ''" />
       </div>
-      <USelect v-model="selected" :items="diagram.edges.map(edge => ({ label: `${diagram.nodes.find(n => n.id === edge.source)?.label} → ${diagram.nodes.find(n => n.id === edge.target)?.label}`, value: edge.id }))" placeholder="Granska ett samband…" aria-label="Granska samband och källa" class="w-full" @update:model-value="nodeId = ''" />
+      <USelect v-model="selected" size="sm" :items="diagram.edges.map(edge => ({ label: `${diagram.nodes.find(n => n.id === edge.source)?.label} → ${diagram.nodes.find(n => n.id === edge.target)?.label}`, value: edge.id }))" placeholder="Granska ett samband…" aria-label="Granska samband och källa" class="w-full" @update:model-value="nodeId = ''" />
     </div>
       <div class="diagram-body" :class="{ 'has-details': !preview && (node || selectedEdge) }">
       <div ref="canvas" class="diagram-canvas relative min-w-0" :class="preview ? 'h-52' : 'diagram-full'">
@@ -142,6 +142,7 @@ const edges = computed(() => props.diagram.edges.map(edge => ({
 .diagram-detail { max-height: 28rem; }
 .diagram-node.is-selected { border-color: var(--ui-primary); outline: 2px solid color-mix(in srgb, var(--ui-primary) 25%, transparent); outline-offset: 3px; }
 @container (min-width: 720px) {
+  .diagram-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .diagram-body.has-details { grid-template-columns: minmax(0, 1fr) 19rem; }
   .diagram-detail { border-top: 0; border-left: 1px solid var(--ui-border); max-height: clamp(26rem, 65dvh, 52rem); }
 }
