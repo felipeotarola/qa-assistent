@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import postgres from "postgres";
+import { repositoryMapTask } from '../shared/repository-map.ts';
+import { sandboxScope } from '../server/utils/sandbox-scope.ts';
 
 if (process.env.RUN_WORKSPACE_TESTS !== "1") throw new Error("Set RUN_WORKSPACE_TESTS=1 to create temporary integration fixtures.");
 const origin = "http://localhost:3000";
@@ -44,6 +46,23 @@ try {
   assert.equal(versions[1].content.summary, 'Inferred structure');
   assert.equal((await tool({ action: 'update', itemId: item.id, expectedVersion: 2, content: { ...content, edges: [{ id: 'invalid', source: 'home', target: 'absent' }] } })).status, 400);
   console.log('PASS diagram API create/read/update/history, source ownership/version, conflict protection and graph validation');
+  const jobId = randomUUID(), sessionKey = randomUUID();
+  const repo = { url: 'https://github.com/felipeotarola/surdeg', commit: 'a'.repeat(40) };
+  const task = repositoryMapTask(repo.url, 'Test fixture');
+  await sql`insert into pat_setup_jobs (id,workspace_id,thread_id,runtime,parent_session_id,session_key,task,model,reasoning) values (${jobId},${a},${thread},'map-integration','fixture',${sessionKey},${task},'glm-5.3-flash','low')`;
+  const result = { jobId, id: sandboxScope(userId, thread, sessionKey).id, workspaceId: a, status: 'completed', message: 'Fixture analysis', result: JSON.stringify({ kind: 'diagram', repository: repo, nodes: [{ id: 'app', label: 'App', code: [{ path: 'app.ts', line: 1 }] }], edges: [] }), updatedAt: new Date().toISOString() };
+  const callbacks = await Promise.all([1,2].map(() => api('/api/internal/setup-result', 'POST', result, true)));
+  callbacks.forEach(r => assert.equal(r.status, 200, JSON.stringify(r.data)));
+  const maps = (await tool({ action: 'list' })).data.items.filter(i => i.title.endsWith('repokarta'));
+  assert.equal(maps.length, 1, 'callback replay must not create duplicate maps');
+  const saved = (await tool({ action: 'read', itemId: maps[0].id })).data.item;
+  assert.deepEqual(saved.content.repository, repo);
+  assert.equal(saved.content.nodes[0].code[0].line, 1);
+  assert.equal((await api('/api/internal/setup-result', 'POST', { ...result, workspaceId: b }, true)).status, 409);
+  assert.equal((await api('/api/internal/setup-result', 'POST', { ...result, updatedAt: new Date(Date.now()+1000).toISOString(), result: '{}' }, true)).status, 200);
+  const [invalid] = await sql`select status,result from pat_setup_jobs where id=${jobId}`;
+  assert.equal(invalid.status, 'failed');
+  console.log('PASS map callback validation, concurrent deduplication, saved commit/references and scope isolation');
 } finally {
   await sql`delete from pat_user where id = ${userId}`;
   await sql.end(); await admin.auth.admin.deleteUser(userId);

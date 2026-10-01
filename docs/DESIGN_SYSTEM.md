@@ -267,6 +267,15 @@ retries, including after reload. Deleted notes must be restored from trash.
 
 ## Material diagrams
 
+Repository maps reuse this diagram surface. Optional `repository` metadata pins
+the GitHub URL and full commit; node `code` references use relative paths and
+optional line numbers. Links are generated for that commit. Component selection
+works through node buttons or the Nuxt UI selector and dims unrelated nodes.
+Details and “Föreslå tester” appear below the canvas, including on narrow screens.
+The action dispatches a proposal to the existing scoped chat; it does not run tests.
+Code evidence is explicitly distinct from functional verification. Old website
+diagrams retain their existing schema and legends.
+
 Material supports a versioned `diagram` object rendered with Vue Flow and Dagre automatic layout. The canvas provides pan, zoom and fit controls; node positions are generated, not manually saved. Standard controls remain Nuxt UI. Nodes and relationships can be edited through the normal workspace editor or its agent quick task.
 
 Use solid relationships for verified links and dashed relationships for inferred structure. Verified edges require an evidence description; a URL list alone is not evidence of navigation. Diagrams retain source item IDs and exact versions and expose those snapshots through the shared source viewer. Limit each diagram to 150 nodes and 400 relationships; prefer focused maps for readability.

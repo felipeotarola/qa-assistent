@@ -51,11 +51,11 @@ export const agentCapabilities = [
   },
   {
     id: 'material', title: 'Material & sammanhang', icon: 'i-lucide-folder-open', summary: 'Gemensamt underlag mellan chattar.',
-    description: 'Agenten kan skapa och uppdatera dokument, tabeller och diagram, samt använda sparade filer och bilder. Chattar i samma workspace delar underlaget.',
+    description: 'Agenten kan skapa och uppdatera dokument, tabeller och diagram. Axel kan analysera ett repository i bakgrunden och spara en repokarta med komponenter, kodreferenser och fast commit. Välj en komponent för att föreslå tester. Chattar i samma workspace delar underlaget.',
     needs: 'Ett valt workspace. Ange vilket objekt som ska ändras, eller skriv direkt från dess kort.',
     steps: ['Läs det aktuella objektet och dess version.', 'Ändra det efterfrågade innehållet och behåll resten.', 'Spara en ny version med källor och bildreferenser.'],
     result: 'Material → samma objekt, med versionshistorik och kopierbart material-ID.',
-    boundary: 'Profil och personligt minne är separata från projektets material. Ett diagram skiljer verifierade samband från antaganden.',
+    boundary: 'Repokartor kräver den aktiverade Codex-piloten på VPS. Kodunderlag är inte ett funktionstest. Ett diagram skiljer underbyggda samband från antaganden. Profil och personligt minne är separata från projektets material.',
     example: 'Läs tabellen med våra publika sidor och gör ett diagram av den.', related: ['research', 'requirements'],
   },
   {

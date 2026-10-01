@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import { runtimeScope } from '../../../shared/runtime-scope';
 import { resolveChatModel, resolveReasoning } from '../../../shared/chat-models';
 import { receiveSetupResult } from '../../utils/setup-jobs';
+import { repositoryMapTarget } from '../../../shared/repository-map';
 
 export default defineEventHandler(async event => {
   requireInternalRequest(event);
@@ -18,6 +19,8 @@ export default defineEventHandler(async event => {
   }).parse(await readBody(event));
   const thread = await getThreadForUser(body.userId, body.threadId);
   if (!thread?.workspaceId) throw createError({ statusCode: 404, statusMessage: 'Workspace not found' });
+  // Axel's child session may finish before the worker; notify the durable chat.
+  if (body.action === 'start' && body.task && repositoryMapTarget(body.task)) body.parentSessionId = thread.sessionId || body.parentSessionId;
   if (body.action==='start') {
     if (!body.parentSessionId || !body.task) throw createError({statusCode:400,statusMessage:'Parent session and task required'});
     await db.insert(schema.setupJobs).values({id:body.jobId,workspaceId:thread.workspaceId,threadId:body.threadId,runtime:runtimeScope(),parentSessionId:body.parentSessionId,sessionKey:body.sessionKey,task:body.task,model:resolveChatModel(body.model),reasoning:resolveReasoning(body.reasoning)}).onConflictDoNothing();

@@ -10,6 +10,8 @@ import { sandboxScope } from './sandbox-scope';
 import { sealEnvironment, openEnvironment } from './environment-crypto';
 import { appOrigin, internalHeaders } from '../../agent/lib/internal-api';
 import { repositoryRequestId } from '#shared/repository-request.mjs';
+import { repositoryMapTarget } from '../../shared/repository-map';
+import { saveRepositoryMap } from './repository-map';
 
 const terminal = (status: string) => !['starting','running','configuring'].includes(status);
 const vaultScope = (workspaceId: string, repo: string) => `${workspaceId}:${repo}:test`;
@@ -29,6 +31,18 @@ export async function receiveSetupResult(input: unknown) {
   if (!job) throw createError({ statusCode:404,statusMessage:'Unknown setup job' });
   const [thread] = await db.select().from(schema.threads).where(eq(schema.threads.id,job.threadId));
   if (!thread || result.workspaceId !== job.workspaceId || result.id !== sandboxScope(thread.userId,job.threadId,job.sessionKey).id) throw createError({statusCode:409,statusMessage:'Setup scope mismatch'});
+  if (job.result && job.result.updatedAt > result.updatedAt) return;
+  if (result.status === 'completed' && repositoryMapTarget(job.task)) {
+    try {
+      const itemId = await saveRepositoryMap(thread.userId, job, result.result || '');
+      result.message = `Repokartan är sparad i Material. Objekt: ${itemId}. Kodanalys, inte funktionstest.`;
+    } catch (error) {
+      if (error instanceof SyntaxError || (error instanceof Error && (error.name === 'ZodError' || error.message.includes('repository map')))) {
+        result.message = 'Analysen avslutades men repokartan kunde inte valideras. Ingen karta sparades. Läs rapporten innan ett nytt försök.';
+        result.status = 'failed';
+      } else throw error; // Retry transient storage failures through existing reconciliation.
+    }
+  }
   await db.update(schema.setupJobs).set({status:result.status,result,updatedAt:new Date()}).where(and(eq(schema.setupJobs.id,job.id),sql`coalesce(${schema.setupJobs.result}->>'updatedAt','') <= ${result.updatedAt}`));
   if (!terminal(result.status)) return;
   // Local and production sessions are distinct. The matching runtime's poller
