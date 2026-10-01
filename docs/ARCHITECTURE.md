@@ -175,4 +175,37 @@ check that the built server starts, not only that compilation succeeds.
 
 ## Eve docs
 
+### Browser delegation: Iris
+
+The main agent V delegates multi-step browser tests with `browser_job`. Iris
+uses a separate durable Eve session through `agent/channels/iris.ts`; the model
+loop runs in Eve and browser actions run on the existing VPS browser service.
+This is an asynchronous worker session, not a synchronous subagent tool call.
+The existing repository specialist is named Axel.
+
+- `pat_browser_jobs` stores workspace/thread ownership, runtime scope, session
+  receipt, status and the final report. Apply database migrations before deploy.
+- Internal channel routes live under `/eve/v1/workers/iris` so both the Nuxt
+  development proxy and Vercel's Eve service routing reach them. They require
+  the internal bearer secret; user-facing reads and cancellation verify ownership.
+- One active Iris job per workspace/runtime. Stable job IDs, a workspace lock
+  and a per-job dispatch lock prevent duplicate starts on retries. An uncertain
+  dispatch remains visible and blocks another job until resolved or cancelled.
+- Iris gets its own browser assignment, the caller's workspace context, and a
+  reduced model tool set. Worker messages do not replace the main chat history.
+- Starting work ends the main agent's tool loop. Users can immediately chat
+  with V while Iris runs. The activity panel polls job receipts every four
+  seconds and subscribes to the worker's Eve stream for tool activity.
+- Completion saves a report and attempts one queued notification to the main
+  chat, with tools disabled for that notification. The saved report remains
+  available if delivery fails; notification retry is not implemented.
+- Stop cancels the Eve turn; it does not close the live browser. Human takeover
+  causes Iris to report the pause; continuing requires a new scoped task.
+  Job completion is distinct from individual test-case success.
+
+Run `RUN_IRIS_TESTS=1 node --env-file=.env tests/browser-jobs.integration.mjs`
+to verify live delegation, concurrent chat, report persistence, idempotency,
+ownership and cancellation. This opt-in test uses the configured pilot account,
+model provider and VPS browser and removes its disposable workspace afterwards.
+
 For channels, tools, connections, and deployment details, read Eve guides in `node_modules/eve/dist/docs/public/`.

@@ -106,6 +106,13 @@
       "when": 1790796726783,
       "tag": "0014_classy_dormammu",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790837186684,
+      "tag": "0015_melted_living_tribunal",
+      "breakpoints": true
     }
   ]
 }

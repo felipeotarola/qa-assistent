@@ -11,7 +11,7 @@ export default defineTool({
     const threadId = auth?.attributes.browserThreadId;
     if (auth?.authenticator !== "app" || !userId || typeof threadId !== "string" || !threadId) return { status: "unavailable", message: "The live browser is available in the web chat only." };
     const response = await fetch(`${appOrigin()}/api/internal/browser`, {
-      method: "POST", headers: internalHeaders(), body: JSON.stringify({ userId, threadId, agentId: ctx.session.parent ? ctx.session.id : 'main', input }), signal: ctx.abortSignal,
+      method: "POST", headers: internalHeaders(), body: JSON.stringify({ userId, threadId, agentId: ctx.session.parent || auth.attributes.browserWorker === 'iris' ? ctx.session.id : 'main', input }), signal: ctx.abortSignal,
     });
     if (!response.ok) return { status: "error", message: "Could not access the browser. Check the session and configured browser service. Do not keep retrying." };
     return await response.json();

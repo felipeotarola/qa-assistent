@@ -3,7 +3,7 @@ import { agent } from './agent';
 export const mainAgentGuide = {
   id: 'main', title: `${agent.name} · Huvudagent`, icon: agent.avatar.icon,
   summary: 'Ditt mål, ett gemensamt sammanhang.',
-  description: 'Din kontakt i chatten. Huvudagenten samordnar uppdraget, använder verktygen och tar hjälp av repo-agenten när en undersökning behöver ett eget sammanhang.',
+  description: 'Din kontakt i chatten. Huvudagenten samordnar uppdraget, använder verktygen och tar hjälp av Axel när en undersökning behöver ett eget sammanhang.',
   needs: 'Beskriv målet i en chatt och välj det workspace vars material och krav ska användas.',
   steps: ['Förstå målet och läs relevant underlag.', 'Använd verktyg direkt för enkla uppgifter; delegera repo-undersökningar vid behov.', 'Sammanfatta resultat, begränsningar och vad som sparats.'],
   result: 'Chatten, aktivitetspanelen och de material eller testresultat som uppdraget skapar.',
@@ -14,10 +14,10 @@ export const mainAgentGuide = {
 /** Product guide to the implemented tools, not a runtime health or permission report. */
 export const agentCapabilities = [
   {
-    id: 'repository', title: 'Repository & kodtester', icon: 'i-lucide-git-branch', summary: 'Undersök kod och kör projektets testkommandon.',
-    description: 'Huvudagenten hanterar enkla repo-uppgifter direkt. Repo-agenten kan ta över undersökning och val av testkommando i ett eget sammanhang och lämna tillbaka resultatet.',
+    id: 'repository', title: 'Axel · Repository & kodtester', icon: 'i-lucide-git-branch', summary: 'Undersök kod och kör projektets testkommandon.',
+    description: 'Huvudagenten hanterar enkla repo-uppgifter direkt. Axel kan ta över undersökning och val av testkommando i ett eget sammanhang och lämna tillbaka resultatet.',
     needs: 'Ett workspace och ett publikt GitHub-repo. Ange gärna branch och script. Stöder npm samt pnpm@10.33.4 med låsfil. Publika repo-URL:er behöver ingen GitHub-koppling.',
-    steps: ['Ge huvudagenten repo-URL och vad du vill undersöka eller testa.', 'Agenten använder ett känt kommando direkt eller delegerar undersökningen till repo-agenten.', 'Koden körs i en isolerad Docker-miljö på VPS:en. Resultatet sparas med körnings-ID, commit och kommando.'],
+    steps: ['Ge huvudagenten repo-URL och vad du vill undersöka eller testa.', 'Agenten använder ett känt kommando direkt eller delegerar undersökningen till Axel.', 'Koden körs i en isolerad Docker-miljö på VPS:en. Resultatet sparas med körnings-ID, commit och kommando.'],
     result: 'Sammanfattning i chatten. Be agenten hämta den sparade körningen via dess körnings-ID för status och tillgängliga loggar.',
     boundary: 'Privata repos och installationsscript stöds inte i piloten. Ett lyckat kommando betyder inte automatiskt att alla testfall är verifierade. Agenternas modell körs via modellleverantören; VPS:en kör projektets kod.',
     example: 'Undersök https://github.com/felipeotarola/surdeg och ta reda på vilket script vi kan använda för att verifiera projektet. Kör det och sammanfatta resultatet.', related: ['testing', 'integrations'],
@@ -32,12 +32,12 @@ export const agentCapabilities = [
     example: 'Kör testfallet för felaktigt lösenord och spara resultat och skärmbilder.', related: ['browser', 'requirements'],
   },
   {
-    id: 'browser', title: 'Webbläsare', icon: 'i-lucide-globe', summary: 'Se agenten arbeta och ta över vid behov.',
-    description: 'En live-webbläsare i workspacet låter agenten öppna sidor, läsa kontroller, fylla formulär och följa ett flöde.',
+    id: 'browser', title: 'Iris · Webbläsartester', icon: 'i-lucide-globe', summary: 'Testar i webbläsaren medan du fortsätter chatta.',
+    description: 'Iris får ett avgränsat testuppdrag och arbetar i en egen live-webbläsarsession. Huvudagenten är tillgänglig under tiden. Följ verktygssteg och rapport i Pågående arbete.',
     needs: 'Webbchatten och en tillgänglig webbläsartjänst. Inloggning kan göras genom att du tar över sessionen.',
-    steps: ['Be agenten öppna adressen i workspacet.', 'Följ arbetet i webbläsarkortet eller den flytande förhandsvisningen.', 'Ta över för manuell inloggning och lämna sedan tillbaka kontrollen.'],
+    steps: ['Be huvudagenten köra en testplan eller kontrollera ett flöde.', 'Följ Iris i Pågående arbete och fortsätt chatta under körningen.', 'Öppna live-webbläsaren vid behov. Stoppa uppdraget eller läs rapporten i samma panel.'],
     result: 'Live-session i workspace. Skärmbilder kan sparas som material och kopplas till en testkörning.',
-    boundary: 'Agenten väntar medan du har kontrollen. Skriv inte lösenord i chatten. Den här sidan kontrollerar inte webbläsartjänstens driftstatus.',
+    boundary: 'Ett Iris-uppdrag åt gången per workspace. Vid manuell kontroll pausar Iris arbetet och rapporterar vad som återstår. Skriv inte lösenord i chatten. Den här sidan kontrollerar inte tjänstens driftstatus.',
     example: 'Öppna vår testsida i webbläsaren så att jag kan logga in manuellt.', related: ['testing', 'research'],
   },
   {

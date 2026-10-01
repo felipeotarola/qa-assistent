@@ -15,7 +15,7 @@ export default defineHook({
     async "*"(event, ctx) {
       const auth = ctx.session.auth.current;
       const threadId = auth?.attributes.browserThreadId;
-      if (ctx.session.parent || !persisted.has(event.type) || auth?.authenticator !== "app" || typeof threadId !== "string" || !threadId) return;
+      if (auth?.attributes.browserWorker === 'iris' || ctx.session.parent || !persisted.has(event.type) || auth?.authenticator !== "app" || typeof threadId !== "string" || !threadId) return;
       pending.update(events => events.some(saved => saved.meta.id === event.meta.id) ? events : [...events, event]);
       if (!boundaries.has(event.type) && pending.get().length < 50) return;
       const batch = pending.get().slice(0, 100);

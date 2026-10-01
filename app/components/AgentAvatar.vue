@@ -1,9 +1,9 @@
 <script setup lang="ts">
-defineProps<{ role: 'main' | 'repository' }>();
+defineProps<{ role: 'main' | 'repository' | 'browser' }>();
 </script>
 
 <template>
-  <svg viewBox="0 0 64 64" fill="none" aria-hidden="true" class="agent-avatar shrink-0" :class="role === 'main' ? 'agent-avatar-lead' : 'agent-avatar-repo'">
+  <svg viewBox="0 0 64 64" fill="none" aria-hidden="true" class="agent-avatar shrink-0" :class="role === 'main' ? 'agent-avatar-lead' : role === 'browser' ? 'agent-avatar-browser' : 'agent-avatar-repo'">
     <ellipse cx="32" cy="57" rx="19" ry="3" fill="currentColor" opacity=".12" />
     <path d="M32 15V8" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
     <circle cx="32" cy="7" r="4" class="avatar-accent" />
@@ -17,6 +17,7 @@ defineProps<{ role: 'main' | 'repository' }>();
         <path d="M25 32V35M39 32V35" />
         <path d="M29 38Q32 40 35 38" stroke-width="1.5" />
       </template>
+      <template v-else-if="role === 'browser'"><circle cx="26" cy="34" r="3" /><circle cx="38" cy="34" r="3" /><path d="M29 34H35" /></template>
       <template v-else><path d="M27 30L23 34L27 38M37 30L41 34L37 38" /></template>
     </g>
     <path d="M28 47H36" stroke="currentColor" stroke-opacity=".4" stroke-width="2" stroke-linecap="round" />
@@ -31,6 +32,7 @@ defineProps<{ role: 'main' | 'repository' }>();
 .avatar-shell { fill: var(--ui-bg-elevated); }
 .agent-avatar-lead .avatar-accent { fill: var(--ui-info); }
 .agent-avatar-repo .avatar-accent { fill: var(--ui-success); }
+.agent-avatar-browser .avatar-accent { fill: var(--ui-warning); }
 .avatar-eyes { stroke: var(--ui-bg); }
 .avatar-badge { stroke: var(--ui-bg); }
 </style>

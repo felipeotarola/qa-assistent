@@ -9,12 +9,15 @@ import { repoTerminal } from '#shared/repository';
 
 const { snapshot, open, requestedItem, workers } = useAgentActivity();
 const { activeId } = useWorkspaces();
+const { data: browserJobs, refresh: refreshBrowserJobs } = useBrowserJobs();
+const irisBusy = computed(() => browserJobs.value?.jobs.some(job => ['starting', 'running'].includes(job.status)));
 const { data: repositories } = useRepositoryRuns();
 const sandboxes = useState<SandboxState[]>('execution-sandboxes', () => []);
 const browser = useState<BrowserView | null>('activity-browser', () => null);
 const browserRequest = useState<string | null>('activity-browser-request', () => null);
-const backgroundBusy = computed(() => sandboxes.value.some(s => ['starting', 'running'].includes(s.codex?.status || '') || s.processes.some(p => p.status === 'running')) || repositories.value?.runs.some(r => !r.job || !repoTerminal(r.job.status)));
-const hasWork = computed(() => !!snapshot.value || !!browser.value || !!sandboxes.value.length || !!repositories.value?.runs.length);
+const backgroundBusy = computed(() => irisBusy.value || sandboxes.value.some(s => ['starting', 'running'].includes(s.codex?.status || '') || s.processes.some(p => p.status === 'running')) || repositories.value?.runs.some(r => !r.job || !repoTerminal(r.job.status)));
+const hasWork = computed(() => !!browserJobs.value?.jobs.length || !!snapshot.value || !!browser.value || !!sandboxes.value.length || !!repositories.value?.runs.length);
+watch(irisBusy, (value, old) => { if (value && !old) open.value = true; });
 const showSteps = ref(false);
 function openBrowser() {
   if (!browser.value) return;
@@ -78,6 +81,7 @@ watch(() => snapshot.value?.threadId, () => { draft.value = undefined; saveError
   <AgentActivitySurface v-model:open="drawerOpen" :docked="docked" :can-pin="wide" @pin="togglePin">
       <div class="mb-5 space-y-4">
         <p v-if="backgroundBusy" class="flex items-center gap-2 text-xs text-muted" role="status"><span class="size-2 rounded-full bg-success motion-safe:animate-pulse" />Arbete pågår på VPS · Du kan fortsätta chatta</p>
+        <BrowserAgentJobs v-if="activeId" :workspace-id="activeId" :jobs="browserJobs?.jobs || []" @refresh="refreshBrowserJobs()" />
         <SandboxRuns :key="activeId || 'none'" />
         <RepositoryRuns :key="`repo-${activeId}`" />
         <section v-if="browser" class="overflow-hidden rounded-xl border border-default" aria-label="Webbläsare på VPS">

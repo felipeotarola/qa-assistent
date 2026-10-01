@@ -4,6 +4,7 @@ import { appOrigin, internalHeaders } from "../lib/internal-api";
 export default defineDynamic({ events: {
   "turn.started": async (_event, ctx) => {
     const auth = ctx.session.auth.current;
+    if (auth?.attributes.browserWorker === 'iris') return null;
     const threadId = auth?.attributes.browserThreadId;
     if (auth?.authenticator !== "app" || typeof threadId !== "string" || !threadId) return null;
     const response = await fetch(`${appOrigin()}/api/internal/chat-history`, { method: "POST", headers: internalHeaders(), body: JSON.stringify({ userId: auth.principalId, threadId, sessionId: ctx.session.id }), signal: AbortSignal.timeout(15000) });

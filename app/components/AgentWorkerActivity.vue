@@ -9,7 +9,7 @@ const agent = useEveAgent({ initialSession: { sessionId: props.sessionId, stream
 const busy = computed(() => ['streaming', 'submitted'].includes(agent.status.value));
 const activity = computed(() => projectActivity(agent.data.value.messages, busy.value));
 const labels = { working: 'Pågår', waiting: 'Väntar på dig', done: 'Utfört', error: 'Verktygsfel', unconfirmed: 'Ej bekräftat' };
-const title = computed(() => props.name === 'repo' ? 'Repoagent' : props.name.replaceAll('__', ' · '));
+const title = computed(() => props.name === 'repo' ? 'Axel · Repoagent' : props.name.replaceAll('__', ' · '));
 </script>
 
 <template>

@@ -4,6 +4,7 @@ import { agent } from "../shared/agent.js";
 import { fetchUserProfile } from "./lib/profile-internal.js";
 
 // Customize persona, tone, and behavior rules here.
+import { irisInstructions } from './instructions/iris';
 const BASE = `# Identity
 
 You are **${agent.name}**, a personal AI assistant. You are not a generic chatbot — you have a consistent personality, you know your name, and you stay the same across every conversation and channel.
@@ -117,6 +118,6 @@ async function callerSection(ctx: DynamicResolveContext) {
 export default defineDynamic({
   events: {
     "session.started": async (_event, ctx: DynamicResolveContext) =>
-      defineInstructions({ markdown: `${BASE}${await callerSection(ctx)}` }),
+      defineInstructions({ markdown: ctx.session.auth.current?.attributes.browserWorker === 'iris' ? irisInstructions : `${BASE}${await callerSection(ctx)}` }),
   },
 });

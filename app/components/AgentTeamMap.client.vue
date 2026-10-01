@@ -35,7 +35,7 @@ const positions: Record<string, { x: number; y: number }> = {
 };
 const nodes = entries.map((entry, index) => ({ id: entry.id, type: 'guide', position: positions[entry.id]!, data: { ...entry, index } }));
 const connections = [
-  ['main', 'browser', 'Använder'], ['main', 'testing', 'Planerar & verifierar'], ['main', 'repository', 'Delegerar vid behov'],
+  ['main', 'browser', 'Delegerar i bakgrunden'], ['main', 'testing', 'Planerar & verifierar'], ['main', 'repository', 'Delegerar vid behov'],
   ['browser', 'research', 'Samlar underlag'], ['testing', 'requirements', 'Bedömer mot krav'],
   ['repository', 'integrations', 'Kod & ärenden'], ['research', 'material', 'Källor'],
   ['requirements', 'material', 'Gemensamt underlag'], ['integrations', 'material', 'Spårbara länkar'],
@@ -74,9 +74,9 @@ function close() {
           <template #node-guide="{ data }">
             <div class="node-reveal" :style="{ '--entrance-delay': `${data.index * 60}ms` }">
               <Handle type="target" :position="Position.Top" />
-              <button :id="`agent-node-${data.id}`" type="button" class="team-node nodrag nopan text-left" :class="{ 'is-selected': selected === data.id && open, 'is-agent': ['main', 'repository'].includes(data.id) }" :aria-pressed="selected === data.id && open" aria-controls="agent-map-detail" @click.stop="choose(data.id)">
-                <span class="mb-3 flex items-center justify-between gap-3"><AgentAvatar v-if="data.id === 'main' || data.id === 'repository'" :role="data.id" class="size-14" /><span v-else class="flex size-10 items-center justify-center rounded-xl bg-elevated text-primary"><UIcon :name="data.icon" class="size-5" /></span><span class="text-[10px] font-medium uppercase tracking-wider text-muted">{{ data.id === 'main' ? 'Orkestrator' : data.id === 'repository' ? 'Specialist' : 'Förmåga' }}</span></span>
-                <span class="block text-sm font-semibold text-highlighted">{{ data.id === 'repository' ? 'Repo-agent' : data.title }}</span>
+              <button :id="`agent-node-${data.id}`" type="button" class="team-node nodrag nopan text-left" :class="{ 'is-selected': selected === data.id && open, 'is-agent': ['main', 'repository', 'browser'].includes(data.id) }" :aria-pressed="selected === data.id && open" aria-controls="agent-map-detail" @click.stop="choose(data.id)">
+                <span class="mb-3 flex items-center justify-between gap-3"><AgentAvatar v-if="data.id === 'main' || data.id === 'repository' || data.id === 'browser'" :role="data.id" class="size-14" /><span v-else class="flex size-10 items-center justify-center rounded-xl bg-elevated text-primary"><UIcon :name="data.icon" class="size-5" /></span><span class="text-[10px] font-medium uppercase tracking-wider text-muted">{{ data.id === 'main' ? 'Orkestrator' : ['repository', 'browser'].includes(data.id) ? 'Specialist' : 'Förmåga' }}</span></span>
+                <span class="block text-sm font-semibold text-highlighted">{{ data.id === 'repository' ? 'Axel' : data.id === 'browser' ? 'Iris' : data.title }}</span>
                 <span class="mt-1 block text-xs leading-relaxed text-muted">{{ data.summary }}</span>
               </button>
               <Handle type="source" :position="Position.Bottom" />

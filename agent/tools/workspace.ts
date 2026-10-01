@@ -19,7 +19,7 @@ export default defineTool({
     const auth = ctx.session.auth.current;
     const threadId = auth?.attributes.browserThreadId;
     if (auth?.authenticator !== "app" || typeof threadId !== "string" || !threadId) return { error: "Workspace tools require a web chat." };
-    const response = await fetch(`${appOrigin()}/api/internal/workspace`, { method: "POST", headers: internalHeaders(), body: JSON.stringify({ userId: auth.principalId, threadId, agentId: ctx.session.parent ? ctx.session.id : 'main', input }), signal: ctx.abortSignal });
+    const response = await fetch(`${appOrigin()}/api/internal/workspace`, { method: "POST", headers: internalHeaders(), body: JSON.stringify({ userId: auth.principalId, threadId, agentId: ctx.session.parent || auth.attributes.browserWorker === 'iris' ? ctx.session.id : 'main', input }), signal: ctx.abortSignal });
     if (!response.ok) {
       if (response.status === 400) {
         const detail = await response.json().catch(() => null) as { statusMessage?: string } | null;
