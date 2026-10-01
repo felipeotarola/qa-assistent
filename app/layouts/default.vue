@@ -7,7 +7,7 @@ import SidebarNavigationGroup from '~/components/SidebarNavigationGroup.vue';
 const sidebarOpen = ref(false);
 provideWorkspaceAgent();
 const searchOpen = ref(false);
-const { container: splitContainer, width: chatWidth, dragging, start, move, finish, reset, keydown, min, max } = useWorkspaceResize();
+const { container: splitContainer, width: chatWidth, dragging, start, move, finish, reset, toggleChat, toggleWorkspace, keydown, min, max } = useWorkspaceResize();
 const route = useRoute();
 const hasWorkspace = computed(() => !!activeId.value && (route.path === "/" || route.path.startsWith("/chat/")));
 const mobilePane = ref<"chat" | "workspace">("chat");
@@ -24,6 +24,7 @@ const workspaceThreads = computed(() => threads.value.filter(t => t.workspaceId 
 async function openWorkspaceView(view: 'overview' | 'testing' | 'material') {
   await navigateTo({ path: route.path.startsWith('/chat/') ? route.path : '/', query: { workspaceView: view } });
   mobilePane.value = 'workspace';
+  if (chatWidth.value === 100) reset();
   sidebarOpen.value = false;
 }
 const workspaceNavigation = computed(() => [
@@ -157,7 +158,7 @@ defineShortcuts({
       </template>
 
       <template #footer="{ collapsed }">
-        <UNavigationMenu class="w-full" :items="[{ label: 'Inställningar', icon: 'i-lucide-settings', to: '/settings/profile' }]" :collapsed="collapsed" orientation="vertical" />
+        <UserMenu :collapsed="collapsed" />
       </template>
     </UDashboardSidebar>
 
@@ -171,7 +172,11 @@ defineShortcuts({
       <AppNavbar v-if="hasWorkspace" embedded>
         <template #title>
           <div class="flex min-w-0 items-center gap-2.5">
-            <UIcon name="i-lucide-panels-top-left" class="size-4 shrink-0 text-dimmed" />
+            <div v-if="chatWidth === 0 || chatWidth === 100" class="hidden shrink-0 items-center gap-1 lg:flex">
+              <UButton v-if="chatWidth === 0" label="Visa chatt" icon="i-lucide-panel-left" variant="ghost" color="neutral" size="sm" @click="toggleChat" />
+              <UButton v-if="chatWidth === 100" label="Visa workspace" icon="i-lucide-panel-right" variant="ghost" color="neutral" size="sm" @click="toggleWorkspace" />
+            </div>
+                <UIcon name="i-lucide-panels-top-left" class="size-4 shrink-0 text-dimmed" />
             <p class="truncate text-sm font-medium text-highlighted">{{ headerTitle }}</p>
           </div>
         </template>
@@ -184,7 +189,7 @@ defineShortcuts({
         <section
           id="conversation-pane"
           class="relative min-h-0 min-w-0 flex-1"
-          :class="[hasWorkspace ? 'lg:flex lg:w-(--chat-width) lg:flex-none' : 'flex', hasWorkspace && mobilePane === 'workspace' ? 'hidden' : 'flex']"
+          :class="[hasWorkspace ? (chatWidth === 0 ? 'lg:hidden' : chatWidth === 100 ? 'lg:flex lg:flex-1' : 'lg:flex lg:w-(--chat-width) lg:flex-none') : 'flex', hasWorkspace && mobilePane === 'workspace' ? 'hidden' : 'flex']"
           aria-label="Conversation"
         >
           <slot />
@@ -200,7 +205,7 @@ defineShortcuts({
           :aria-valuemin="min"
           :aria-valuemax="max"
           :aria-valuetext="`Chat ${Math.round(chatWidth)}%, workspace ${100 - Math.round(chatWidth)}%`"
-          title="Drag to resize · Double-click to reset"
+          title="Dra till kanten för att dölja en panel · Dubbelklicka för att återställa"
           class="workspace-divider relative z-20 hidden w-px shrink-0 touch-none cursor-col-resize bg-default outline-none lg:block"
           :class="{ 'is-dragging': dragging }"
           @pointerdown="start"
@@ -215,8 +220,8 @@ defineShortcuts({
         </div>
         <WorkspacePanel
           v-if="hasWorkspace"
-          class="min-w-0 flex-1 lg:flex"
-          :class="mobilePane === 'workspace' ? 'flex' : 'hidden'"
+          class="min-w-0 flex-1"
+          :class="[chatWidth === 100 ? 'lg:hidden' : 'lg:flex', mobilePane === 'workspace' ? 'flex' : 'hidden']"
         />
       </div>
     </div>

@@ -19,9 +19,8 @@ defineProps<{ embedded?: boolean }>();
     <template #right>
       <slot />
 
-      <UserMenu />
 
-      <UColorModeButton />
+
 
       <UButton
         color="neutral"

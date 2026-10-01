@@ -9,6 +9,8 @@ import '@vue-flow/core/dist/theme-default.css';
 
 const props = defineProps<{ diagram: DiagramContent; preview?: boolean; item?: WorkspaceItem }>();
 const nodeId = ref('');
+const canvas = ref<HTMLElement>();
+const detailId = useId();
 const node = computed(() => props.diagram.nodes.find(n => n.id === nodeId.value));
 const agent = useWorkspaceAgent();
 const sending = ref(false);
@@ -25,8 +27,23 @@ async function suggestTests() {
   finally { sending.value = false; }
 }
 const selected = ref('');
+const componentSelect = ref<{ $el?: HTMLElement }>();
+function closeDetails() {
+  nodeId.value = ''; selected.value = '';
+  nextTick(() => componentSelect.value?.$el?.focus());
+}
 const summaryOpen = ref(false);
 const flow = shallowRef<VueFlowStore>();
+let observer: ResizeObserver | undefined;
+let fitFrame = 0;
+onMounted(() => {
+  observer = new ResizeObserver(() => {
+    cancelAnimationFrame(fitFrame);
+    fitFrame = requestAnimationFrame(() => { if (canvas.value?.clientWidth) void flow.value?.fitView({ padding: 0.18 }); });
+  });
+  if (canvas.value) observer.observe(canvas.value);
+});
+onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(fitFrame); });
 const selectedEdge = computed(() => props.diagram.edges.find(edge => edge.id === selected.value));
 const graph = computed(() => {
   const layout = new dagre.graphlib.Graph().setGraph({ rankdir: props.diagram.direction, nodesep: 35, ranksep: 85 }).setDefaultEdgeLabel(() => ({}));
@@ -35,7 +52,7 @@ const graph = computed(() => {
   dagre.layout(layout);
   return props.diagram.nodes.map(node => {
     const point = layout.node(node.id);
-    return { id: node.id, type: 'page', position: { x: point.x - 115, y: point.y - 55 }, data: node, style: { opacity: nodeId.value && !focused.value.has(node.id) ? 0.3 : 1 } };
+    return { id: node.id, type: 'page', position: { x: point.x - 115, y: point.y - 55 }, data: node, style: { opacity: nodeId.value && !focused.value.has(node.id) ? 0.6 : 1 } };
   });
 });
 const edges = computed(() => props.diagram.edges.map(edge => ({
@@ -60,13 +77,22 @@ const edges = computed(() => props.diagram.edges.map(edge => ({
       <UIcon name="i-lucide-workflow" class="mb-2 size-8" />
       <p>Lägg till sidor i Redigera eller be agenten skapa ett diagram från ert material.</p>
     </div>
-    <div v-else class="diagram-canvas overflow-hidden rounded-xl border border-default bg-muted" :class="preview ? 'h-52' : 'h-[clamp(20rem,55dvh,52rem)]'">
-      <VueFlow :key="String(preview)" :nodes="graph" :edges="edges" fit-view-on-init :nodes-draggable="false" :nodes-connectable="false" :min-zoom="0.08" :max-zoom="2" :zoom-on-scroll="false" @init="flow = $event" @edge-click="selected = $event.edge.id">
+    <div v-else class="diagram-explorer overflow-hidden rounded-xl border border-default">
+    <div v-if="!preview" class="space-y-2 border-b border-default p-3">
+      <div class="flex gap-2">
+        <USelect ref="componentSelect" v-model="nodeId" :items="diagram.nodes.map(n => ({ label: n.label, value: n.id }))" placeholder="Utforska en komponent…" aria-label="Välj komponent" class="min-w-0 flex-1" @update:model-value="selected = ''; notice = ''" />
+        <UButton v-if="nodeId" label="Visa alla" variant="ghost" color="neutral" @click="nodeId = ''" />
+      </div>
+      <USelect v-model="selected" :items="diagram.edges.map(edge => ({ label: `${diagram.nodes.find(n => n.id === edge.source)?.label} → ${diagram.nodes.find(n => n.id === edge.target)?.label}`, value: edge.id }))" placeholder="Granska ett samband…" aria-label="Granska samband och källa" class="w-full" @update:model-value="nodeId = ''" />
+    </div>
+      <div class="diagram-body" :class="{ 'has-details': !preview && (node || selectedEdge) }">
+      <div ref="canvas" class="diagram-canvas relative min-w-0" :class="preview ? 'h-52' : 'diagram-full'">
+      <VueFlow :key="String(preview)" :nodes="graph" :edges="edges" fit-view-on-init :nodes-draggable="false" :nodes-connectable="false" :min-zoom="0.08" :max-zoom="2" :zoom-on-scroll="!preview" @init="flow = $event" @node-click="nodeId = $event.node.id; selected = ''; notice = ''" @edge-click="selected = $event.edge.id; nodeId = ''">
         <template #node-page="{ data }">
-          <div class="h-[110px] w-[230px] rounded-xl border border-default bg-default p-3 shadow-sm">
+          <div :class="{ 'is-selected': nodeId === data.id }" class="diagram-node cursor-pointer h-[110px] w-[230px] rounded-xl border border-default bg-default p-3 shadow-sm">
             <Handle type="target" :position="diagram.direction === 'LR' ? Position.Left : Position.Top" />
             <div class="mb-1 flex items-center gap-2 text-xs text-primary"><UIcon name="i-lucide-file" />{{ data.category }}</div>
-            <button class="nodrag nopan line-clamp-2 text-left font-semibold text-highlighted focus-visible:outline-2 focus-visible:outline-primary" :title="data.description || data.label" :aria-pressed="nodeId === data.id" @click="nodeId = nodeId === data.id ? '' : data.id">{{ data.label }}</button>
+            <button class="nodrag nopan line-clamp-2 text-left font-semibold text-highlighted focus-visible:outline-2 focus-visible:outline-primary" :title="data.description || data.label" :aria-pressed="nodeId === data.id" :aria-controls="detailId" @click="nodeId = data.id; selected = ''; notice = ''">{{ data.label }}</button>
             <a v-if="data.url" :href="data.url" target="_blank" rel="noopener noreferrer" class="nodrag nopan mt-1 block truncate text-xs text-muted underline" :title="data.url">{{ data.url }}</a>
             <Handle type="source" :position="diagram.direction === 'LR' ? Position.Right : Position.Bottom" />
           </div>
@@ -79,14 +105,13 @@ const edges = computed(() => props.diagram.edges.map(edge => ({
           </div>
         </template>
       </VueFlow>
-    </div>
-    <div class="flex flex-wrap gap-3 text-xs text-muted"><span>{{ diagram.nodes.length }} noder · {{ diagram.edges.length }} samband</span><span class="text-primary">— {{ diagram.repository ? 'Kodunderlag angivet' : 'Verifierat' }}</span><span class="text-warning">┄ Antaget</span></div>
-    <template v-if="!preview">
-      <div class="flex gap-2">
-        <USelect v-model="nodeId" :items="diagram.nodes.map(n => ({ label: n.label, value: n.id }))" placeholder="Utforska en komponent…" aria-label="Välj komponent" class="min-w-0 flex-1" />
-        <UButton v-if="nodeId" label="Visa alla" variant="ghost" color="neutral" @click="nodeId = ''" />
       </div>
-      <section v-if="node" aria-label="Komponentdetaljer" class="space-y-3 rounded-xl border border-default p-4">
+      <aside v-if="!preview && (node || selectedEdge)" :id="detailId" class="diagram-detail min-w-0 overflow-y-auto border-t border-default bg-default" aria-label="Diagramdetaljer" @keydown.esc="closeDetails">
+        <div class="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-default bg-default p-3">
+          <span class="text-xs font-medium uppercase tracking-wide text-muted">{{ node ? node.category || 'Komponent' : 'Samband' }}</span>
+          <UButton icon="i-lucide-x" aria-label="Stäng detaljer" color="neutral" variant="ghost" @click="closeDetails" />
+        </div>
+      <section v-if="node" aria-label="Komponentdetaljer" class="space-y-4 p-4">
         <h3 class="font-semibold">{{ node.label }}</h3>
         <p class="whitespace-pre-wrap text-sm text-muted">{{ node.description || 'Beskrivning saknas.' }}</p>
         <ul v-if="diagram.repository && node.code?.length" class="space-y-2 text-sm">
@@ -96,17 +121,31 @@ const edges = computed(() => props.diagram.edges.map(edge => ({
         <UButton v-if="diagram.repository" label="Föreslå tester" icon="i-lucide-list-checks" :disabled="!canAsk || sending" :loading="sending" @click="suggestTests" />
         <p v-if="diagram.repository" aria-live="polite" class="text-xs text-muted">{{ sending ? 'Skickar till chatten…' : notice || (!agent ? 'Öppna en chatt i detta workspace för att föreslå tester.' : !canAsk ? 'Vänta tills chatten är redo.' : 'Förslagen visas i chatten. Inga tester startas.') }}</p>
       </section>
-      <USelect v-model="selected" :items="diagram.edges.map(edge => ({ label: `${diagram.nodes.find(n => n.id === edge.source)?.label} → ${diagram.nodes.find(n => n.id === edge.target)?.label}`, value: edge.id }))" placeholder="Granska ett samband…" aria-label="Granska samband och källa" class="w-full" />
-      <div v-if="selectedEdge" class="rounded-lg border border-default p-3 text-sm">
+      <div v-if="selectedEdge" class="space-y-3 p-4 text-sm">
         <UBadge :color="selectedEdge.status === 'verified' ? 'primary' : 'warning'" variant="soft">{{ selectedEdge.status === 'verified' ? (diagram.repository ? 'Kodunderlag angivet' : 'Verifierat samband') : 'Antaget samband' }}</UBadge>
         <p class="mt-2 font-medium">{{ selectedEdge.label }}</p>
         <p class="whitespace-pre-wrap text-muted">{{ selectedEdge.evidence || 'Ingen verifierad källa. Be agenten undersöka sambandet.' }}</p>
       </div>
-    </template>
+      </aside>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-3 text-xs text-muted"><span>{{ diagram.nodes.length }} noder · {{ diagram.edges.length }} samband</span><span class="text-primary">— {{ diagram.repository ? 'Kodunderlag angivet' : 'Verifierat' }}</span><span class="text-warning">┄ Antaget</span></div>
+
   </div>
 </template>
 
 <style scoped>
+.diagram-explorer { container-type: inline-size; }
+.diagram-body { display: grid; grid-template-columns: minmax(0, 1fr); }
+.diagram-full { height: clamp(26rem, 65dvh, 52rem); }
+.diagram-canvas { background-color: var(--ui-bg); background-image: radial-gradient(var(--ui-border-accented) 1px, transparent 1px); background-size: 20px 20px; }
+.diagram-detail { max-height: 28rem; }
+.diagram-node.is-selected { border-color: var(--ui-primary); outline: 2px solid color-mix(in srgb, var(--ui-primary) 25%, transparent); outline-offset: 3px; }
+@container (min-width: 720px) {
+  .diagram-body.has-details { grid-template-columns: minmax(0, 1fr) 19rem; }
+  .diagram-detail { border-top: 0; border-left: 1px solid var(--ui-border); max-height: clamp(26rem, 65dvh, 52rem); }
+}
+
 .diagram-canvas :deep(.vue-flow__edge.selected path) { stroke-width: 3; }
 .diagram-canvas :deep(.vue-flow__handle) { background: var(--ui-primary); border-color: var(--ui-bg); }
 </style>

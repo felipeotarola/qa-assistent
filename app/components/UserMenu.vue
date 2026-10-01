@@ -2,7 +2,10 @@
 import type { DropdownMenuItem } from "@nuxt/ui";
 import { authClient } from "~/lib/auth-client";
 
+defineProps<{ collapsed?: boolean }>();
+
 const session = authClient.useSession();
+const colorMode = useColorMode();
 
 const user = computed(() => session.value?.data?.user);
 
@@ -13,19 +16,30 @@ const displayName = computed(
 const items = computed<DropdownMenuItem[][]>(() => [
   [
     {
-      label: "Settings",
+      label: "Profil och inställningar",
       icon: "i-lucide-settings",
       to: "/settings/profile",
     },
     {
-      label: "Integrations",
+      label: "Integrationer",
       icon: "i-lucide-plug",
       to: "/settings/integrations",
     },
   ],
   [
     {
-      label: "Sign out",
+      label: "Tema",
+      icon: "i-lucide-palette",
+      children: [
+        { label: "Ljust", icon: "i-lucide-sun", type: "checkbox", checked: colorMode.preference === "light", onSelect: () => { colorMode.preference = "light"; } },
+        { label: "Mörkt", icon: "i-lucide-moon", type: "checkbox", checked: colorMode.preference === "dark", onSelect: () => { colorMode.preference = "dark"; } },
+        { label: "System", icon: "i-lucide-monitor", type: "checkbox", checked: colorMode.preference === "system", onSelect: () => { colorMode.preference = "system"; } },
+      ],
+    },
+  ],
+  [
+    {
+      label: "Logga ut",
       icon: "i-lucide-log-out",
       onSelect: signOut,
     },
@@ -42,19 +56,23 @@ async function signOut() {
   <UDropdownMenu
     v-if="user"
     :items
-    :content="{ align: 'end', collisionPadding: 12 }"
+    :content="{ side: collapsed ? 'right' : 'top', align: 'start', collisionPadding: 12 }"
     :ui="{ content: 'min-w-56 p-1' }"
   >
     <UButton
       color="neutral"
       variant="ghost"
-      square
-      class="rounded-full data-[state=open]:bg-elevated"
+      :square="collapsed"
+      class="w-full min-w-0 data-[state=open]:bg-elevated"
+      :class="collapsed ? 'justify-center' : 'justify-start'"
+      :label="collapsed ? undefined : displayName"
+      :trailing-icon="collapsed ? undefined : 'i-lucide-chevrons-up-down'"
+      :ui="{ label: 'truncate flex-1 text-left', trailingIcon: 'shrink-0 text-dimmed' }"
       :avatar="{
         alt: displayName,
-        size: 'xs',
+        size: 'sm',
       }"
-      aria-label="Account menu"
+      :aria-label="`Kontomeny för ${displayName}`"
     />
 
     <template #content-top="{ sub }">

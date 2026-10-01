@@ -89,7 +89,7 @@ watch(() => snapshot.value?.threadId, () => { draft.value = undefined; saveError
 </script>
 
 <template>
-  <div v-if="hasWork && !docked" class="fixed right-28 top-3 z-30">
+  <div v-if="hasWork && !docked" class="fixed right-14 top-3 z-30 lg:right-4">
     <UButton :icon="snapshot?.busy || backgroundBusy ? 'i-lucide-loader-circle' : 'i-lucide-activity'" label="Pågående arbete" color="neutral" variant="soft" size="sm" :aria-expanded="drawerOpen" @click="open = !open" />
   </div>
   <AgentActivitySurface v-model:open="drawerOpen" :docked="docked" :can-pin="wide" @pin="togglePin">

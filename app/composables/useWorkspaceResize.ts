@@ -1,6 +1,6 @@
 const DEFAULT_WIDTH = 46;
-const MIN_WIDTH = 30;
-const MAX_WIDTH = 70;
+const MIN_WIDTH = 0;
+const MAX_WIDTH = 100;
 
 export function useWorkspaceResize() {
   const savedWidth = useCookie<number>("pat_chat_width", {
@@ -22,7 +22,9 @@ export function useWorkspaceResize() {
 
   function applyPosition() {
     frame = 0;
-    if (bounds?.width) width.value = clamp((pointerX - bounds.left) / bounds.width * 100);
+    if (!bounds?.width) return;
+    const next = clamp((pointerX - bounds.left) / bounds.width * 100);
+    width.value = next <= 8 ? 0 : next >= 92 ? 100 : next;
   }
 
   function finish() {
@@ -69,6 +71,16 @@ export function useWorkspaceResize() {
     savedWidth.value = DEFAULT_WIDTH;
   }
 
+  function toggleChat() {
+    width.value = width.value === 0 ? DEFAULT_WIDTH : 0;
+    savedWidth.value = width.value;
+  }
+
+  function toggleWorkspace() {
+    width.value = width.value === 100 ? DEFAULT_WIDTH : 100;
+    savedWidth.value = width.value;
+  }
+
   function keydown(event: KeyboardEvent) {
     const step = event.shiftKey ? 5 : 2;
     if (!["ArrowLeft", "ArrowRight", "Home", "End", "Enter"].includes(event.key)) return;
@@ -81,5 +93,5 @@ export function useWorkspaceResize() {
   }
 
   onBeforeUnmount(finish);
-  return { container, width, dragging, start, move, finish, reset, keydown, min: MIN_WIDTH, max: MAX_WIDTH };
+  return { container, width, dragging, start, move, finish, reset, toggleChat, toggleWorkspace, keydown, min: MIN_WIDTH, max: MAX_WIDTH };
 }
