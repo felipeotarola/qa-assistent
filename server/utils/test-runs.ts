@@ -7,6 +7,7 @@ import { ownedItem, requireWorkspace } from './workspaces';
 import { testRunActionSchema, runChecks, runVerificationError } from '../../shared/test-run';
 import { testRunReviews } from '../db/schema/test-requirements';
 import { runReviewSchema } from '../../shared/test-requirement';
+import { autoReviewEnabled, enqueueReview, listAssessments } from './result-assessments';
 import { testCaptures } from '../db/schema/test-captures';
 
 export async function listTestRuns(userId: string, workspaceId: string, itemId?: string) {
@@ -14,7 +15,8 @@ export async function listTestRuns(userId: string, workspaceId: string, itemId?:
   const runs = await db.select().from(testRuns).where(and(eq(testRuns.workspaceId, workspaceId), itemId ? eq(testRuns.itemId, itemId) : undefined)).orderBy(desc(testRuns.startedAt));
   const reviews = runs.length ? await db.select().from(testRunReviews).where(inArray(testRunReviews.runId, runs.map(r => r.id))).orderBy(desc(testRunReviews.createdAt)) : [];
   const captures = runs.length ? await db.select().from(testCaptures).where(inArray(testCaptures.runId, runs.map(r => r.id))).orderBy(testCaptures.createdAt) : [];
-  return runs.map(run => ({ ...run, reviews: reviews.filter(review => review.runId === run.id), captures: captures.filter(c => c.runId === run.id) }));
+  const assessments = await listAssessments(userId, workspaceId);
+  return runs.map(run => ({ ...run, assessments: assessments.filter(a => a.runId === run.id), reviews: reviews.filter(review => review.runId === run.id), captures: captures.filter(c => c.runId === run.id) }));
 }
 export async function reviewTestRun(userId: string, workspaceId: string, input: unknown) {
   const parsed = runReviewSchema.safeParse(input);
@@ -72,6 +74,7 @@ export async function testRunAction(userId: string, workspaceId: string, threadI
       if (evidence.content.kind !== 'image' && evidence.content.kind !== 'file') throw createError({ statusCode: 400, statusMessage: 'Evidence must be a saved image or file' });
     }
     const [saved] = await tx.update(testRuns).set({ result: action.result, finishedAt: new Date() }).where(eq(testRuns.id, run.id)).returning();
+    if (autoReviewEnabled(workspaceId)) await enqueueReview(tx, userId, workspaceId, run.id, threadId);
     return saved;
   });
 }

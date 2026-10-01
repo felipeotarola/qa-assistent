@@ -44,6 +44,9 @@ onUnmounted(() => document.removeEventListener("click", onDocumentClick));
   >
     <button
       type="button"
+      :aria-label="`Strömstatus: ${status}. Visa utvecklardetaljer`"
+      :aria-expanded="open"
+      :title="`Strömstatus: ${status}`"
       class="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted transition-colors hover:bg-elevated hover:text-highlighted"
       :class="open && 'bg-elevated text-highlighted'"
       @click="open = !open"
@@ -52,9 +55,9 @@ onUnmounted(() => document.removeEventListener("click", onDocumentClick));
         class="size-1.5 rounded-full bg-current"
         :class="[statusColor, (status === 'streaming' || status === 'submitted') && 'animate-pulse']"
       />
-      <span class="font-mono">eve stream</span>
-      <span class="text-dimmed">·</span>
-      <span class="font-mono text-dimmed">{{ status }}</span>
+      <span class="composer-control-label font-mono">eve stream</span>
+      <span class="composer-control-label text-dimmed">·</span>
+      <span class="composer-control-label font-mono text-dimmed">{{ status }}</span>
       <UIcon
         :name="open ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
         class="size-3 text-dimmed"
@@ -71,7 +74,7 @@ onUnmounted(() => document.removeEventListener("click", onDocumentClick));
     >
       <div
         v-if="open"
-        class="absolute bottom-full left-0 z-20 mb-2 w-72 overflow-hidden rounded-lg border border-default bg-elevated shadow-lg"
+        class="absolute bottom-full left-0 z-20 mb-2 w-72 max-w-[calc(100cqw-1rem)] overflow-hidden rounded-lg border border-default bg-elevated shadow-lg"
       >
         <div class="border-b border-default px-3 py-2">
           <p class="text-xs font-medium text-highlighted">

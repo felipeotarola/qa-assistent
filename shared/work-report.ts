@@ -1,3 +1,4 @@
+import { agentIdentities } from './agent-identities.ts';
 import type { RepoJob } from './repository';
 import type { SandboxState } from './sandbox';
 
@@ -43,10 +44,10 @@ export function browserReport(job: BrowserJobReportInput): WorkReport | null {
 
 export function codexReport(job: NonNullable<SandboxState['codex']>, at: string): WorkReport | null {
   if (!['completed', 'failed', 'cancelled', 'timeout', 'interrupted','needs_configuration'].includes(job.status)) return null;
-  if (job.status==='needs_configuration') return {id:`codex:${job.jobId}:configuration`,at:job.updatedAt||at,actor:'Codex',category:'setup',title:'Appen behöver konfiguration',result:`Saknade obligatoriska inställningar: ${job.environment?.variables.filter(v=>v.required).map(v=>v.name).join(', ')||'se rapporten'}. Tester har inte startat.`,next:'Öppna Pågående arbete och välj Konfigurera testmiljön.',prompt:''};
+  if (job.status==='needs_configuration') return {id:`codex:${job.jobId}:configuration`,at:job.updatedAt||at,actor:agentIdentities.vps.name,category:'setup',title:'Appen behöver konfiguration',result:`Saknade obligatoriska inställningar: ${job.environment?.variables.filter(v=>v.required).map(v=>v.name).join(', ')||'se rapporten'}. Tester har inte startat.`,next:'Öppna Pågående arbete och välj Konfigurera testmiljön.',prompt:''};
   const done = job.status === 'completed';
-  return { id: `codex:${job.jobId}`, at: job.updatedAt || at, actor: 'Codex', category: done ? 'result' : job.status === 'failed' ? 'execution' : 'interrupted',
-    title: done ? 'Codex har lämnat en rapport' : job.status === 'timeout' ? 'Codex nådde tidsgränsen' : 'Codex-uppdraget avbröts',
+  return { id: `codex:${job.jobId}`, at: job.updatedAt || at, actor: agentIdentities.vps.name, category: done ? 'result' : job.status === 'failed' ? 'execution' : 'interrupted',
+    title: done ? `${agentIdentities.vps.name} har lämnat en rapport` : job.status === 'timeout' ? `${agentIdentities.vps.name} nådde tidsgränsen` : `${agentIdentities.vps.name}s uppdrag avbröts`,
     result: done ? 'Rapporten finns i Pågående arbete. Jobbstatus bekräftar inte appstart eller godkända tester.' : 'Eventuella delresultat finns kvar. Uppdraget är inte verifierat klart.',
     next: 'Granska rapporten och kontrollera vad som faktiskt blev klart.',
     // Codex status is sandbox-scoped. Never send a different chat to create a

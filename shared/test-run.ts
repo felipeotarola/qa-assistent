@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { TestCase } from './test-plan';
 import type { RunReview } from './test-requirement';
+import type { AssessmentView } from './result-assessment';
 export const testTargetSchema = z.object({
   environment: z.string().trim().max(200),
   url: z.string().trim().max(2000).refine(value => { if (!value) return true; try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password; } catch { return false; } }, 'Ange en http- eller https-adress utan inloggningsuppgifter'),
@@ -68,6 +69,7 @@ export type TestRun = {
   target?: TestTarget | null;
   startedAt: string; finishedAt: string | null; result: RunResult | null;
   reviews?: RunReview[];
+  assessments?: AssessmentView[];
   captures?: { id: string; itemId: string | null; url: string; title: string; action: string; error: string | null; createdAt: string }[];
 };
 export function effectiveRunOutcome(run: TestRun) {

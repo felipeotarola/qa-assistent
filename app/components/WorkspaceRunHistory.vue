@@ -33,6 +33,7 @@ async function ask(task: string) {
       <p class="break-all text-xs text-muted">{{ run.environment }} · plan v{{ run.planVersion }} · {{ run.target?.revision || 'Testad version ej dokumenterad' }}</p>
       <p class="text-xs text-muted">Körnings-ID: {{ run.id }}</p>
       <div v-if="run.result" class="space-y-3">
+        <WorkspaceResultAssessment :key="`assessment-${run.id}`" :workspace-id="item.workspaceId" :run-id="run.id" :requirements="coverage?.checks ?? []" />
         <WorkspaceRunReview :key="run.id" :run="run" />
         <p class="font-medium">Agentens ursprungliga bedömning: {{ runLabels[run.result.outcome] }}</p>
         <div v-if="coverage" class="space-y-2 rounded-lg border border-default p-3">

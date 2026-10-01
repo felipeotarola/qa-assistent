@@ -58,7 +58,7 @@ watchEffect(() => {
   activity.snapshot.value = { ...projectActivity(activityMessages, isBusy.value), threadId: thread.value.id,
     workspaceId: thread.value.workspaceId, busy: isBusy.value, connected: true, failed: !!chatError.value || (!!savedText.value && !isBusy.value) };
 });
-watch(isBusy, (busy, previous) => { if (busy && !previous) activity.open.value = true; });
+watch(isBusy, (busy, previous) => { if (busy && !previous) activity.autoOpen(); });
 onBeforeUnmount(() => {
   if (activity.snapshot.value?.threadId === thread.value.id) activity.snapshot.value = null;
 });
@@ -152,7 +152,7 @@ function handleInputResponses(responses: Parameters<typeof respond>[0]) {
         v-else
         class="flex min-w-0 flex-1"
       >
-        <UContainer class="flex min-w-0 flex-1 flex-col gap-4 px-4 sm:gap-6 sm:px-5">
+        <UContainer class="chat-content-gutters flex min-w-0 flex-1 flex-col gap-4 px-4 sm:gap-6 sm:px-5">
           <UChatMessages
             should-auto-scroll
             :messages="messages"

@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { agent } from '#shared/agent';
+import { isAgentRole } from '#shared/agent-identities';
+import { vpsToolGuides } from '#shared/vps-tool-guides';
 import AgentAvatar from '~/components/AgentAvatar.vue';
 import { agentCapabilities, mainAgentGuide } from '#shared/agent-capabilities';
 import type { ConnectorState } from '#shared/types/connector';
 
 useHead({ title: `Agenten · ${agent.name}` });
 const selected = ref<string>('main');
-const capability = computed(() => selected.value === 'main' ? mainAgentGuide : agentCapabilities.find(item => item.id === selected.value) ?? mainAgentGuide);
-const related = computed(() => agentCapabilities.filter(item => (capability.value.related as readonly string[]).includes(item.id)));
+const guides = [...agentCapabilities, ...vpsToolGuides];
+const capability = computed(() => selected.value === 'main' ? mainAgentGuide : guides.find(item => item.id === selected.value) ?? mainAgentGuide);
+const related = computed(() => guides.filter(item => (capability.value.related as readonly string[]).includes(item.id)));
 const { connectors, pending, error, refresh } = useConnectors();
 const statuses: Record<ConnectorState, string> = { connected: 'Anslutet', not_connected: 'Inte anslutet', installation_required: 'Installation behövs', setup_required: 'Konfiguration behövs', error: 'Kunde inte kontrolleras' };
 const mounted = ref(false);
@@ -24,15 +27,19 @@ async function copyExample() {
     <template #header><AppNavbar embedded><template #title><h1 class="text-sm font-semibold">Agenten</h1></template></AppNavbar></template>
     <template #body>
       <div class="app-page space-y-6">
-        <WorkspacePageHeader title="Dina agenter och deras verktyg" description="Ge huvudagenten ett mål. Den arbetar med ditt workspace och tar hjälp av repo-agenten när uppgiften behöver det.">
+        <WorkspacePageHeader title="Dina agenter och deras verktyg" description="Huvudagenten samordnar, Iris testar i webbläsaren och Axel arbetar med kod. Otto sköter VPS-miljön och Klara granskar underlaget från sparade testkörningar.">
           <UButton to="/?view=workspaces" label="Öppna ett workspace" icon="i-lucide-arrow-up-right" variant="outline" color="neutral" />
         </WorkspacePageHeader>
 
         <AgentTeamMap v-model="selected">
           <section id="capability-detail" class="min-w-0 p-5" aria-labelledby="capability-title" aria-live="polite">
-            <div class="flex items-center gap-3"><AgentAvatar v-if="selected === 'main' || selected === 'repository'" :role="selected" class="size-16" /><UIcon v-else :name="capability.icon" class="size-6 text-primary" /><h2 id="capability-title" class="text-lg font-semibold">{{ capability.title }}</h2></div>
+            <div class="flex items-center gap-3"><AgentAvatar v-if="isAgentRole(selected)" :role="selected" class="size-16" /><UIcon v-else :name="capability.icon" class="size-6 text-primary" /><h2 id="capability-title" class="text-lg font-semibold">{{ capability.title }}</h2></div>
             <p class="mt-3 text-sm leading-relaxed text-muted">{{ capability.description }}</p>
             <div class="mt-5 rounded-lg border border-default bg-muted p-4"><h3 class="text-sm font-semibold">Det här behövs</h3><p class="mt-2 text-sm leading-relaxed text-muted">{{ capability.needs }}</p></div>
+            <section v-if="selected === 'vps'" class="mt-5 space-y-2" aria-label="Ottos VPS-verktyg">
+              <h3 class="text-sm font-semibold">Verktyg i arbetsmiljön</h3>
+              <UButton v-for="tool in vpsToolGuides" :key="tool.id" :label="tool.title" :icon="tool.icon" color="neutral" variant="outline" block @click="selected = tool.id" />
+            </section>
             <h3 class="mt-6 text-sm font-semibold">Så fungerar det</h3>
             <ol class="mt-3 space-y-4"><li v-for="(step, index) in capability.steps" :key="step" class="flex gap-3 text-sm leading-relaxed"><span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-elevated text-xs font-semibold text-primary">{{ index + 1 }}</span><span>{{ step }}</span></li></ol>
             <div class="mt-5 border-t border-default pt-5"><h3 class="text-sm font-semibold">Här hittar du resultatet</h3><p class="mt-2 text-sm leading-relaxed text-muted">{{ capability.result }}</p></div>

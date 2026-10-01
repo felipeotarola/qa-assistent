@@ -11,16 +11,20 @@ const options = [
 </script>
 
 <template>
-  <label class="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
-    <span>Reasoning</span>
+  <div class="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
+    <span class="composer-control-label">Reasoning</span>
+    <UTooltip :text="`Resonemang: ${options.find(option => option.value === model)?.label}`">
     <USelect
       v-model="model"
       :items="options"
       :disabled="disabled"
-      aria-label="Reasoning level"
+      :aria-label="`Resonemang: ${options.find(option => option.value === model)?.label}`"
       size="xs"
       color="neutral"
-      class="w-20"
-    />
-  </label>
+      class="composer-reasoning w-20"
+    >
+      <template #default><UIcon name="i-lucide-brain" class="composer-compact-icon size-4 shrink-0" /><span class="composer-control-label">{{ options.find(option => option.value === model)?.label }}</span></template>
+    </USelect>
+    </UTooltip>
+  </div>
 </template>

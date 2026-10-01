@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { agentIdentities } from '#shared/agent-identities';
 import { toolDetails } from '#shared/tool-details';
 import {
   getToolName,
@@ -79,7 +80,7 @@ const showThinking = computed(
         variant="card"
         :icon="getToolName(part) === 'bash' ? 'i-lucide-terminal' : 'i-lucide-wrench'"
         :loading="isToolStreaming(part)"
-        :text="isDynamicToolUIPart(part) ? getToolDisplayName(part as EveDynamicToolPart) : getToolName(part)"
+        :text="isDynamicToolUIPart(part) ? getToolDisplayName(part as EveDynamicToolPart) : getToolName(part) === 'codex' ? agentIdentities.vps.name : getToolName(part)"
         :suffix="[isDynamicToolUIPart(part) ? getToolNamespace(part as EveDynamicToolPart) : '', part.state === 'output-error' || part.state === 'output-denied' ? 'Verktygsfel' : part.state === 'output-available' ? 'Svar mottaget' : isToolStreaming(part) ? 'Pågår' : 'Väntar'].filter(Boolean).join(' · ')"
         :streaming="isToolStreaming(part)"
         chevron="trailing"

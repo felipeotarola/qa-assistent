@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { activityRailState } from '#shared/activity-rail';
+import { agentIdentities, vpsStatusMessage, type AgentRole } from '#shared/agent-identities';
+import AgentAvatar from './AgentAvatar.vue';
 import type { ActivityStep } from '#shared/agent-activity';
 import type { WorkspaceItem } from '#shared/workspace';
 import AgentActivitySurface from './AgentActivitySurface.vue';
@@ -9,8 +12,20 @@ import { repoTerminal } from '#shared/repository';
 import { browserReport, codexReport, repositoryReport, type WorkReport } from '#shared/work-report';
 import type { SetupView } from '#shared/project-environment';
 
-const { snapshot, open, requestedItem, workers } = useAgentActivity();
+const { snapshot, open, collapsed, requestedItem, workers } = useAgentActivity();
+const focusTarget = ref<string>();
+watch(open, value => { if (value) collapsed.value = false; });
+function collapse() {
+  collapsed.value = true; open.value = false; focusTarget.value = undefined;
+  nextTick(() => document.getElementById('activity-rail-expand')?.focus());
+}
+function reveal(target?: string) { focusTarget.value = target; open.value = true; }
+const panelOpen = computed({ get: () => open.value, set: value => { if (value) reveal(); else collapse(); } });
 const { activeId } = useWorkspaces();
+const { data: assessments } = useResultAssessments();
+const reviewJobs = computed(() => assessments.value?.workspaceId === activeId.value ? assessments.value.assessments : []);
+const reviewBusy = computed(() => reviewJobs.value.some(j => ['queued', 'running'].includes(j.status)));
+const reviewDone = computed(() => reviewJobs.value.filter(j => ['completed', 'failed'].includes(j.status)).length);
 const { data: browserJobs, refresh: refreshBrowserJobs } = useBrowserJobs();
 const irisBusy = computed(() => browserJobs.value?.jobs.some(job => ['starting', 'running'].includes(job.status)));
 const { data: repositories } = useRepositoryRuns();
@@ -30,8 +45,9 @@ watchEffect(() => {
 const browser = useState<BrowserView | null>('activity-browser', () => null);
 const browserRequest = useState<string | null>('activity-browser-request', () => null);
 const backgroundBusy = computed(() => irisBusy.value || setupJobs.value.some(j=>['starting','running','configuring'].includes(j.status)) || sandboxes.value.some(s => ['starting', 'running', 'configuring'].includes(s.codex?.status || '') || !s.codex && s.processes.some(p => p.status === 'running')) || repositories.value?.runs.some(r => !r.job || !repoTerminal(r.job.status)));
-const hasWork = computed(() => !!setupJobs.value.length || !!browserJobs.value?.jobs.length || !!snapshot.value || !!browser.value || !!sandboxes.value.length || !!repositories.value?.runs.length);
-watch(irisBusy, (value, old) => { if (value && !old) open.value = true; });
+const hasWork = computed(() => !!reviewJobs.value.length || !!setupJobs.value.length || !!browserJobs.value?.jobs.length || !!snapshot.value || !!browser.value || !!sandboxes.value.length || !!repositories.value?.runs.length);
+watch(irisBusy, (value, old) => { if (value && !old && !collapsed.value) open.value = true; });
+watch(reviewBusy, (value, old) => { if (value && !old && !collapsed.value) open.value = true; });
 const showSteps = ref(false);
 function openBrowser() {
   if (!browser.value) return;
@@ -39,9 +55,8 @@ function openBrowser() {
   if (!docked.value) open.value = false;
 }
 const visibleSteps = computed(() => showSteps.value ? snapshot.value?.steps : snapshot.value?.steps.slice(-5));
-watch(() => [sandboxes.value.map(s => s.codex?.jobId || s.id).sort().join(','), repositories.value?.runs[0]?.id, browser.value?.sessionId].join('|'), (value, previous) => { if (value !== previous && (backgroundBusy.value || browser.value)) open.value = true; });
+watch(() => [sandboxes.value.map(s => s.codex?.jobId || s.id).sort().join(','), repositories.value?.runs[0]?.id, browser.value?.sessionId].join('|'), (value, previous) => { if (value !== previous && (backgroundBusy.value || browser.value) && !collapsed.value) open.value = true; });
 watch(activeId, () => { showSteps.value = false; });
-const pinned = useCookie<boolean>('agent-activity-pinned', { default: () => false, sameSite: 'lax' });
 const wide = ref(false);
 onMounted(() => {
   const media = window.matchMedia('(min-width: 1280px)');
@@ -49,9 +64,7 @@ onMounted(() => {
   sync(); media.addEventListener('change', sync);
   onBeforeUnmount(() => media.removeEventListener('change', sync));
 });
-const docked = computed(() => pinned.value && wide.value && hasWork.value);
-const drawerOpen = computed({ get: () => open.value && !docked.value, set: value => { open.value = value; } });
-function togglePin() { pinned.value = !pinned.value; open.value = true; }
+const docked = computed(() => wide.value && hasWork.value && open.value);
 const section = ref('activity');
 const labels = { working: 'Pågår', waiting: 'Väntar på dig', done: 'Utfört', error: 'Verktygsfel', unconfirmed: 'Ej bekräftat' };
 const icons = { working: 'i-lucide-loader-circle', waiting: 'i-lucide-message-circle-question', done: 'i-lucide-check', error: 'i-lucide-circle-alert', unconfirmed: 'i-lucide-circle-help' };
@@ -63,6 +76,22 @@ const draft = ref<{ id: string; text: string; title: string; threadId: string; w
 const current = computed(() => snapshot.value?.steps.findLast(step => step.status === 'working' || step.status === 'waiting'));
 const heading = computed(() => snapshot.value?.failed ? 'Behöver uppmärksamhet' : current.value?.status === 'waiting' ? 'Väntar på dig' : snapshot.value?.busy ? 'Agenten arbetar' : 'Senaste arbete');
 const results = computed(() => [...new Map(snapshot.value?.steps.flatMap(step => step.item ? [[step.item.id, step.item] as const] : []) ?? []).values()]);
+const railItems = computed(() => {
+  type RailItem = { id: string; label: string; icon: string; role?: AgentRole; status: 'working' | 'waiting' | 'error' | 'idle'; detail: string; count?: number };
+  const items: RailItem[] = [];
+  function add(id: string, label: string, icon: string, statuses: string[], role?: AgentRole) {
+    if (statuses.length) items.push({ id, label, icon, role, count: statuses.length, ...activityRailState(statuses) });
+  }
+  if (snapshot.value) add('main', agentIdentities.main.name, 'i-lucide-bot', [snapshot.value.failed ? 'failed' : current.value?.status === 'waiting' ? 'waiting' : snapshot.value.busy ? 'working' : 'idle'], 'main');
+  if (browserJobs.value?.workspaceId === activeId.value) add('iris', 'Iris · Webbtester', 'i-lucide-globe', browserJobs.value.jobs.map(j => j.status), 'browser');
+  const localSandboxes = sandboxes.value.filter(s => s.workspaceId === activeId.value);
+  const setupIds = new Set(setupJobs.value.map(j => j.result?.jobId || j.id));
+  add('vps', 'Otto · VPS', 'i-lucide-container', [...setupJobs.value.map(j => j.status), ...localSandboxes.filter(s => !s.codex || !setupIds.has(s.codex.jobId)).map(s => s.codex?.status || 'idle')], 'vps');
+  add('repository', 'Axel · Repokörningar', 'i-lucide-git-branch', (repositories.value?.runs || []).filter(r => !r.job || r.job.workspaceId === activeId.value).map(r => r.job?.status || 'starting'), 'repository');
+  add('reviewer', 'Klara · Granskningar', 'i-lucide-scan-eye', reviewJobs.value.map(j => j.status), 'reviewer');
+  if (browser.value) items.push({ id: 'browser', label: 'Livewebbläsare', icon: 'i-lucide-globe', status: browser.value.control === 'human' ? 'waiting' : 'idle', detail: browser.value.control === 'human' ? 'Du styr webbläsaren' : browser.value.title || 'Session tillgänglig' });
+  return items;
+});
 function showItem(id: string) {
   if (!snapshot.value?.workspaceId) return;
   requestedItem.value = { workspaceId: snapshot.value.workspaceId, itemId: id };
@@ -89,23 +118,33 @@ watch(() => snapshot.value?.threadId, () => { draft.value = undefined; saveError
 </script>
 
 <template>
-  <div v-if="hasWork && !docked" class="fixed right-14 top-3 z-30 lg:right-4">
-    <UButton :icon="snapshot?.busy || backgroundBusy ? 'i-lucide-loader-circle' : 'i-lucide-activity'" label="Pågående arbete" color="neutral" variant="soft" size="sm" :aria-expanded="drawerOpen" @click="open = !open" />
+  <div v-if="hasWork && !wide" class="fixed right-14 top-3 z-30 lg:right-4">
+    <UButton :icon="snapshot?.busy || backgroundBusy || reviewBusy ? 'i-lucide-loader-circle' : 'i-lucide-activity'" label="Pågående arbete" color="neutral" variant="soft" size="sm" :aria-expanded="open" @click="panelOpen = !open" />
   </div>
-  <AgentActivitySurface v-model:open="drawerOpen" :docked="docked" :can-pin="wide" @pin="togglePin">
+  <AgentActivitySurface v-model:open="panelOpen" :docked="wide && hasWork" :focus-target="focusTarget">
+      <template #rail><AgentActivityRail :items="railItems" @expand="reveal" /></template>
       <div class="mb-5 space-y-4">
+        <section v-if="reviewJobs.length" id="activity-section-reviewer" tabindex="-1" class="space-y-1 rounded-lg border border-default p-3" aria-label="Resultatgranskning"><p class="flex items-center gap-2 text-sm font-semibold"><AgentAvatar role="reviewer" class="size-9" />{{ agentIdentities.reviewer.name }} · Resultatgranskning</p><p class="text-sm" role="status">{{ reviewBusy ? 'Granskar resultat' : 'Resultatgranskning' }} · {{ reviewDone }} av {{ reviewJobs.length }} avslutade</p><p class="text-xs text-muted">Bedömningarna finns under respektive testkörning i Testning. {{ reviewJobs.filter(j => j.status === 'failed').length }} kunde inte slutföras.</p></section>
         <p v-if="backgroundBusy" class="flex items-center gap-2 text-xs text-muted" role="status"><span class="size-2 rounded-full bg-success motion-safe:animate-pulse" />Arbete pågår på VPS · Du kan fortsätta chatta</p>
+        <div id="activity-section-vps" tabindex="-1" class="space-y-4">
         <ProjectEnvironment v-for="job in setupJobs.filter(job=>job.result?.environment)" :key="job.id" :job="job" :workspace-id="activeId!" />
-        <BrowserAgentJobs v-if="activeId" :workspace-id="activeId" :jobs="browserJobs?.jobs || []" @refresh="refreshBrowserJobs()" />
+        <article v-for="job in setupJobs.filter(job => !job.result?.environment && !sandboxes.some(s => s.codex?.jobId === (job.result?.jobId || job.id)))" :key="job.id" class="space-y-2 rounded-lg border border-default p-3">
+          <p class="flex items-center gap-2 text-sm font-semibold"><AgentAvatar role="vps" class="size-9" />{{ agentIdentities.vps.name }} · VPS</p>
+          <p class="text-xs text-muted">{{ job.result ? vpsStatusMessage(job.result.message) : activityRailState([job.status]).detail }}</p>
+          <details v-if="job.result?.result"><summary class="cursor-pointer text-sm">Visa rapport</summary><div class="mt-2 max-h-72 overflow-auto break-words text-sm"><ChatComark :value="job.result.result" /></div></details>
+          <p class="text-xs text-muted">Uppdragsstatus bekräftar inte appstart eller godkända tester.</p>
+        </article>
         <SandboxRuns :key="activeId || 'none'" />
-        <RepositoryRuns :key="`repo-${activeId}`" />
-        <section v-if="browser" class="overflow-hidden rounded-xl border border-default" aria-label="Webbläsare på VPS">
+        </div>
+        <div id="activity-section-iris" tabindex="-1"><BrowserAgentJobs v-if="activeId" :workspace-id="activeId" :jobs="browserJobs?.jobs || []" @refresh="refreshBrowserJobs()" /></div>
+        <div id="activity-section-repository" tabindex="-1"><RepositoryRuns :key="`repo-${activeId}`" /></div>
+        <section v-if="browser" id="activity-section-browser" tabindex="-1" class="overflow-hidden rounded-xl border border-default" aria-label="Webbläsare på VPS">
           <div class="flex items-center gap-3 p-3"><UIcon name="i-lucide-globe-2" class="size-5 shrink-0" /><div class="min-w-0 flex-1"><p class="truncate text-sm font-medium">{{ browser.title || 'Webbläsare' }}</p><p class="truncate text-xs text-muted">{{ browser.url }}</p></div><UButton icon="i-lucide-maximize-2" aria-label="Öppna webbläsaren" variant="ghost" size="sm" @click="openBrowser()" /></div>
           <BrowserLivePreview :url="browser.liveUrl" :session-id="browser.sessionId" @open="openBrowser()" />
         </section>
       </div>
       <AgentWorkerActivity v-for="worker in workers.filter(worker => worker.threadId === snapshot?.threadId)" :key="worker.sessionId" :thread-id="worker.threadId" :session-id="worker.sessionId" :name="worker.name" />
-      <div v-if="snapshot" class="space-y-6">
+      <div v-if="snapshot" id="activity-section-main" tabindex="-1" class="space-y-6">
         <div class="rounded-lg border border-default bg-muted p-4 space-y-2" role="status">
           <div class="flex items-center gap-2 font-semibold">
             <UIcon :name="snapshot.busy ? 'i-lucide-loader-circle' : 'i-lucide-bot'" :class="snapshot.busy ? 'motion-safe:animate-spin' : ''" />

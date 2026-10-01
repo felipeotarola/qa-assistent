@@ -2,6 +2,8 @@
 import { VueFlow, Handle, Position, MarkerType, type VueFlowStore } from '@vue-flow/core';
 import AgentAvatar from './AgentAvatar.vue';
 import { agentCapabilities, mainAgentGuide } from '#shared/agent-capabilities';
+import { agentIdentities, isAgentRole } from '#shared/agent-identities';
+import { vpsToolGuides } from '#shared/vps-tool-guides';
 import '@vue-flow/core/dist/style.css';
 import '@vue-flow/core/dist/theme-default.css';
 
@@ -26,22 +28,28 @@ onMounted(() => {
   if (canvas.value) resizeObserver.observe(canvas.value);
 });
 onBeforeUnmount(() => { resizeObserver?.disconnect(); cancelAnimationFrame(fitFrame); });
-const entries = [mainAgentGuide, ...agentCapabilities];
+const entries = [mainAgentGuide, ...agentCapabilities, ...vpsToolGuides];
+const nodeTitle = (id: string, title: string) => isAgentRole(id) ? agentIdentities[id].name : title;
+const vpsView = computed(() => selected.value === 'vps' || selected.value.startsWith('vps-'));
 const positions: Record<string, { x: number; y: number }> = {
   main: { x: 300, y: 0 }, repository: { x: 600, y: 190 },
   browser: { x: 0, y: 190 }, testing: { x: 300, y: 190 },
-  research: { x: 0, y: 390 }, requirements: { x: 300, y: 390 },
-  integrations: { x: 600, y: 390 }, material: { x: 300, y: 590 },
+  research: { x: 0, y: 390 }, reviewer: { x: 300, y: 390 }, requirements: { x: 0, y: 590 },
+  vps: { x: 600, y: 390 }, integrations: { x: 600, y: 590 }, material: { x: 300, y: 790 },
 };
-const nodes = entries.map((entry, index) => ({ id: entry.id, type: 'guide', position: positions[entry.id]!, data: { ...entry, index } }));
+const toolPositions: Record<string, { x: number; y: number }> = { vps: { x: 300, y: 0 } };
+vpsToolGuides.forEach((tool, index) => { toolPositions[tool.id] = index === 4 ? { x: 300, y: 670 } : { x: (index % 2) * 600, y: 240 + Math.floor(index / 2) * 220 }; });
+const nodes = computed(() => entries.filter(entry => vpsView.value ? entry.id === 'vps' || entry.id.startsWith('vps-') : !entry.id.startsWith('vps-')).map((entry, index) => ({ id: entry.id, type: 'guide', position: (vpsView.value ? toolPositions : positions)[entry.id]!, data: { ...entry, index } })));
 const connections = [
   ['main', 'browser', 'Delegerar i bakgrunden'], ['main', 'testing', 'Planerar & verifierar'], ['main', 'repository', 'Delegerar vid behov'],
-  ['browser', 'research', 'Samlar underlag'], ['testing', 'requirements', 'Bedömer mot krav'],
-  ['repository', 'integrations', 'Kod & ärenden'], ['research', 'material', 'Källor'],
-  ['requirements', 'material', 'Gemensamt underlag'], ['integrations', 'material', 'Spårbara länkar'],
+  ['browser', 'research', 'Samlar underlag'], ['testing', 'reviewer', 'Sparade körningar'],
+  ['repository', 'vps', 'Arbete i sandlådan'], ['repository', 'integrations', 'Kod & ärenden'], ['research', 'material', 'Källor'],
+  ['requirements', 'reviewer', 'Ursprungliga krav'], ['reviewer', 'material', 'Läser underlag'], ['integrations', 'material', 'Spårbara länkar'],
 ];
-const edges = computed(() => connections.map(([source, target, label]) => ({
+const edges = computed(() => (vpsView.value ? vpsToolGuides.map(tool => ['vps', tool.id, '']) : connections).map(([source, target, label]) => ({
   id: `${source}-${target}`, source: source!, target: target!, label,
+  ...(source === 'requirements' && target === 'reviewer' ? { sourceHandle: 'review-input', targetHandle: 'requirements' } : {}),
+  ...(source === 'repository' && target === 'integrations' ? { sourceHandle: 'integrations', targetHandle: 'repository' } : {}),
   type: 'smoothstep', animated: moving.value, markerEnd: MarkerType.ArrowClosed,
   style: { stroke: 'var(--ui-primary)', opacity: source === selected.value || target === selected.value ? 0.9 : 0.35 },
   labelStyle: { fill: 'var(--ui-text-muted)', fontSize: 11 }, labelBgStyle: { fill: 'var(--ui-bg)' },
@@ -64,22 +72,28 @@ function close() {
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-default px-4 py-3 sm:px-5">
       <div><h2 class="text-sm font-semibold">Från uppdrag till resultat</h2><p class="mt-1 text-xs text-muted">Interaktiv guide · rörelsen illustrerar samband, inte liveaktivitet</p></div>
       <div class="flex flex-wrap gap-2">
+        <UButton v-if="vpsView" label="Visa hela teamet" icon="i-lucide-arrow-left" color="neutral" variant="outline" @click="choose('main')" />
         <USelect :model-value="selected" :items="entries.map(item => ({ label: item.title, value: item.id }))" aria-label="Visa agent eller förmåga" class="w-52" @update:model-value="choose($event)" />
         <UButton :icon="moving ? 'i-lucide-pause' : 'i-lucide-play'" :label="reducedMotion ? 'Minskad rörelse' : moving ? 'Pausa rörelse' : 'Starta rörelse'" :disabled="reducedMotion" :aria-pressed="!moving" color="neutral" variant="outline" @click="paused = !paused" />
       </div>
     </div>
     <div class="team-map-body grid" :class="open ? 'xl:grid-cols-[minmax(0,1fr)_24rem]' : 'grid-cols-1'">
       <div ref="canvas" class="team-canvas relative min-w-0" aria-label="Panorera och zooma agentkartan">
-        <VueFlow :nodes="nodes" :edges="edges" fit-view-on-init :nodes-draggable="false" :nodes-connectable="false" :elements-selectable="false" :min-zoom="0.3" :max-zoom="1.6" :zoom-on-scroll="true" @init="flow = $event" @node-click="choose($event.node.id)">
+        <VueFlow :key="vpsView ? 'vps' : 'team'" :nodes="nodes" :edges="edges" fit-view-on-init :nodes-draggable="false" :nodes-connectable="false" :elements-selectable="false" :min-zoom="0.3" :max-zoom="1.6" :zoom-on-scroll="true" @init="flow = $event" @node-click="choose($event.node.id)">
           <template #node-guide="{ data }">
             <div class="node-reveal" :style="{ '--entrance-delay': `${data.index * 60}ms` }">
-              <Handle type="target" :position="Position.Top" />
-              <button :id="`agent-node-${data.id}`" type="button" class="team-node nodrag nopan text-left" :class="{ 'is-selected': selected === data.id && open, 'is-agent': ['main', 'repository', 'browser'].includes(data.id) }" :aria-pressed="selected === data.id && open" aria-controls="agent-map-detail" @click.stop="choose(data.id)">
-                <span class="mb-3 flex items-center justify-between gap-3"><AgentAvatar v-if="data.id === 'main' || data.id === 'repository' || data.id === 'browser'" :role="data.id" class="size-14" /><span v-else class="flex size-10 items-center justify-center rounded-xl bg-elevated text-primary"><UIcon :name="data.icon" class="size-5" /></span><span class="text-[10px] font-medium uppercase tracking-wider text-muted">{{ data.id === 'main' ? 'Orkestrator' : ['repository', 'browser'].includes(data.id) ? 'Specialist' : 'Förmåga' }}</span></span>
-                <span class="block text-sm font-semibold text-highlighted">{{ data.id === 'repository' ? 'Axel' : data.id === 'browser' ? 'Iris' : data.title }}</span>
+              <Handle type="target" :position="data.id.startsWith('vps-') && data.id !== 'vps-environment' ? toolPositions[data.id]?.x === 0 ? Position.Right : Position.Left : Position.Top" />
+              <Handle v-if="data.id === 'reviewer'" id="requirements" type="target" :position="Position.Left" />
+              <Handle v-if="data.id === 'integrations'" id="repository" type="target" :position="Position.Right" />
+              <button :id="`agent-node-${data.id}`" type="button" class="team-node nodrag nopan text-left" :class="{ 'is-selected': selected === data.id && open, 'is-agent': isAgentRole(data.id) }" :aria-pressed="selected === data.id && open" aria-controls="agent-map-detail" @click.stop="choose(data.id)">
+                <span class="mb-3 flex items-center justify-between gap-3"><AgentAvatar v-if="isAgentRole(data.id)" :role="data.id" class="size-14" /><span v-else class="flex size-10 items-center justify-center rounded-xl bg-elevated text-primary"><UIcon :name="data.icon" class="size-5" /></span><span class="text-[10px] font-medium uppercase tracking-wider text-muted">{{ data.id === 'main' ? 'Orkestrator' : isAgentRole(data.id) ? 'Specialist' : data.id.startsWith('vps-') ? 'VPS-verktyg' : 'Förmåga' }}</span></span>
+                <span class="block text-sm font-semibold text-highlighted">{{ nodeTitle(data.id, data.title) }}</span>
                 <span class="mt-1 block text-xs leading-relaxed text-muted">{{ data.summary }}</span>
+                <span v-if="data.id === 'vps' && !vpsView" class="mt-2 block text-xs font-medium text-primary">Visa 5 VPS-verktyg →</span>
               </button>
               <Handle type="source" :position="Position.Bottom" />
+              <Handle v-if="data.id === 'requirements'" id="review-input" type="source" :position="Position.Right" />
+              <Handle v-if="data.id === 'repository'" id="integrations" type="source" :position="Position.Right" />
             </div>
           </template>
         </VueFlow>
@@ -91,7 +105,7 @@ function close() {
       </div>
       <Transition name="agent-detail">
         <aside v-if="open" id="agent-map-detail" :key="selected" class="team-detail min-w-0 overflow-y-auto border-t border-default bg-default xl:border-t-0 xl:border-l" aria-label="Vald agent eller förmåga" @keydown.esc="close">
-          <div class="sticky top-0 z-10 flex items-center justify-between border-b border-default bg-default px-5 py-3"><span class="text-xs font-medium uppercase tracking-wider text-muted">{{ selected === 'main' ? 'Huvudagent' : selected === 'repository' ? 'Repo-specialist' : 'Verktyg & förmågor' }}</span><UButton icon="i-lucide-x" aria-label="Stäng detaljer" color="neutral" variant="ghost" @click="close" /></div>
+          <div class="sticky top-0 z-10 flex items-center justify-between border-b border-default bg-default px-5 py-3"><span class="text-xs font-medium uppercase tracking-wider text-muted">{{ selected === 'main' ? 'Huvudagent' : selected === 'repository' ? 'Repo-specialist' : selected === 'browser' ? 'Webbläsarspecialist' : selected === 'vps' ? 'VPS-specialist' : selected === 'reviewer' ? 'Resultatgranskning' : 'Verktyg & förmågor' }}</span><UButton icon="i-lucide-x" aria-label="Stäng detaljer" color="neutral" variant="ghost" @click="close" /></div>
           <slot />
         </aside>
       </Transition>

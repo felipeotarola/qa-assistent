@@ -54,6 +54,25 @@
 .qaa-modal { box-shadow: 0 0 0 1px var(--border), var(--shadow-float); }
 .qaa-composer { background: var(--card); border-radius: 24px; box-shadow: 0 0 0 1px var(--qaa-border-component), var(--shadow-composer); }
 .qaa-composer:focus-within { outline: none; box-shadow: var(--shadow-composer-focus); }
+.qaa-composer { container: composer / inline-size; min-width: 0; }
+.composer-compact-icon { display: none; }
+#conversation-pane { container: conversation / inline-size; }
+@container conversation (max-width: 360px) {
+  .chat-content-gutters { padding-inline: 8px; }
+  .qaa-composer { padding: 10px; border-radius: 16px; }
+}
+@container composer (max-width: 360px) {
+  .composer-control-label, .composer-report-context { display: none; }
+  .composer-compact-icon { display: inline-flex; }
+  .composer-icon-control, .composer-reasoning {
+    width: 32px; height: 32px; min-width: 32px; padding: 0; justify-content: center; flex-shrink: 0;
+  }
+  .composer-reasoning [data-slot="trailing"] { display: none; }
+  .composer-report { padding: 8px; }
+  .composer-report-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .composer-report:not(.is-expanded) .composer-report-body { display: none; }
+  .composer-report.is-expanded .composer-report-title { display: block; }
+}
 .qaa-composer textarea { font-size: 16px; outline: none; box-shadow: none; }
 .qaa-shell, .workspace-surface { background-color: var(--qaa-page-surface); background-image: var(--qaa-page-backdrop); background-repeat: no-repeat; background-size: 100% 100%; }
 .qaa-sidebar { background: var(--sidebar); container-type: inline-size; }

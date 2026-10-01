@@ -7,10 +7,9 @@ defineProps<{ disabled?: boolean }>();
 
 <template>
   <div class="inline-flex shrink-0 items-center gap-0.5 rounded-lg bg-elevated p-0.5" role="group" aria-label="Chat model">
+    <UTooltip v-for="option in CHAT_MODELS" :key="option.id" :text="option.id === 'glm-5.3-flash' ? 'GLM 5.3 Flash' : option.label">
     <UButton
-      v-for="option in CHAT_MODELS"
-      :key="option.id"
-      :label="option.label"
+      class="composer-icon-control"
       :icon="option.id === 'glm-5.3-flash' ? 'i-lucide-zap' : 'i-lucide-sparkles'"
       :variant="model === option.id ? 'solid' : 'ghost'"
       :aria-pressed="model === option.id"
@@ -19,6 +18,7 @@ defineProps<{ disabled?: boolean }>();
       color="neutral"
       size="xs"
       @click="model = option.id"
-    />
+    ><span class="composer-control-label">{{ option.label }}</span></UButton>
+    </UTooltip>
   </div>
 </template>

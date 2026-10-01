@@ -12,18 +12,18 @@ export default defineNuxtConfig({
     'nitro:config'(config) {
       // Eve/Nuxt mounts only its transport prefix automatically. Custom channels
       // keep their own namespace and must also reach the Eve service.
-      const path = '/workers/setup/notify';
+      const paths = ['/workers/setup/notify', '/workers/result-review/notify'];
       const proxy = config.routeRules?.['/eve/v1/**']?.proxy;
       const target = typeof proxy === 'string' ? proxy : proxy?.to;
       if (target) {
         config.routeRules ||= {};
-        config.routeRules[path] = { proxy: `${new URL(target).origin}${path}`, headers: { 'cache-control': 'no-store' } };
+        for (const path of paths) config.routeRules[path] = { proxy: `${new URL(target).origin}${path}`, headers: { 'cache-control': 'no-store' } };
       }
       // Eve generates Services fields newer than Nitro's Vercel config types.
       const vercel = config.vercel?.config as { routes?: unknown[]; services?: Record<string, { routes?: unknown[] }> } | undefined;
       if (vercel?.services?.eve) {
-        vercel.routes = [{ src: '^/workers/setup/notify$', destination: { type: 'service', service: 'eve' } }, ...(vercel.routes || [])];
-        vercel.services.eve.routes = [{ src: '^/workers/setup/notify$', transforms: [{ type: 'request.path', op: 'set', args: path }] }, ...(vercel.services.eve.routes || [])];
+        vercel.routes = [...paths.map(path => ({ src: `^${path}$`, destination: { type: 'service', service: 'eve' } })), ...(vercel.routes || [])];
+        vercel.services.eve.routes = [...paths.map(path => ({ src: `^${path}$`, transforms: [{ type: 'request.path', op: 'set', args: path }] })), ...(vercel.services.eve.routes || [])];
       }
     },
   },
@@ -66,6 +66,7 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
+    vercel: { functions: { maxDuration: 240 } },
     // Eve's package-internal #shared imports must resolve inside Eve, not
     // against Nuxt's application #shared alias.
     // Inline the client so Nitro doesn't omit its package-private dependencies.

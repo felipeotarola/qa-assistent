@@ -12,7 +12,7 @@ export default defineAgent({
         ctx.session.auth.current?.attributes.reasoning,
         !!codexTurn.get().turnId,
         ctx.session.auth.current?.attributes.browserWorker === 'iris',
-        ctx.session.auth.current?.attributes.browserNotification === 'iris' || ctx.session.auth.current?.attributes.setupNotification === 'blocked',
+        ctx.session.auth.current?.attributes.resultReviewNotification === 'true' || ctx.session.auth.current?.attributes.browserNotification === 'iris' || ctx.session.auth.current?.attributes.setupNotification === 'blocked',
       ),
     },
   }),

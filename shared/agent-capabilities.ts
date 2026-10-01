@@ -1,14 +1,15 @@
 import { agent } from './agent';
+import { agentIdentities } from './agent-identities';
 
 export const mainAgentGuide = {
   id: 'main', title: `${agent.name} · Huvudagent`, icon: agent.avatar.icon,
   summary: 'Ditt mål, ett gemensamt sammanhang.',
-  description: 'Din kontakt i chatten. Huvudagenten samordnar uppdraget, använder verktygen och tar hjälp av Axel när en undersökning behöver ett eget sammanhang.',
+  description: 'Din kontakt i chatten. Huvudagenten samordnar uppdraget, låter Iris testa i webbläsaren och tar hjälp av Axel för repo-undersökningar och Otto för arbete i VPS-miljön. Klara granskar resultaten och kontrollerar om sparat underlag stöder slutsatserna.',
   needs: 'Beskriv målet i en chatt och välj det workspace vars material och krav ska användas.',
-  steps: ['Förstå målet och läs relevant underlag.', 'Använd verktyg direkt för enkla uppgifter; delegera repo-undersökningar vid behov.', 'Sammanfatta resultat, begränsningar och vad som sparats.'],
+  steps: ['Förstå målet och läs relevant underlag.', 'Använd verktyg direkt eller delegera till Iris och Axel medan chatten är tillgänglig.', 'Sammanfatta rapporterade resultat, tillgängliga granskningsbedömningar och nästa steg.'],
   result: 'Chatten, aktivitetspanelen och de material eller testresultat som uppdraget skapar.',
-  boundary: 'Agenterna använder Eve och chattens modell- och resonemangsval. Modellen körs hos modellleverantören; repo-kod körs isolerat på VPS:en.',
-  example: 'Läs vårt underlag och föreslå vad vi behöver verifiera härnäst.', related: ['repository', 'testing', 'material'],
+  boundary: 'Modellerna körs hos modellleverantören; repo-kod körs isolerat på VPS:en. Klara har en egen modellinställning och påverkas inte av chattens modellval. Ett rapporterat godkännande och ett granskat underlag är olika saker.',
+  example: 'Läs vårt underlag och föreslå vad vi behöver verifiera härnäst.', related: ['browser', 'repository', 'vps', 'reviewer', 'testing', 'material'],
 };
 
 /** Product guide to the implemented tools, not a runtime health or permission report. */
@@ -20,7 +21,7 @@ export const agentCapabilities = [
     steps: ['Ge huvudagenten repo-URL och vad du vill undersöka eller testa.', 'Agenten använder ett känt kommando direkt eller delegerar undersökningen till Axel.', 'Koden körs i en isolerad Docker-miljö på VPS:en. Resultatet sparas med körnings-ID, commit och kommando.'],
     result: 'Sammanfattning i chatten. Be agenten hämta den sparade körningen via dess körnings-ID för status och tillgängliga loggar.',
     boundary: 'Privata repos och installationsscript stöds inte i piloten. Ett lyckat kommando betyder inte automatiskt att alla testfall är verifierade. Agenternas modell körs via modellleverantören; VPS:en kör projektets kod.',
-    example: 'Undersök https://github.com/felipeotarola/surdeg och ta reda på vilket script vi kan använda för att verifiera projektet. Kör det och sammanfatta resultatet.', related: ['testing', 'integrations'],
+    example: 'Undersök https://github.com/felipeotarola/surdeg och ta reda på vilket script vi kan använda för att verifiera projektet. Kör det och sammanfatta resultatet.', related: ['vps', 'testing', 'integrations'],
   },
   {
     id: 'testing', title: 'Testning', icon: 'i-lucide-clipboard-check', summary: 'Från testfall till spårbara resultat.',
@@ -29,7 +30,25 @@ export const agentCapabilities = [
     steps: ['Läs testfall, förutsättningar och förväntat resultat.', 'Genomför testet i webbläsaren eller samla den manuella verifieringen.', 'Spara utfall, observationer, begränsningar och tillgängliga skärmbilder.'],
     result: 'Testning → testfallet → körningsresultat och historik.',
     boundary: 'Beskrivna testfall är inte körda tester. Saknade fakta ska synas som en begränsning eller ett behov av bedömning.',
-    example: 'Kör testfallet för felaktigt lösenord och spara resultat och skärmbilder.', related: ['browser', 'requirements'],
+    example: 'Kör testfallet för felaktigt lösenord och spara resultat och skärmbilder.', related: ['browser', 'reviewer', 'requirements'],
+  },
+  {
+    id: 'reviewer', title: `${agentIdentities.reviewer.name} · Resultatgranskning`, icon: 'i-lucide-scan-eye', summary: 'Kontrollerar om underlaget stöder slutsatsen.',
+    description: 'Granskar sparade testkörningar från Iris eller andra utförare mot testfallets ursprungliga krav. Kodregler kontrollerar täckning, körningskoppling och version. Därefter bedömer en separat modell vad läsbara bilder och loggar faktiskt styrker.',
+    needs: 'En avslutad testkörning med sparade observationer och underlag. Välj Granska resultat under testfallets körningsresultat. Automatisk granskning behöver aktiveras separat per workspace.',
+    steps: ['Läs en låst ögonblicksbild av testfallet, körningen, miljön och underlagets versioner.', 'Kontrollera dataluckor med kodregler och bedöm sedan läsbart underlag. Saknas läsbart underlag behövs inget modellanrop.', 'Spara Underbyggt, Behöver kompletteras eller Motsägs av underlaget, med underlagsreferenser och ett föreslaget nästa steg.'],
+    result: 'Testning → testfallet → körningsresultat. Framsteg visas i Pågående arbete. Huvudagenten får en kort återrapportering i den ursprungliga chatten när den är tillgänglig.',
+    boundary: 'Ändrar inte originalresultatet, kraven eller manuella ombedömningar och startar inga omtester. Underbyggt kan också betyda ett korrekt rapporterat misslyckande. Ändrat underlag gör bedömningen inaktuell. Klara har en separat modellinställning och inga körverktyg. En AI-bedömning är ingen garanti.',
+    example: 'Sammanfatta Klaras sparade granskningsbedömningar för vår testplan. Skilj rapporterat utfall från granskat underlag och föreslå ett nästa steg. Starta inga omtester.', related: ['testing', 'requirements', 'material'],
+  },
+  {
+    id: 'vps', title: `${agentIdentities.vps.name} · VPS & arbetsmiljö`, icon: 'i-lucide-container', summary: 'Förbereder och kör projekt i den isolerade VPS-miljön.',
+    description: 'Otto tar emot avgränsade bakgrundsuppdrag från huvudagenten eller Axel. Han undersöker befintlig miljö, läser kod, installerar beroenden, startar tjänster och rapporterar vad som faktiskt fungerar. Du kan fortsätta chatta under tiden.',
+    needs: 'Ett workspace, en tilldelad VPS-sandlåda och aktiverad åtkomst till VPS-agenten. Åtkomst och inloggning konfigureras av administratören.',
+    steps: ['Inspektera befintliga repos, processer och portar och återanvänd matchande arbete.', 'Kör uppdraget med avgränsade VPS-verktyg och följ processernas loggar.', 'Verifiera appstart med HTTP, rapportera saknad konfiguration och lämna resultat eller port till huvudagenten.'],
+    result: 'Pågående arbete → Arbetsmiljö på VPS. Repokartor sparas i Material. Saknad konfiguration fylls i via testmiljöns formulär.',
+    boundary: 'Otto arbetar i sandlådan, inte som administratör över hela VPS:en. Ett aktivt uppdrag åt gången i den nuvarande workern. Preview öppnas av huvudagenten och webbläsartester utförs av Iris. En startad server är inte ett godkänt test. Denna guide visar förmågor, inte aktuell driftstatus.',
+    example: 'Förbered repot för testning. Återanvänd befintlig miljö, starta appen och verifiera HTTP. Visa saknad konfiguration om den inte blir testklar.', related: ['repository', 'browser', 'testing', 'material'],
   },
   {
     id: 'browser', title: 'Iris · Webbläsartester', icon: 'i-lucide-globe', summary: 'Testar i webbläsaren medan du fortsätter chatta.',
@@ -55,7 +74,7 @@ export const agentCapabilities = [
     needs: 'Ett valt workspace. Ange vilket objekt som ska ändras, eller skriv direkt från dess kort.',
     steps: ['Läs det aktuella objektet och dess version.', 'Ändra det efterfrågade innehållet och behåll resten.', 'Spara en ny version med källor och bildreferenser.'],
     result: 'Material → samma objekt, med versionshistorik och kopierbart material-ID.',
-    boundary: 'Repokartor kräver den aktiverade Codex-piloten på VPS. Kodunderlag är inte ett funktionstest. Ett diagram skiljer underbyggda samband från antaganden. Profil och personligt minne är separata från projektets material.',
+    boundary: 'Repokartor kräver aktiverad åtkomst till Otto på VPS. Kodunderlag är inte ett funktionstest. Ett diagram skiljer underbyggda samband från antaganden. Profil och personligt minne är separata från projektets material.',
     example: 'Läs tabellen med våra publika sidor och gör ett diagram av den.', related: ['research', 'requirements'],
   },
   {
@@ -64,8 +83,8 @@ export const agentCapabilities = [
     needs: 'Ett testfall och ett konkret kravbeslut. Publicering kräver en Linear-koppling och ett valt ärende.',
     steps: ['Öppna Krav & kontext i testfallet och besvara det som saknas.', 'Granska förslaget och koppla rätt Linear-ärende innan publicering.', 'Använd det uppdaterade testfallet vid nästa körning; bedöm äldre körningar separat.'],
     result: 'Krav & kontext i testfallet, publicerat kravavsnitt i Linear och spårbar bedömning av körningen.',
-    boundary: 'En observation är inte automatiskt ett fel. En kravändring gör inte tidigare körningar automatiskt godkända.',
-    example: 'Ett generiskt felmeddelande är acceptabelt här. Förbered ett kravförtydligande för testfallet.', related: ['testing', 'integrations'],
+    boundary: 'En observation är inte automatiskt ett fel. En kravändring gör inte tidigare körningar automatiskt godkända. Din manuella ombedömning är separat från Klaras bedömning av underlaget.',
+    example: 'Ett generiskt felmeddelande är acceptabelt här. Förbered ett kravförtydligande för testfallet.', related: ['testing', 'reviewer', 'integrations'],
   },
   {
     id: 'integrations', title: 'Linear & GitHub', icon: 'i-lucide-plug', summary: 'Koppla krav och resultat till era ärenden.',

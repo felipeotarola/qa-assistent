@@ -1,3 +1,4 @@
+import { agentIdentities } from '#shared/agent-identities';
 import { isDynamicToolUIPart, isToolUIPart } from "ai";
 import type { UIMessage } from "ai";
 import type { EveDynamicToolPart } from "eve/vue";
@@ -36,6 +37,7 @@ export function getToolDisplayName(part: EveDynamicToolPart): string {
   }
 
   const name = part.toolName.split("__").at(-1) ?? part.toolName;
+  if (name === 'codex') return agentIdentities.vps.name;
   const words = name
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")

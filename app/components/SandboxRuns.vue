@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { agentIdentities, vpsStatusMessage } from '#shared/agent-identities';
+import AgentAvatar from './AgentAvatar.vue';
 import type { SandboxState } from '#shared/sandbox';
 const sessions = useState<SandboxState[]>('execution-sandboxes', () => []);
 const { activeId } = useWorkspaces();
@@ -21,8 +23,8 @@ async function stop(id: string) {
       <div v-show="!minimized" class="space-y-4 border-t border-default p-4">
         <article v-for="session in sessions" :key="session.id" class="space-y-3">
           <div v-if="session.codex" class="space-y-2 rounded-lg border border-default p-3">
-            <p class="flex items-center gap-2 text-sm font-medium"><UIcon :name="['starting', 'running', 'configuring'].includes(session.codex.status) ? 'i-lucide-loader-circle' : 'i-lucide-bot'" :class="['starting', 'running', 'configuring'].includes(session.codex.status) ? 'motion-safe:animate-spin' : ''" />Codex · {{ session.codex.status==='needs_configuration'?'Behöver konfiguration':session.codex.status }}</p>
-            <p class="text-xs text-muted" role="status">{{ session.codex.message }}</p>
+            <p class="flex items-center gap-2 text-sm font-medium"><AgentAvatar role="vps" class="size-9" /><UIcon :name="['starting', 'running', 'configuring'].includes(session.codex.status) ? 'i-lucide-loader-circle' : 'i-lucide-bot'" :class="['starting', 'running', 'configuring'].includes(session.codex.status) ? 'motion-safe:animate-spin' : ''" />{{ agentIdentities.vps.name }} · {{ session.codex.status==='needs_configuration'?'Behöver konfiguration':session.codex.status }}</p>
+            <p class="text-xs text-muted" role="status">{{ vpsStatusMessage(session.codex.message) }}</p>
             <details v-if="session.codex.result"><summary class="cursor-pointer text-xs">Visa rapport</summary><p class="mt-2 whitespace-pre-wrap break-words text-sm">{{ session.codex.result }}</p></details>
           </div>
           <p class="text-sm" role="status">{{ session.message }}</p><p class="text-xs text-muted">{{ session.id.slice(0, 8) }} · {{ session.status }} · {{ session.processes.length }} processer</p>
