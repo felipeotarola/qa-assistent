@@ -100,6 +100,21 @@ and density. This document does not claim a complete UI migration has happened.
 
 ## Workspace views
 
+The workspace header groups actions in the `Verktyg` dropdown using
+`UDropdownMenu`: creation/upload actions follow the selected view, while
+connections and trash are always available. The existing view tabs remain
+navigation. `WorkspaceDestinations` is a controlled dialog opened from this
+menu; the upload input stays mounted outside the menu portal.
+
+When a workspace has a Linear destination, its Linear tab reads the selected
+project through an authenticated, project/team-scoped endpoint. Overview,
+paginated issues and project documents remain provider data, not duplicated
+Material objects. Refresh is explicit and the fetch time is visible. Issue
+actions dispatch to the current workspace chat (or create one): test planning
+stores a source-linked test plan; reporting requests an evidence-backed Linear
+comment through the existing external tool. These actions never silently change
+issue status. Browsing is read-only and credentials stay server-side.
+
 The shared sidebar groups global navigation, workspace selection/tools, and chats
 with `SidebarNavigationGroup` (Nuxt UI Collapsible). Group choices survive route
 changes and mobile drawer remounts. Workspace shortcuts select the existing
@@ -113,9 +128,8 @@ Overview. `WorkspaceOverview` links to the same existing items, not copies.
 Test plans appear under Testing; other saved items appear under Material.
 The browser remains mounted across view changes, but its inline card is shown
 only in Material. Testing lists test plans, never standalone material or browser cards. Card controls and creation actions stay in their relevant view.
-An active browser also has a floating live preview across workspace views.
-It can be minimized without closing the session; opening it reveals the existing
-browser card. The Testing tab indicates an active agent turn with a browser
+An active browser has a live preview in Pågående arbete across workspace views.
+Opening it reveals the existing browser card in Material. The Testing tab indicates an active agent turn with a browser
 session, not merely an idle open browser, and stops during human takeover.
 Plan readiness describes the definition only, never a test execution outcome.
 
@@ -209,7 +223,7 @@ Switching chats clears the previous projection; reopening a chat rebuilds it.
 This is not a monitor of unopened chats or background child sessions.
 
 Tool success is separate from test success. Incomplete calls are unconfirmed,
-not green. The panel does not render raw tool payloads or reasoning. Workspace
+not green. The panel does not render raw tool payloads or reasoning. Analysis events show status only. Tool steps expand into the same bounded, display-field projection used in chat (command, output, exit code and task fields); credential-shaped values are redacted. Workspace
 write receipts link to existing objects; selected assistant text is explicitly
 saved as a new material note with source-chat evidence. The authenticated
 activity-material endpoint uses a transactional source receipt to deduplicate
@@ -226,18 +240,23 @@ Use solid relationships for verified links and dashed relationships for inferred
 `useExecutionFeed` owns the workspace's shared SSE subscription and four-second
 fallback refresh (backoff up to 30 seconds on errors). `RepositoryRuns` consumes
 this state and bounded history;
-it appears in a minimizable floating panel, automatically expanded for a new run.
-The layout's `floating-work-panels` host stacks it with the browser preview so
-the panels do not overlap each other and remain available across workspace tabs.
+it appears inside AgentActivityPanel with sandbox and browser activity.
+There is no separate floating execution host. The shared panel is available
+without an active chat when the workspace has executions.
 `RepositoryRunCard` renders actual VPS job state, logs and cancellation across
 workspace views. Completed jobs can be saved to Material through the authenticated
 repository-material endpoint, which builds content from the persisted run and
 uses a durable receipt to deduplicate retries. Do not restore the old repository
 connection form under Testing. Request a repo URL and execution in chat.
 
-`SandboxRuns` shares the floating host and shows real sandbox status, observed
+`SandboxRuns` shares the activity panel and shows real sandbox status, observed
 process output and stop controls. A completed shell command does not mean a
 background app it started has exited. `BrowserWorkspace` selects explicit
 sessions, including child-agent previews; takeover and return target that ID.
 All controls keep their Nuxt UI styles and keyboard labels. No percentages or
 worker counts are invented from model narration.
+
+The activity panel groups live VPS work above the chat timeline. Completed
+processes and older tool steps are collapsed by default, with explicit history
+controls. Opening/closing the panel never cancels execution; stop buttons are
+explicit. Live browser previews open the existing workspace browser controls.

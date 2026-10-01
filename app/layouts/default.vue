@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import SandboxRuns from '~/components/SandboxRuns.vue';
 import { startNewChat } from "~/composables/chat/navigation";
 import { useThreadList } from "~/composables/chat/useThreads";
 import AgentActivityPanel from '~/components/AgentActivityPanel.vue';
@@ -15,7 +14,7 @@ const mobilePane = ref<"chat" | "workspace">("chat");
 const { requestedItem } = useAgentActivity();
 watch(requestedItem, request => { if (request) mobilePane.value = 'workspace'; });
 watch(() => route.fullPath, () => {
-  mobilePane.value = ['overview', 'testing', 'material'].includes(String(route.query.workspaceView)) ? 'workspace' : 'chat';
+  mobilePane.value = ['overview', 'testing', 'material', 'linear'].includes(String(route.query.workspaceView)) ? 'workspace' : 'chat';
 }, { immediate: true });
 
 const { threads, pending, refresh } = useThreadList();
@@ -74,10 +73,6 @@ defineShortcuts({
 
 <template>
   <UDashboardGroup unit="rem" class="qaa-shell">
-    <Teleport to="body">
-    <div id="floating-work-panels" class="pointer-events-none fixed bottom-4 right-4 z-40 flex max-h-[calc(100dvh-2rem)] w-[28rem] max-w-[calc(100vw-2rem)] flex-col items-end gap-3 overflow-y-auto" />
-    </Teleport>
-    <SandboxRuns />
     <UDashboardSidebar
       id="default"
       v-model:open="sidebarOpen"

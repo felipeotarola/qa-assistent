@@ -24,3 +24,12 @@ test('raw inputs, credentials and reasoning are not projected into the panel', (
   const result = projectActivity([assistant([{type:'reasoning',text:'internal'},tool('1','output-available',{password:'secret'},{password:'secret'}),{type:'text',text:'Visible answer'}])], false);
   assert.ok(!JSON.stringify(result).includes('secret')); assert.ok(!JSON.stringify(result).includes('internal')); assert.equal(result.texts[0].text,'Visible answer');
 });
+
+test('analysis is a status event and tool details remain attached to their call', () => {
+  const result = projectActivity([assistant([{ type: 'reasoning', state: 'done', text: 'private reasoning' }, tool('c', 'output-available', { stdout: 'ok', exitCode: 0 }, { command: 'echo hello', token: 'private-token' })])], false);
+  assert.equal(result.steps[0].kind, 'reasoning');
+  assert.equal(result.steps[0].status, 'done');
+  assert.equal(result.steps[1].input[0].text, 'echo hello');
+  assert.equal(result.steps[1].output.find(row => row.label === 'Exitkod').text, '0');
+  assert.ok(!JSON.stringify(result).includes('private'));
+});

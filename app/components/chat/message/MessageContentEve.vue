@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toolDetails } from '#shared/tool-details';
 import {
   getToolName,
   isDynamicToolUIPart,
@@ -81,10 +82,13 @@ const showThinking = computed(
       </UChatTool>
       <UChatTool
         v-else-if="getToolName(part) !== 'ask_question'"
+        variant="card"
+        :icon="getToolName(part) === 'bash' ? 'i-lucide-terminal' : 'i-lucide-wrench'"
+        :loading="isToolStreaming(part)"
         :text="isDynamicToolUIPart(part) ? getToolDisplayName(part as EveDynamicToolPart) : getToolName(part)"
-        :suffix="isDynamicToolUIPart(part) ? getToolNamespace(part as EveDynamicToolPart) : undefined"
+        :suffix="[isDynamicToolUIPart(part) ? getToolNamespace(part as EveDynamicToolPart) : '', part.state === 'output-error' || part.state === 'output-denied' ? 'Verktygsfel' : part.state === 'output-available' ? 'Svar mottaget' : isToolStreaming(part) ? 'Pågår' : 'Väntar'].filter(Boolean).join(' · ')"
         :streaming="isToolStreaming(part)"
-        chevron="leading"
+        chevron="trailing"
         :default-open="part.state === 'approval-requested' || part.state === 'approval-responded'"
       >
         <AgentInputRequest
@@ -94,16 +98,10 @@ const showThinking = computed(
           @input-responses="emit('inputResponses', $event)"
         />
 
-        <pre
-          v-if="part.input && (!isDynamicToolUIPart(part) || shouldShowToolInput(part as EveDynamicToolPart))"
-          class="overflow-x-auto rounded-md bg-muted p-2 text-xs"
-        >{{ JSON.stringify(part.input, null, 2) }}</pre>
-
-        <pre
-          v-if="part.output || part.errorText"
-          class="overflow-x-auto rounded-md bg-muted p-2 text-xs"
-          :class="part.errorText ? 'text-error' : ''"
-        >{{ part.errorText ?? JSON.stringify(part.output, null, 2) }}</pre>
+        <ToolCallDetails
+          :input="(!isDynamicToolUIPart(part) || shouldShowToolInput(part as EveDynamicToolPart)) ? toolDetails(part.input) : []"
+          :output="toolDetails(part.errorText ? { errorText: part.errorText } : part.output)"
+        />
       </UChatTool>
 
       <AgentInputRequest

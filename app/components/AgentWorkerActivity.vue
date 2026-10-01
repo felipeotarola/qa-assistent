@@ -21,9 +21,12 @@ const title = computed(() => props.name === 'repo' ? 'Repoagent' : props.name.re
     </div>
     <p v-if="agent.error.value" class="text-xs text-muted">Barnagentens ström kunde inte läsas. Huvudagentens svar och sparade körresultat finns kvar.</p>
     <ol v-else-if="activity.steps.length" class="space-y-2">
-      <li v-for="step in activity.steps.slice(-8)" :key="step.id" class="flex items-start justify-between gap-3 text-xs">
-        <span class="min-w-0 break-words">{{ step.label }}</span>
-        <span class="shrink-0 text-muted">{{ labels[step.status] }}</span>
+      <li v-for="step in activity.steps.slice(-8)" :key="step.id" class="text-xs">
+        <details v-if="step.kind !== 'reasoning'">
+          <summary class="cursor-pointer break-words">{{ step.label }} · {{ labels[step.status] }}</summary>
+          <ToolCallDetails :input="step.input || []" :output="step.output || []" />
+        </details>
+        <p v-else class="text-muted">{{ step.label }} · {{ labels[step.status] }}</p>
       </li>
     </ol>
     <p v-else class="text-xs text-muted">{{ busy ? 'Analyserar uppgiften…' : 'Inga verktygssteg att visa.' }}</p>

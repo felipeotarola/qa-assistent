@@ -3,8 +3,27 @@ import type { ActivityStep } from '#shared/agent-activity';
 import type { WorkspaceItem } from '#shared/workspace';
 import AgentActivitySurface from './AgentActivitySurface.vue';
 import AgentWorkerActivity from './AgentWorkerActivity.vue';
+import type { SandboxState } from '#shared/sandbox';
+import type { BrowserView } from '#shared/browser';
+import { repoTerminal } from '#shared/repository';
 
 const { snapshot, open, requestedItem, workers } = useAgentActivity();
+const { activeId } = useWorkspaces();
+const { data: repositories } = useRepositoryRuns();
+const sandboxes = useState<SandboxState[]>('execution-sandboxes', () => []);
+const browser = useState<BrowserView | null>('activity-browser', () => null);
+const browserRequest = useState<string | null>('activity-browser-request', () => null);
+const backgroundBusy = computed(() => sandboxes.value.some(s => ['starting', 'running'].includes(s.codex?.status || '') || s.processes.some(p => p.status === 'running')) || repositories.value?.runs.some(r => !r.job || !repoTerminal(r.job.status)));
+const hasWork = computed(() => !!snapshot.value || !!browser.value || !!sandboxes.value.length || !!repositories.value?.runs.length);
+const showSteps = ref(false);
+function openBrowser() {
+  if (!browser.value) return;
+  browserRequest.value = browser.value.sessionId;
+  if (!docked.value) open.value = false;
+}
+const visibleSteps = computed(() => showSteps.value ? snapshot.value?.steps : snapshot.value?.steps.slice(-5));
+watch(() => [sandboxes.value.map(s => s.codex?.jobId || s.id).sort().join(','), repositories.value?.runs[0]?.id, browser.value?.sessionId].join('|'), (value, previous) => { if (value !== previous && (backgroundBusy.value || browser.value)) open.value = true; });
+watch(activeId, () => { showSteps.value = false; });
 const pinned = useCookie<boolean>('agent-activity-pinned', { default: () => false, sameSite: 'lax' });
 const wide = ref(false);
 onMounted(() => {
@@ -13,7 +32,7 @@ onMounted(() => {
   sync(); media.addEventListener('change', sync);
   onBeforeUnmount(() => media.removeEventListener('change', sync));
 });
-const docked = computed(() => pinned.value && wide.value && !!snapshot.value);
+const docked = computed(() => pinned.value && wide.value && hasWork.value);
 const drawerOpen = computed({ get: () => open.value && !docked.value, set: value => { open.value = value; } });
 function togglePin() { pinned.value = !pinned.value; open.value = true; }
 const section = ref('activity');
@@ -53,11 +72,19 @@ watch(() => snapshot.value?.threadId, () => { draft.value = undefined; saveError
 </script>
 
 <template>
-  <div v-if="snapshot && !docked" class="fixed right-28 top-3 z-30">
-    <UButton :icon="snapshot.busy ? 'i-lucide-loader-circle' : 'i-lucide-activity'" :label="heading" color="neutral" variant="soft" size="sm" :aria-expanded="drawerOpen" @click="open = !open" />
+  <div v-if="hasWork && !docked" class="fixed right-28 top-3 z-30">
+    <UButton :icon="snapshot?.busy || backgroundBusy ? 'i-lucide-loader-circle' : 'i-lucide-activity'" label="Pågående arbete" color="neutral" variant="soft" size="sm" :aria-expanded="drawerOpen" @click="open = !open" />
   </div>
   <AgentActivitySurface v-model:open="drawerOpen" :docked="docked" :can-pin="wide" @pin="togglePin">
-      <RepositoryActivity />
+      <div class="mb-5 space-y-4">
+        <p v-if="backgroundBusy" class="flex items-center gap-2 text-xs text-muted" role="status"><span class="size-2 rounded-full bg-success motion-safe:animate-pulse" />Arbete pågår på VPS · Du kan fortsätta chatta</p>
+        <SandboxRuns :key="activeId || 'none'" />
+        <RepositoryRuns :key="`repo-${activeId}`" />
+        <section v-if="browser" class="overflow-hidden rounded-xl border border-default" aria-label="Webbläsare på VPS">
+          <div class="flex items-center gap-3 p-3"><UIcon name="i-lucide-globe-2" class="size-5 shrink-0" /><div class="min-w-0 flex-1"><p class="truncate text-sm font-medium">{{ browser.title || 'Webbläsare' }}</p><p class="truncate text-xs text-muted">{{ browser.url }}</p></div><UButton icon="i-lucide-maximize-2" aria-label="Öppna webbläsaren" variant="ghost" size="sm" @click="openBrowser()" /></div>
+          <BrowserLivePreview :url="browser.liveUrl" :session-id="browser.sessionId" @open="openBrowser()" />
+        </section>
+      </div>
       <AgentWorkerActivity v-for="worker in workers.filter(worker => worker.threadId === snapshot?.threadId)" :key="worker.sessionId" :thread-id="worker.threadId" :session-id="worker.sessionId" :name="worker.name" />
       <div v-if="snapshot" class="space-y-6">
         <div class="rounded-lg border border-default bg-muted p-4 space-y-2" role="status">
@@ -66,18 +93,28 @@ watch(() => snapshot.value?.threadId, () => { draft.value = undefined; saveError
             {{ heading }}
           </div>
           <p class="text-sm text-muted">{{ current?.label ?? (snapshot.busy ? 'Bearbetar uppgiften…' : 'Se utförda steg och tillgängliga resultat nedan.') }}</p>
-          <p class="text-xs text-dimmed">Huvudagent · {{ snapshot.steps.length }} verktygssteg</p>
+          <p class="text-xs text-dimmed">Huvudagent · {{ snapshot.steps.filter(step => step.kind !== 'reasoning').length }} verktygssteg · {{ snapshot.steps.filter(step => step.kind === 'reasoning').length }} analyssteg</p>
         </div>
         <UAlert v-if="snapshot.failed" color="warning" variant="soft" title="Kontrollera chatten" description="Ett fel har rapporterats. Redan sparade resultat kan finnas kvar; kör inte om skrivningar utan att kontrollera dem." />
         <UTabs v-model="section" :items="[{ label: 'Aktivitet', value: 'activity', icon: 'i-lucide-list-checks' }, { label: 'Resultat', value: 'results', icon: 'i-lucide-files' }]" />
         <div v-if="section === 'activity'" class="space-y-3">
           <p class="text-xs text-muted">Utfört betyder att verktyget svarade. Testernas godkännande visas under Testning.</p>
           <p v-if="!snapshot.steps.length" class="text-sm text-muted">Inga verktygssteg i den här uppgiften ännu.</p>
-          <ol class="space-y-3" aria-label="Agentens arbetssteg">
-            <li v-for="step in snapshot.steps" :key="step.id" class="rounded-lg border border-default p-3">
-              <div class="flex items-start gap-3">
-                <UIcon :name="icons[step.status]" class="mt-0.5 size-4 shrink-0" :class="step.status === 'working' ? 'motion-safe:animate-spin' : ''" />
-                <div class="min-w-0 space-y-2"><p class="text-sm font-medium break-words">{{ step.label }}</p><UBadge :color="color(step.status)" variant="soft" size="sm">{{ labels[step.status] }}</UBadge></div>
+          <UButton v-if="snapshot.steps.length > 5" :label="showSteps ? 'Visa senaste stegen' : `Visa alla ${snapshot.steps.length} steg`" variant="ghost" size="sm" @click="showSteps = !showSteps" />
+          <ol class="ml-2 border-l border-default" aria-label="Agentens arbetssteg">
+            <li v-for="step in visibleSteps" :key="step.id" class="relative ml-3 border-b border-default/50 py-3 pl-1 last:border-0">
+              <details v-if="step.kind !== 'reasoning'" class="group min-w-0">
+                <summary class="flex cursor-pointer list-none items-start gap-2 rounded-md focus-visible:outline-2 focus-visible:outline-primary">
+                  <UIcon :name="icons[step.status]" class="mt-0.5 size-4 shrink-0" :class="step.status === 'working' ? 'motion-safe:animate-spin' : ''" />
+                  <div class="min-w-0 flex-1 space-y-1"><p class="text-sm font-medium break-words">{{ step.label }}</p><UBadge :color="color(step.status)" variant="soft" size="sm">{{ labels[step.status] }}</UBadge></div>
+                  <UIcon name="i-lucide-chevron-down" class="mt-1 size-3.5 shrink-0 text-muted group-open:rotate-180" />
+                </summary>
+                <ToolCallDetails :input="step.input || []" :output="step.output || []" />
+                <UButton v-if="step.item" label="Visa sparat resultat" variant="link" size="sm" @click="showItem(step.item.id)" />
+              </details>
+              <div v-else class="flex items-center gap-2 text-xs text-muted">
+                <UIcon :name="step.status === 'working' ? 'i-lucide-loader-circle' : 'i-lucide-brain'" :class="step.status === 'working' ? 'motion-safe:animate-spin' : ''" class="size-4 shrink-0" />
+                {{ step.label }} · {{ labels[step.status] }}
               </div>
             </li>
           </ol>
@@ -105,6 +142,6 @@ watch(() => snapshot.value?.threadId, () => { draft.value = undefined; saveError
           </div>
         </div>
       </div>
-      <p v-else class="text-sm text-muted">Öppna en chatt för att följa agentens arbete.</p>
+      <p v-else-if="!hasWork" class="text-sm text-muted">Öppna en chatt för att följa agentens arbete.</p>
   </AgentActivitySurface>
 </template>

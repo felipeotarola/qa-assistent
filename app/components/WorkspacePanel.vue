@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui';
 import type { WorkspaceItem } from "#shared/workspace";
 import { imageReferences } from "#shared/workspace";
 import { useThreadList } from "~/composables/chat/useThreads";
@@ -7,13 +8,19 @@ import WorkspaceTesting from './WorkspaceTesting.vue';
 const { activeId, workspaces } = useWorkspaces();
 const route = useRoute();
 const router = useRouter();
-const views = [
+const connectionFetch = useRequestFetch();
+const { data: connections } = await useAsyncData(() => `workspace-linear-destination-${activeId.value}`, async () => {
+  if (!activeId.value) return { destinations: [] };
+  return connectionFetch<{ destinations: import('#shared/external').Destination[] }>(`/api/workspaces/${activeId.value}/destinations`);
+});
+const views = computed(() => [
   { label: 'Översikt', value: 'overview', icon: 'i-lucide-house' },
   { label: 'Testning', value: 'testing', icon: 'i-lucide-list-checks' },
   { label: 'Material', value: 'material', icon: 'i-lucide-folder' },
-];
+  ...(connections.value?.destinations.some(d => d.provider === 'linear') ? [{ label: 'Linear', value: 'linear', icon: 'i-lucide-panels-top-left' }] : []),
+]);
 const view = computed({
-  get: () => ['testing', 'material'].includes(String(route.query.workspaceView)) ? String(route.query.workspaceView) : 'overview',
+  get: () => ['testing', 'material', 'linear'].includes(String(route.query.workspaceView)) ? String(route.query.workspaceView) : 'overview',
   set: value => { void router.replace({ query: { ...route.query, workspaceView: value === 'overview' ? undefined : value } }); },
 });
 const materialMode = useCookie<'cards' | 'table'>('material-view', { default: () => 'cards', sameSite: 'lax' });
@@ -147,6 +154,28 @@ async function create(kind: "text" | "table" | "test_plan" | "diagram") {
   catch { error.value = "Kunde inte skapa objektet."; }
   finally { busy.value = false; }
 }
+const connectionsOpen = ref(false);
+const workspaceName = computed(() => workspaces.value.find(w => w.id === activeId.value)?.name || 'Workspace');
+const workspaceActions = computed<DropdownMenuItem[][]>(() => {
+  const groups: DropdownMenuItem[][] = [[{ label: workspaceName.value, type: 'label' }]];
+  if (!trash.value && view.value === 'material') groups.push([
+    { label: 'Nytt dokument', icon: 'i-lucide-file-plus', disabled: busy.value, onSelect: () => { void create('text'); } },
+    { label: 'Ny tabell', icon: 'i-lucide-table-2', disabled: busy.value, onSelect: () => { void create('table'); } },
+    { label: 'Nytt diagram', icon: 'i-lucide-workflow', disabled: busy.value, onSelect: () => { void create('diagram'); } },
+    { label: 'Ladda upp fil', icon: 'i-lucide-upload', disabled: busy.value, onSelect: () => upload.value?.click() },
+  ], [
+    { label: 'Visa även använda bilder', icon: 'i-lucide-images', type: 'checkbox', checked: showLibrary.value, onUpdateChecked: checked => { showLibrary.value = checked; } },
+  ]);
+  if (!trash.value && view.value === 'testing') groups.push([
+    { label: 'Ny testplan', icon: 'i-lucide-list-checks', disabled: busy.value, onSelect: () => { void create('test_plan'); } },
+  ]);
+  groups.push([
+    { label: 'Kopplingar', icon: 'i-lucide-plug', onSelect: () => { connectionsOpen.value = true; } },
+    { label: trash.value ? 'Tillbaka från papperskorgen' : 'Papperskorg', icon: trash.value ? 'i-lucide-arrow-left' : 'i-lucide-trash-2', onSelect: () => { trash.value = !trash.value; } },
+  ]);
+  return groups;
+});
+watch(activeId, () => { connectionsOpen.value = false; });
 async function uploadFile(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -171,19 +200,11 @@ async function uploadFile(event: Event) {
     <header class="flex min-h-(--ui-header-height) shrink-0 flex-wrap items-center gap-2 border-b border-default bg-default px-4 py-2">
       <UIcon name="i-lucide-layout-grid" class="size-4 text-dimmed" />
       <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ workspaces.find(w => w.id === activeId)?.name || 'Workspace' }}</span>
-      <WorkspaceDestinations v-if="activeId" :key="activeId" :workspace-id="activeId" />
-      <UButton icon="i-lucide-trash-2" :label="trash ? 'Tillbaka' : undefined" aria-label="Papperskorg" title="Papperskorg" :aria-pressed="trash" color="neutral" :variant="trash ? 'soft' : 'ghost'" @click="trash = !trash" />
-      <template v-if="!trash">
-      <template v-if="view === 'material'">
-      <UButton icon="i-lucide-images" aria-label="Visa även använda bilder" title="Visa även använda bilder" :aria-pressed="showLibrary" color="neutral" :variant="showLibrary ? 'soft' : 'ghost'" @click="showLibrary = !showLibrary" />
-      <UButton icon="i-lucide-file-plus" aria-label="Nytt dokument" title="Nytt dokument" color="neutral" variant="ghost" size="sm" :disabled="busy || !activeId" @click="create('text')" />
-      <UButton icon="i-lucide-workflow" label="Diagram" aria-label="Nytt diagram" color="neutral" variant="ghost" size="sm" :disabled="busy || !activeId" @click="create('diagram')" />
-      <UButton icon="i-lucide-table-2" aria-label="Ny tabell" title="Ny tabell" color="neutral" variant="ghost" size="sm" :disabled="busy || !activeId" @click="create('table')" />
-      <UButton icon="i-lucide-upload" label="Ladda upp" color="neutral" variant="soft" size="sm" :loading="busy" :disabled="!activeId" @click="upload?.click()" />
+      <UDropdownMenu :items="workspaceActions" :content="{ align: 'end' }" :ui="{ content: 'w-60' }">
+        <UButton label="Verktyg" trailing-icon="i-lucide-chevron-down" color="neutral" variant="ghost" :disabled="!activeId" class="shrink-0" aria-label="Workspace-verktyg" />
+      </UDropdownMenu>
+      <WorkspaceDestinations v-if="activeId" :key="activeId" v-model:open="connectionsOpen" :workspace-id="activeId" />
       <input ref="upload" type="file" class="hidden" aria-label="Ladda upp fil" @change="uploadFile">
-      </template>
-      <UButton v-if="view === 'testing'" icon="i-lucide-list-checks" label="Ny testplan" color="neutral" variant="soft" :disabled="busy || !activeId" @click="create('test_plan')" />
-      </template>
     </header>
     <UTabs v-show="!trash" v-model="view" :items="views" :content="false" variant="link" class="shrink-0 border-b border-default bg-default px-4" aria-label="Workspace-vyer">
       <template #trailing="{ item }">
@@ -195,7 +216,6 @@ async function uploadFile(event: Event) {
     <p v-if="error" role="alert" class="px-4 py-2 text-xs text-error">{{ error }}</p>
     <div class="qaa-workspace-content min-h-0 flex-1 overflow-auto">
       <p v-if="!loaded && !error" role="status" class="py-8 text-center text-sm text-muted">Hämtar workspace…</p>
-      <RepositoryRuns :key="activeId || 'none'" @saved="refresh" />
       <div v-if="trash" class="space-y-2">
         <p class="mb-4 text-sm text-muted">Papperskorg — objekt och filer behålls tills vidare och kan återställas.</p>
         <div v-for="item in items" :key="item.id" class="flex items-center gap-3 rounded-lg border border-default bg-default p-3">
@@ -205,6 +225,7 @@ async function uploadFile(event: Event) {
         <p v-if="loaded && !items.length" class="text-sm text-dimmed">Papperskorgen är tom.</p>
       </div>
       <WorkspaceOverview v-if="loaded && !trash && view === 'overview'" :items="items" :browser-present="browserPresent" @open="openItem" @testing="view = 'testing'" @material="view = 'material'" />
+      <WorkspaceLinear v-if="activeId && !trash && view === 'linear'" :key="activeId" :workspace-id="activeId" />
       <WorkspaceTesting v-if="loaded && !trash && view === 'testing'" :items="plans" @open="openItem" />
       <WorkspacePageHeader v-if="!trash && view === 'material'" title="Material" description="Gemensamma dokument, tabeller, bilder och filer för alla chattar.">
         <template #title-action>
@@ -235,7 +256,7 @@ icon="i-lucide-grip-vertical" color="neutral" variant="ghost" size="xs" class="c
           <BrowserWorkspace v-else-if="threadId && activeId" :key="activeId" :thread-id="threadId" embedded @presence="browserPresent = $event" @working="browserWorking = $event" @reveal="trash = false; view = 'material'" />
         </div>
       </TransitionGroup>
-      <div v-if="loaded && !trash && view !== 'overview' && !(view === 'testing' ? plans.length : materials.length)" class="mx-auto mt-12 max-w-64 text-center text-sm leading-relaxed text-dimmed">
+      <div v-if="loaded && !trash && ['testing', 'material'].includes(view) && !(view === 'testing' ? plans.length : materials.length)" class="mx-auto mt-12 max-w-64 text-center text-sm leading-relaxed text-dimmed">
         <UIcon name="i-lucide-sparkles" class="mb-3 size-6" />
         <p>{{ view === 'testing' ? 'Börja med det ni vill testa.' : 'Plats för ert gemensamma material.' }}</p>
         <p class="mt-2 text-xs">{{ view === 'testing' ? 'Be agenten skapa en testplan från ett krav eller välj Ny testplan. Befintliga dokument och tabeller finns under Material.' : 'Be agenten spara en text, tabell eller skärmbild — eller ladda upp en fil.' }}</p>

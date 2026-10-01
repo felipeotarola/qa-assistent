@@ -1,9 +1,13 @@
+import { toolDetails, type ToolDetail } from './tool-details.ts';
 /** UI projection only. Durable messages and workspace objects remain authoritative. */
 export interface ActivityStep {
   id: string;
   actorId: string;
   parentId?: string;
   label: string;
+  kind?: 'tool' | 'reasoning';
+  input?: ToolDetail[];
+  output?: ToolDetail[];
   status: 'working' | 'waiting' | 'done' | 'error' | 'unconfirmed';
   item?: { id: string; title: string; kind: string };
 }
@@ -31,6 +35,11 @@ export function projectActivity(messages: readonly { id: string; role: string; p
     if (message.role !== 'assistant') continue;
     for (const [index, raw] of message.parts.entries()) {
       const part = record(raw);
+      if (part.type === 'reasoning') {
+        const active = busy && part.state === 'streaming';
+        const id = `${message.id}:reasoning:${index}`;
+        steps.set(id, { id, actorId: 'main', kind: 'reasoning', label: active ? 'Analyserar uppgiften' : 'Analyssteg', status: active ? 'working' : part.state === 'done' ? 'done' : 'unconfirmed' });
+      }
       if (part.type === 'text' && typeof part.text === 'string' && part.text.trim()) texts.push({ id: `${message.id}:${index}`, text: part.text });
       if (typeof part.type !== 'string' || !(part.type === 'dynamic-tool' || part.type.startsWith('tool-'))) continue;
       const name = part.type === 'dynamic-tool' ? String(part.toolName ?? '') : part.type.slice(5);
@@ -42,7 +51,7 @@ export function projectActivity(messages: readonly { id: string; role: string; p
         : part.state === 'output-available' ? 'done' : waiting ? 'waiting' : busy ? 'working' : 'unconfirmed';
       const item = record(output.item), content = record(item.content);
       const saved = name === 'workspace' && ['create', 'update', 'save_file', 'screenshot'].includes(String(input.action)) && status === 'done';
-      steps.set(id, { id, actorId: 'main', label: `${names[name] ?? name.replaceAll('__', ' · ').replaceAll('_', ' ')}${typeof input.action === 'string' ? ` · ${actions[input.action] ?? input.action}` : ''}`, status,
+      steps.set(id, { id, actorId: 'main', kind: 'tool', input: toolDetails(part.input), output: toolDetails(part.errorText ? { errorText: part.errorText } : part.output), label: `${names[name] ?? name.replaceAll('__', ' · ').replaceAll('_', ' ')}${typeof input.action === 'string' ? ` · ${actions[input.action] ?? input.action}` : ''}`, status,
         ...(saved && typeof item.id === 'string' && typeof item.title === 'string' ? { item: { id: item.id, title: item.title, kind: String(content.kind ?? '') } } : {}) });
       if (name === 'test_run' && status === 'done' && typeof output.itemId === 'string' && typeof output.id === 'string') {
         steps.get(id)!.item = { id: output.itemId, title: `Testkörning · ${String(record(output.snapshot).title ?? output.caseId ?? '')}`, kind: 'test_plan' };

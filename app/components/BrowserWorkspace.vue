@@ -20,7 +20,11 @@ watch(liveEvent, event => {
 const emit = defineEmits<{ presence: [visible: boolean]; working: [active: boolean]; reveal: [] }>();
 const chatActivity = useState<Record<string, boolean>>('chat-activity', () => ({}));
 const working = computed(() => !!browser.value && !disconnected.value && browser.value.control === 'agent' && !!chatActivity.value[browser.value.threadId || props.threadId]);
-const minimized = ref(false);
+const { open: activityOpen } = useAgentActivity();
+const activityBrowser = useState<BrowserView | null>('activity-browser', () => null);
+const browserRequest = useState<string | null>('activity-browser-request', () => null);
+watch(browser, value => { activityBrowser.value = value; });
+watch(browserRequest, id => { if (id && id === browser.value?.sessionId) { browserRequest.value = null; void reveal(); } });
 watch(working, value => emit('working', value));
 async function reveal() {
   await navigateTo({ path: route.path, query: { ...route.query, workspaceView: 'material' } });
@@ -111,13 +115,13 @@ function onMessage(event: MessageEvent) {
   if (!browser.value || event.origin !== new URL(browser.value.liveUrl).origin) return;
   if (event.data === "browserbase-disconnected" || event.data === "workspace-browser-disconnected") disconnected.value = true;
 }
-watch(() => browser.value?.sessionId, () => { loaded.value = false; disconnected.value = false; expanded.value = false; minimized.value = false; });
+watch(() => browser.value?.sessionId, () => { loaded.value = false; disconnected.value = false; expanded.value = false; });
 watch(() => route.query.workspaceView, () => { expanded.value = false; });
 onMounted(() => {
   void poll();
   window.addEventListener("message", onMessage);
   heartbeat = setInterval(() => {
-    const watchingPreview = browser.value?.preview && !disconnected.value && (expanded.value || !minimized.value || working.value);
+    const watchingPreview = browser.value?.preview && !disconnected.value && (expanded.value || activityOpen.value || working.value);
     const interacting = expanded.value && browser.value?.control === 'human' && document.activeElement?.tagName === 'IFRAME';
     if (browser.value && document.visibilityState === 'visible' && (watchingPreview || interacting)) {
       void $fetch(`/api/threads/${props.threadId}/browser`, { method: "POST", body: { control: "heartbeat", sessionId: browser.value.sessionId } }).catch(() => {});
@@ -126,6 +130,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   disposed = true;
+  activityBrowser.value = null;
   previewObserver?.disconnect();
   clearTimeout(timer);
   clearInterval(heartbeat);
@@ -140,25 +145,6 @@ const displayUrl = computed(() => {
 </script>
 
 <template>
-  <ClientOnly><Teleport defer to="#floating-work-panels">
-    <section v-if="browser && !expanded" aria-label="Flytande webbläsare" class="pointer-events-auto w-80 max-w-full shrink-0 overflow-hidden rounded-xl border border-default bg-default shadow-xl">
-      <header class="flex items-center gap-2 px-3 py-2">
-        <UIcon :name="working ? 'i-lucide-loader-circle' : 'i-lucide-globe-2'" class="size-4 shrink-0 text-primary" :class="{ 'animate-spin motion-reduce:animate-none': working }" />
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-xs font-medium">{{ error ? 'Kontrollerar anslutningen…' : disconnected ? 'Webbläsaren frånkopplad' : working ? 'Agenten arbetar' : browser.control === 'human' ? 'Du har kontrollen' : 'Webbläsaren är redo' }}</p>
-          <p class="truncate text-[10px] text-muted">{{ displayUrl }}</p>
-        </div>
-        <UButton :icon="minimized ? 'i-lucide-chevron-up' : 'i-lucide-minus'" :aria-label="minimized ? 'Visa liveförhandsvisning' : 'Minimera liveförhandsvisning'" color="neutral" variant="ghost" size="xs" @click="minimized = !minimized" />
-        <UButton icon="i-lucide-maximize-2" aria-label="Öppna webbläsaren i workspace" color="neutral" variant="ghost" size="xs" @click="reveal" />
-      </header>
-      <USelect v-if="browsers.length > 1" :model-value="selectedId" :items="browserOptions" aria-label="Välj webbläsarsession" :disabled="busy" class="mx-3 mb-2 w-[calc(100%-1.5rem)]" @update:model-value="selectBrowser" />
-      <BrowserLivePreview v-if="!minimized && !disconnected" :url="browser.liveUrl" :session-id="browser.sessionId" @open="reveal" />
-      <div v-if="!minimized" class="flex items-center justify-between gap-2 border-t border-default px-3 py-2">
-        <span class="text-[10px] text-muted">{{ disconnected ? 'Öppna för att ansluta igen' : 'Live från workspace' }}</span>
-        <UButton label="Öppna" trailing-icon="i-lucide-arrow-up-right" color="neutral" variant="ghost" size="xs" @click="reveal" />
-      </div>
-    </section>
-  </Teleport></ClientOnly>
   <div :class="embedded ? (browser ? 'w-full min-w-0' : 'hidden') : 'workspace-surface relative flex h-full min-h-0 flex-col overflow-hidden'">
     <div v-if="!embedded" class="flex h-12 shrink-0 items-center gap-2 px-5 text-xs text-muted">
       <UIcon name="i-lucide-layout-grid" class="size-3.5" /> Workspace

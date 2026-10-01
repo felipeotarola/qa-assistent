@@ -23,6 +23,7 @@ export default defineAppConfig({
     select: { slots: { base: 'qaa-field', content: 'qaa-popup' }, variants: { variant: { outline: 'qaa-field-outline' }, size: { md: { base: 'qaa-field-standard py-2 text-sm' } } } },
     selectMenu: { slots: { base: 'qaa-field', content: 'qaa-popup' }, variants: { variant: { outline: 'qaa-field-outline' }, size: { md: { base: 'qaa-field-standard py-2 text-sm' } } } },
     dropdownMenu: { slots: { content: 'qaa-popup', item: 'rounded-lg py-2' } },
+    chatTool: { variants: { variant: { card: { root: 'rounded-xl my-2', trigger: 'px-3 py-3', body: 'p-3 max-h-96 text-default' } } } },
     popover: { slots: { content: 'qaa-popup' } },
     card: { slots: { root: 'qaa-panel' } },
     chatPrompt: { slots: { root: 'qaa-composer p-4', base: 'text-base', footer: 'pt-2' } },

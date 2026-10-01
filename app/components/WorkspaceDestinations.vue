@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Destination, DestinationOption, ExternalProvider, ExternalIssue } from "#shared/external";
 const props = defineProps<{ workspaceId: string }>();
-const open = ref(false);
+const open = defineModel<boolean>('open', { default: false });
 const provider = ref<ExternalProvider>("github");
 const targets = ref<Destination[]>([]);
 const options = ref<DestinationOption[]>([]);
@@ -91,7 +91,6 @@ const safeLink = (url: string) => /^https:\/\/(github\.com|linear\.app)\//.test(
 
 <template>
   <UModal v-model:open="open" title="Workspace-kopplingar" description="Välj var agenten arbetar när du ber den läsa eller spara externa ärenden.">
-    <UButton icon="i-lucide-plug" label="Kopplingar" color="neutral" variant="ghost" size="sm" />
     <template #body>
       <div class="space-y-4">
         <p class="text-sm text-muted">Din personliga anslutning används. Valen gäller alla chattar i detta workspace. Dokument kan fortfarande sparas här, eller användas som underlag för externa ärenden.</p>

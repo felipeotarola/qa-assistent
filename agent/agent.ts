@@ -1,5 +1,6 @@
 import { defineAgent, defineDynamic } from "eve";
 import { grundenModelSelection } from "./lib/grunden";
+import { codexTurn } from './lib/codex-turn';
 
 export default defineAgent({
   model: defineDynamic({
@@ -9,6 +10,7 @@ export default defineAgent({
       "step.started": (_event, ctx) => grundenModelSelection(
         ctx.session.auth.current?.attributes.chatModel,
         ctx.session.auth.current?.attributes.reasoning,
+        !!codexTurn.get().turnId,
       ),
     },
   }),

@@ -7,4 +7,5 @@ export interface SandboxState {
   updatedAt: string;
   expiresAt: number;
   processes: { id: string; status: string; stdout: string; stderr: string; exitCode: number | null }[];
+  codex?: { jobId: string; status: string; message: string; result?: string };
 }

@@ -70,7 +70,11 @@ const cardRunner = async (item: Parameters<typeof cardTaskPrompt>[0], text: stri
   return !savedText.value && !chatError.value;
 };
 watchEffect(() => {
-  cardAgent.value = { workspaceId: thread.value.workspaceId ?? "", available: !isBusy.value && !savedText.value, run: cardRunner };
+  cardAgent.value = { workspaceId: thread.value.workspaceId ?? "", available: !isBusy.value && !savedText.value, run: cardRunner, ask: async text => {
+    if (isBusy.value || savedText.value) return false;
+    await send(text);
+    return !savedText.value && !chatError.value;
+  } };
 });
 onUnmounted(() => { if (cardAgent.value?.run === cardRunner) cardAgent.value = null; });
 
