@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { and, eq, desc, sql, isNotNull, isNull } from 'drizzle-orm';
 import { db, schema } from '@nuxthub/db';
 import { testRequirements } from '../db/schema/test-requirements';
-import { ownedItem } from './workspaces';
+import { ownedItem, type WorkspaceDatabase } from './workspaces';
 import { destinations, externalOperation } from './external';
 import { requirementToolSchema, requirementSection } from '../../shared/test-requirement';
 import type { ExternalIssue } from '../../shared/external';
@@ -14,8 +14,8 @@ function publicRequirement(row: typeof testRequirements.$inferSelect) {
   const { preparedBody: _body, destination: _destination, requestId: _requestId, workspaceId: _workspaceId, userId: _userId, ...value } = row;
   return { ...value, issue: value.issue ? { ...value.issue, body: '' } : null };
 }
-async function requireCase(userId: string, workspaceId: string, itemId: string, caseId: string) {
-  const item = await ownedItem(userId, workspaceId, itemId);
+async function requireCase(userId: string, workspaceId: string, itemId: string, caseId: string, connection: WorkspaceDatabase = db) {
+  const item = await ownedItem(userId, workspaceId, itemId, connection);
   if (item.content.kind !== 'test_plan' || !item.content.cases.some(c => c.id === caseId)) throw createError({ statusCode: 404, statusMessage: 'Test case not found' });
   return item;
 }
@@ -33,7 +33,7 @@ export async function requirementAction(userId: string, workspaceId: string, inp
       return publicRequirement(existing);
     }
     if (item.version !== action.expectedVersion) throw createError({ statusCode: 409, statusMessage: 'Testplanen har ändrats. Läs den igen innan du sparar förslaget.' });
-    const source = action.sourceItemId ? await ownedItem(userId, workspaceId, action.sourceItemId) : null;
+    const source = action.sourceItemId ? await ownedItem(userId, workspaceId, action.sourceItemId, tx) : null;
     if (source && source.content.kind !== 'text') throw createError({ statusCode: 400, statusMessage: 'Välj ett kravdokument i Material.' });
     const issueId = action.issueId?.trim();
     const destination = issueId ? (await destinations(userId, workspaceId)).find(d => d.provider === 'linear') : null;
@@ -50,12 +50,13 @@ export async function publishRequirement(userId: string, workspaceId: string, id
   // Publication and application are separate durable stages. A provider success
   // survives a local conflict; retries use the exact same external receipt key.
   return db.transaction(async lock => {
-    await lock.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`requirement-publish:${workspaceId}`}, 0))`);
-    const [record] = await db.select().from(testRequirements).where(and(eq(testRequirements.id, id), eq(testRequirements.workspaceId, workspaceId)));
+    const [lease] = await lock.execute(sql`select pg_try_advisory_xact_lock(hashtextextended(${`requirement-publish:${workspaceId}`}, 0)) as acquired`);
+    if (!lease?.acquired) throw createError({ statusCode: 409, statusMessage: 'Ett krav publiceras redan i detta workspace. Vänta tills det är klart och försök igen.' });
+    const [record] = await lock.select().from(testRequirements).where(and(eq(testRequirements.id, id), eq(testRequirements.workspaceId, workspaceId)));
     if (!record) throw createError({ statusCode: 404, statusMessage: 'Förslaget hittades inte.' });
-    const item = await requireCase(userId, workspaceId, record.itemId, record.caseId);
+    const item = await requireCase(userId, workspaceId, record.itemId, record.caseId, lock);
     if (record.appliedVersion) return publicRequirement(record);
-    const [newer] = await db.select().from(testRequirements).where(and(eq(testRequirements.itemId, record.itemId), eq(testRequirements.caseId, record.caseId), isNotNull(testRequirements.appliedVersion))).orderBy(desc(testRequirements.createdAt)).limit(1);
+    const [newer] = await lock.select().from(testRequirements).where(and(eq(testRequirements.itemId, record.itemId), eq(testRequirements.caseId, record.caseId), isNotNull(testRequirements.appliedVersion))).orderBy(desc(testRequirements.createdAt)).limit(1);
     if (newer && newer.createdAt > record.createdAt) throw createError({ statusCode: 409, statusMessage: 'Ett senare krav har redan tillämpats. Granska det och skapa ett nytt förslag.' });
     if (!record.issue || !record.preparedBody || !record.clarification || !record.expected) throw createError({ statusCode: 400, statusMessage: 'Komplettera förslaget med Linear-ärende, beslutat krav och förväntat resultat.' });
     if (item.version !== expectedVersion) throw createError({ statusCode: 409, statusMessage: 'Testplanen har ändrats. Läs den senaste versionen innan du fortsätter.' });
@@ -64,15 +65,15 @@ export async function publishRequirement(userId: string, workspaceId: string, id
     if (!record.publishedAt) {
       if (record.planVersion !== item.version) throw createError({ statusCode: 409, statusMessage: 'Förslaget gäller en äldre planversion. Granska och spara ett nytt förslag.' });
       const key = `test-requirement:${record.id}`;
-      const pending = await db.select().from(testRequirements).where(and(eq(testRequirements.workspaceId, workspaceId), isNull(testRequirements.publishedAt)));
+      const pending = await lock.select().from(testRequirements).where(and(eq(testRequirements.workspaceId, workspaceId), isNull(testRequirements.publishedAt)));
       for (const prior of pending) {
         if (prior.id === id || prior.issue?.id !== record.issue.id) continue;
         const priorId = createHash('sha256').update(`${prior.userId}:${workspaceId}:test-requirement:${prior.id}`).digest('hex');
-        const [uncertain] = await db.select().from(schema.externalOperations).where(eq(schema.externalOperations.id, priorId));
+        const [uncertain] = await lock.select().from(schema.externalOperations).where(eq(schema.externalOperations.id, priorId));
         if (uncertain && ['pending', 'unknown'].includes(uncertain.state)) throw createError({ statusCode: 409, statusMessage: 'En tidigare uppdatering av detta Linear-ärende har okänt utfall. Kontrollera den innan ett nytt förslag publiceras.' });
       }
       const receiptId = createHash('sha256').update(`${userId}:${workspaceId}:${key}`).digest('hex');
-      const [receipt] = await db.select().from(schema.externalOperations).where(eq(schema.externalOperations.id, receiptId));
+      const [receipt] = await lock.select().from(schema.externalOperations).where(eq(schema.externalOperations.id, receiptId));
       if (!receipt) {
         const current = (await externalOperation(userId, workspaceId, 'read', { action: 'read', provider: 'linear', issueId: record.issue.id }) as { issue: ExternalIssue }).issue;
         if (current.body !== record.issue.body) throw createError({ statusCode: 409, statusMessage: 'Kravet har ändrats i Linear. Läs och spara ett nytt förslag innan du publicerar.' });
@@ -84,7 +85,7 @@ export async function publishRequirement(userId: string, workspaceId: string, id
     }
     return db.transaction(async tx => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace-content:${workspaceId}`}, 0))`);
-      const current = await ownedItem(userId, workspaceId, record.itemId);
+      const current = await ownedItem(userId, workspaceId, record.itemId, tx);
       if (current.version !== expectedVersion || current.content.kind !== 'test_plan' || !current.content.cases.some(c => c.id === record.caseId)) throw createError({ statusCode: 409, statusMessage: 'Sparat i Linear. Testplanen ändrades under tiden; lokal uppdatering återstår. Läs planen och slutför sedan.' });
       const [previous] = await tx.select().from(testRequirements).where(and(eq(testRequirements.itemId, record.itemId), eq(testRequirements.caseId, record.caseId), isNotNull(testRequirements.appliedVersion))).orderBy(desc(testRequirements.createdAt)).limit(1);
       const materialId = previous?.materialId ?? randomUUID();

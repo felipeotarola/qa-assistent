@@ -1,7 +1,37 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { runResultSchema, testRunActionSchema, latestCaseRun, effectiveRunOutcome } from '../shared/test-run.ts';
+import { runResultSchema, testRunActionSchema, latestCaseRun, effectiveRunOutcome, runChecks, runVerificationError, runCoverage } from '../shared/test-run.ts';
+
+test('coverage distinguishes legacy unknown, partial steps and unmet expectations', () => {
+ const snapshot={steps:'1. Open page. 2. Log in.',expected:'Return to page',preconditions:'Logged out'};
+ assert.equal(runCoverage(snapshot,{outcome:'passed'}).recorded,false);
+ const coverage=runCoverage(snapshot,{checks:[{id:'step-1',status:'verified',actual:'Page opened'},{id:'expected',status:'blocked',actual:'No test account'}]});
+ assert.equal(coverage.total,2); assert.equal(coverage.verified,1);
+ assert.equal(coverage.checks.find(c=>c.id==='step-2').status,'unverified');
+ assert.equal(coverage.checks.find(c=>c.id==='expected').actual,'No test account');
+});
+
+test('original login return requirement cannot disappear when delegated scope is narrower', () => {
+ const snapshot={steps:'1. Open /konto logged out. 2. Open /starta logged out. 3. Log in and verify return.',expected:'Protected pages require login and preserve return path.',preconditions:'Logged out'};
+ const checks=runChecks(snapshot);
+ assert.deepEqual(checks.map(c=>c.id),['preconditions','step-1','step-2','step-3','expected']);
+ const result={outcome:'passed',actual:'Redirect works',unverified:'',observations:[],evidenceItemIds:[]};
+ assert.ok(runVerificationError(snapshot,result),'Legacy freeform pass is insufficient for new writes');
+ const verified=checks.map(c=>({id:c.id,status:'verified',actual:`Observed: ${c.requirement}`}));
+ assert.ok(runVerificationError(snapshot,{...result,checks:verified.filter(c=>c.id!=='step-3')}));
+ assert.ok(runVerificationError(snapshot,{...result,checks:verified.map(c=>c.id==='step-3'?{...c,status:'unverified'}:c)}));
+ assert.equal(runVerificationError(snapshot,{...result,checks:verified}),null);
+ assert.equal(runVerificationError(snapshot,{...result,outcome:'inconclusive',checks:verified.filter(c=>c.id!=='step-3')}),null);
+ assert.ok(runVerificationError(snapshot,{...result,checks:[...verified,verified[0]]}));
+ assert.ok(runVerificationError(snapshot,{...result,checks:[...verified,{id:'invented',status:'verified',actual:'x'}]}));
+ assert.ok(runVerificationError({...snapshot,expected:''},{...result,checks:verified}));
+});
+
+test('unstructured steps stay intact and declared coverage must agree with pass', () => {
+ assert.deepEqual(runChecks({steps:'Open page and inspect 3.14 values',expected:'Visible',preconditions:''}).map(c=>c.id),['step-1','expected']);
+ assert.equal(runResultSchema.safeParse({outcome:'passed',actual:'Partial',unverified:'',observations:[],evidenceItemIds:[],checks:[{id:'expected',status:'unverified',actual:'No account'}]}).success,false);
+});
 test('incomplete verification cannot pass', () => {
  const result={outcome:'passed',actual:'UI stayed put',unverified:'Session not checked',observations:[],evidenceItemIds:[]};
  assert.equal(runResultSchema.safeParse(result).success,false);

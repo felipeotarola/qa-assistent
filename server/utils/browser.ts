@@ -206,18 +206,22 @@ async function start(tx: Tx, row: Row) {
 
 async function snapshot(page: Page) {
   const prefix = crypto.randomUUID().slice(0, 8);
-  const controls = await page.locator("body").evaluate((body, prefix) => {
+  const controlSnapshot = await page.locator("body").evaluate((body, prefix) => {
     const elements = Array.from(body.querySelectorAll("a,button,input,textarea,select,[role=button],[role=link],[contenteditable=true]"));
-    return elements.filter((el) => {
+    const rendered = elements.filter((el) => {
       const rect = el.getBoundingClientRect();
-      return el.checkVisibility({ visibilityProperty: true, opacityProperty: true }) && rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
-    }).slice(0, 150).map((el, index) => {
+      return el.checkVisibility({ visibilityProperty: true, opacityProperty: true }) && rect.width > 0 && rect.height > 0;
+    });
+    const controls = rendered.slice(0, 150).map((el, index) => {
+      const rect = el.getBoundingClientRect();
       const ref = `${prefix}-${index}`;
       el.setAttribute("data-pat-ref", ref);
-      return { ref, tag: el.tagName.toLowerCase(), type: el.getAttribute("type"), label: (el.getAttribute("aria-label") || el.getAttribute("placeholder") || (el as HTMLInputElement).labels?.[0]?.textContent || el.textContent || "").trim().slice(0, 160) };
+      return { ref, inViewport: rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth, tag: el.tagName.toLowerCase(), type: el.getAttribute("type"), label: (el.getAttribute("aria-label") || el.getAttribute("placeholder") || (el as HTMLInputElement).labels?.[0]?.textContent || el.textContent || "").trim().slice(0, 160) };
     });
+    return { controls, controlsTruncated: rendered.length > controls.length, controlScope: 'Rendered DOM controls, including offscreen elements; excludes iframes and custom controls without interactive semantics. Absence does not prove a missing control.' };
   }, prefix);
-  return { url: page.url(), title: await page.title(), text: (await page.locator("body").innerText()).slice(0, 16000), controls };
+  const text = await page.locator("body").innerText();
+  return { url: page.url(), title: await page.title(), text: text.slice(0, 16000), textTruncated: text.length > 16000, ...controlSnapshot };
 }
 
 async function foregroundPage(pages: Page[]) {
@@ -271,6 +275,12 @@ export async function browserAction(userId: string, threadId: string, input: Bro
       }
       const activePage = await foregroundPage(context.pages()) ?? page;
       activePage.setDefaultTimeout(8000);
+      let navigation: { expectedUrl: string; verified: boolean } | undefined;
+      if (input.expectedUrl) {
+        const expected = new URL(input.expectedUrl).href;
+        await activePage.waitForURL(url => url.href === expected, { timeout: 5000, waitUntil: 'domcontentloaded' }).catch(() => {});
+        navigation = { expectedUrl: expected, verified: activePage.url() === expected };
+      }
       phase = "read";
       // Read the actual DOM: cached history restores can omit lifecycle events
       // on a newly attached CDP connection. The body locator waits for the DOM.
@@ -281,7 +291,7 @@ export async function browserAction(userId: string, threadId: string, input: Bro
       let capture = {};
       try { capture = await captureTestStep(userId, row.workspaceId, threadId, input.action, activePage, input.runId, tx); }
       catch { capture = { captureWarning: 'Screenshot recording unavailable. Browser action completed; do not repeat it.' }; }
-      return { status: "ready", sessionId: row.sessionId, ...result, ...capture };
+      return { status: "ready", sessionId: row.sessionId, ...result, ...capture, navigation, verificationNote: 'Action completed; this is not a test verdict. Inspect observed behavior and all case checks. An unmet destination or missing snapshot control needs investigation, not an automatic defect.' };
     }
     catch (error) {
       // Never leak provider connection URLs/API keys or filled text in errors.

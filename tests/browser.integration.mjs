@@ -46,6 +46,21 @@ try {
   assert.equal((await api(`/api/threads/${threadId}/browser`, undefined, false, true)).status, 401);
   assert.equal((await api("/api/internal/browser", { userId: randomUUID(), threadId, input: { action: "inspect" } }, true)).status, 404);
   console.log("PASS authenticated access and ownership isolation");
+  if (process.env.TEST_SURDEG_RELIABILITY === '1') {
+    const home = await action({action:'open',url:'https://www.surdeg.nu/'});
+    assert.equal(home.status,'ready',JSON.stringify(home));
+    assert.ok(home.controls.some(c=>c.inViewport===false),'Offscreen controls remain inspectable');
+    assert.equal(typeof home.controlsTruncated,'boolean');
+    const live=home.controls.find(c=>/Se live/i.test(c.label));
+    assert.ok(live,'Live link present');
+    const clicked=await action({action:'click',ref:live.ref,expectedUrl:'https://www.surdeg.nu/surdeg/birgitta'});
+    assert.equal(clicked.navigation?.verified,true,JSON.stringify(clicked));
+    const unmet=await action({action:'inspect',expectedUrl:'https://www.surdeg.nu/not-the-current-page'});
+    assert.equal(unmet.status,'ready','Unmet navigation does not replay action or claim click failure');
+    assert.equal(unmet.navigation.verified,false);
+    assert.equal(unmet.url,clicked.url);
+    console.log('PASS Surdeg real VPS click, offscreen controls and non-mutating unmet expectation');
+  }
   // Regression: workspace polling must not exhaust the DB pool while capture
   // reads run inside the browser transaction (especially on the first session).
   let polling = false;

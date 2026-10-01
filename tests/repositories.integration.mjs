@@ -42,6 +42,7 @@ console.log('Terminal status:', job.status, job.message, job.logs.slice(-1200));
 assert.match(job.commit,/^[a-f0-9]{40}$/);
 console.log(JSON.stringify({status:job.status,commit:job.commit,exitCode:job.testExitCode,logs:job.logs.slice(-4000)}));
 assert.ok(['passed','failed'].includes(job.status),'Expected a completed command, not infrastructure blockage');
+if (process.env.REPO_EXPECT_STATUS) assert.equal(job.status,process.env.REPO_EXPECT_STATUS,'Reference repository must meet the regression expectation');
 console.log('PASS persisted terminal result and exact commit; actual repo outcome above');
 const reportPath=`/api/workspaces/${workspaceId}/repository-material`;
 assert.equal((await api(reportPath,{runId:job.id},true)).status,401);

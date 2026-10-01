@@ -9,6 +9,7 @@ export const browserActionSchema = z.object({
   direction: z.enum(["up", "down"]).optional(),
   runId: z.string().uuid().optional(),
   sessionId: z.string().uuid().optional().describe('Only when resuming an explicitly selected browser session in this workspace.'),
+  expectedUrl: z.string().url().max(4096).optional().describe('Optional exact observed/known destination for click, press or inspect. Waits up to 5 seconds without repeating the action; unmet means unverified, not a proven product defect.'),
 });
 export type BrowserAction = z.infer<typeof browserActionSchema>;
 export interface BrowserView {

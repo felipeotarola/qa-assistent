@@ -26,7 +26,8 @@ const client = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.
 });
 const cookie = () => [...cookies].map(([k, v]) => `${k}=${v}`).join("; ");
 async function api(path, method = "GET", body, internal = false) {
-  const r = await fetch(origin + path, { signal: AbortSignal.timeout(120000), method, headers: { cookie: cookie(), "content-type": "application/json", ...(internal ? { authorization: `Bearer ${process.env.INTERNAL_API_SECRET}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const started = Date.now();
+  const r = await fetch(origin + path, { signal: AbortSignal.timeout(30000), method, headers: { cookie: cookie(), "content-type": "application/json", ...(internal ? { authorization: `Bearer ${process.env.INTERNAL_API_SECRET}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }).catch(error => { throw new Error(`${method} ${path} ${body?.action ?? body?.input?.action ?? ''} failed after ${Date.now()-started}ms`, {cause:error}); });
   return { status: r.status, data: await r.json() };
 }
 const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 });
@@ -63,10 +64,20 @@ try {
   assert.deepEqual(read.data.item.content,plan);
   const second=await call({...input,requestId:randomUUID()});
   assert.equal(second.status,200);
+  assert.deepEqual(second.data.checks.map(c=>c.id),['step-1','expected']);
+  const pass={outcome:'passed',actual:'Observed fixture',unverified:'',observations:[],evidenceItemIds:[]};
+  assert.equal((await call({action:'finish',runId:second.data.id,result:pass})).status,400,'No full-case checklist means no pass');
+  assert.equal((await call({action:'finish',runId:second.data.id,result:{...pass,checks:[{id:'step-1',status:'verified',actual:'Observed'}]}})).status,400,'Missing expected outcome cannot pass');
   assert.notEqual(second.data.id,id);
   const listed=(await call({action:'list',itemId:item.id})).data;
   assert.equal(listed.length,2);
   assert.equal(listed.find(r=>r.id===id).snapshot.expected,'Expected');
+  const complete=await call({...input,requestId:randomUUID()});
+  const completeResult={...pass,checks:complete.data.checks.map(c=>({id:c.id,status:'verified',actual:'Observed fixture requirement'}))};
+  assert.equal((await call({action:'finish',runId:complete.data.id,result:completeResult})).status,200);
+  assert.equal((await call({action:'finish',runId:complete.data.id,result:completeResult})).status,200,'Idempotent complete result');
+  console.log('PASS full-case verification gate, complete result, immutable history and retry');
+  if (process.env.RUN_RELIABILITY_ONLY !== '1') {
   const requirement = {action:'propose',itemId:item.id,caseId,expectedVersion:1,requestId:randomUUID(),question:'Is a generic authentication message acceptable?',clarification:'',expected:'Expected'};
   const reqPath = `/api/workspaces/${a}/requirements`;
   assert.equal((await api(`/api/workspaces/${b}/requirements`,'POST',requirement)).status,404);
@@ -76,6 +87,8 @@ try {
   assert.equal((await api(reqPath,'POST',requirement)).data.id,proposal.data.id);
   assert.equal((await api(reqPath,'POST',{...requirement,issueId:'COM-999'})).status,409);
   assert.equal((await api(reqPath,'POST',{action:'publish',id:proposal.data.id,expectedVersion:1})).status,400,'Incomplete proposal cannot publish');
+  const concurrent = await Promise.all(Array.from({length:3}, () => api(reqPath,'POST',{action:'publish',id:proposal.data.id,expectedVersion:1})));
+  assert.ok(concurrent.every(r=>[400,409].includes(r.status)),'Concurrent validation must return invalid/busy instead of deadlocking');
   assert.equal((await api('/api/internal/test-requirement','POST',{userId,threadId:t,action:'publish',id:proposal.data.id,expectedVersion:1},true)).status,400,'Agent tool cannot publish');
   const reqs = await api(reqPath,'POST',{action:'list',itemId:item.id,caseId});
   assert.equal(reqs.data.length,1);
@@ -113,7 +126,8 @@ try {
     const file=await fetch(origin+imagePath+'/file',{headers:{cookie:cookie()}});
     assert.equal(file.status,200); assert.match(file.headers.get('content-type'),/image\/png/);
     assert.equal((await fetch(origin+imagePath+'/file')).status,401);
-    await call({action:'finish',runId:browserRun.data.id,result:{outcome:'passed',actual:'Example Domain visible in isolated screenshot fixture.',unverified:'',observations:[],evidenceItemIds:[]}});
+    const finished=await call({action:'finish',runId:browserRun.data.id,result:{outcome:'passed',actual:'Example Domain visible in isolated screenshot fixture.',unverified:'',observations:[],evidenceItemIds:[],checks:browserRun.data.checks.map(c=>({id:c.id,status:'verified',actual:'Example Domain is visible at https://example.com/ in browser screenshot.'}))}});
+    assert.equal(finished.status,200,JSON.stringify(finished.data));
     const after=await browserAction({action:'inspect'});
     assert.equal(after.data.capture,undefined,'No capture after run completes');
     await api(`/api/threads/${t}/browser`,'POST',{control:'close'});
@@ -142,6 +156,7 @@ try {
     console.log('PASS real agent starts and finalizes structured run');
   }
   console.log('PASS: authenticated access, workspace isolation, version check, retry idempotency, immutable results, retained plan, independent reruns');
+  }
 } finally {
   if (process.env.TEST_CAPTURES === '1') {
     const browsers=await sql`select workspace_id, context_id from pat_workspace_browsers where user_id = ${userId}`;

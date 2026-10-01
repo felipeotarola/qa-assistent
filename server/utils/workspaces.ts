@@ -3,7 +3,7 @@ import { db, schema } from "@nuxthub/db";
 import { put, del } from "@vercel/blob";
 import type { ItemContent } from "../../shared/workspace";
 import { imageReferences, documentText } from "../../shared/workspace";
-type WorkspaceDatabase = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type WorkspaceDatabase = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export function workspaceBlobToken() {
   const token = process.env.WORKSPACE_BLOB_READ_WRITE_TOKEN;
@@ -39,9 +39,9 @@ export async function listItems(userId: string, workspaceId: string, trash = fal
   const counts = new Map(links.map(row => [row.itemId, { sources: row.sources, tickets: row.tickets, related: row.related }]));
   return (await db.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.workspaceId, workspaceId), trash ? isNotNull(schema.workspaceItems.deletedAt) : isNull(schema.workspaceItems.deletedAt))).orderBy(desc(schema.workspaceItems.updatedAt))).map(row => ({ ...publicItem(row), evidenceSummary: counts.get(row.id) }));
 }
-export async function ownedItem(userId: string, workspaceId: string, itemId: string) {
-  await requireWorkspace(userId, workspaceId);
-  const [item] = await db.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.id, itemId), eq(schema.workspaceItems.workspaceId, workspaceId)));
+export async function ownedItem(userId: string, workspaceId: string, itemId: string, connection: WorkspaceDatabase = db) {
+  await requireWorkspace(userId, workspaceId, connection);
+  const [item] = await connection.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.id, itemId), eq(schema.workspaceItems.workspaceId, workspaceId)));
   if (!item || item.deletedAt) throw createError({ statusCode: 404, statusMessage: "Item not found" });
   return item;
 }

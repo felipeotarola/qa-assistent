@@ -2,13 +2,15 @@
 import WorkspaceRunStatus from './WorkspaceRunStatus.vue';
 import WorkspaceRunReview from './WorkspaceRunReview.vue';
 import { runNarrative } from '#shared/run-narrative';
-import { runLabels, type TestRun } from '#shared/test-run';
+import { runLabels, runCoverage, type TestRun } from '#shared/test-run';
 import type { WorkspaceItem } from '#shared/workspace';
 const props = defineProps<{ item: WorkspaceItem; caseId: string }>();
 const runs = inject<Ref<TestRun[]>>('workspace-test-runs', ref([]));
 const history = computed(() => runs.value.filter(r => r.itemId === props.item.id && r.caseId === props.caseId).sort((a,b) => b.startedAt.localeCompare(a.startedAt)));
 const chosen = ref('');
 const run = computed(() => history.value.find(r => r.id === chosen.value) ?? history.value[0]);
+const coverage = computed(() => run.value?.result ? runCoverage(run.value.snapshot, run.value.result) : null);
+const checkLabels = { verified: 'Verifierat', mismatch: 'Avvikelse', unverified: 'Ej verifierat', blocked: 'Blockerat' };
 const agent = useWorkspaceAgent();
 const busy = ref(false);
 const notice = ref('');
@@ -33,6 +35,22 @@ async function ask(task: string) {
       <div v-if="run.result" class="space-y-3">
         <WorkspaceRunReview :key="run.id" :run="run" />
         <p class="font-medium">Agentens ursprungliga bedömning: {{ runLabels[run.result.outcome] }}</p>
+        <div v-if="coverage" class="space-y-2 rounded-lg border border-default p-3">
+          <p class="text-sm font-semibold">Testtäckning: {{ coverage.recorded ? `${coverage.verified} av ${coverage.total} steg verifierade` : 'Inte dokumenterad per steg' }}</p>
+          <p v-if="!coverage.recorded" class="text-sm text-muted">Denna körning saknar checklista. Resultatet visar inte att varje steg har verifierats.</p>
+          <UCollapsible>
+            <UButton label="Visa steg och återstående kontroller" color="neutral" variant="link" trailing-icon="i-lucide-chevron-down" />
+            <template #content>
+              <ol class="mt-2 space-y-3">
+                <li v-for="check in coverage.checks" :key="check.id" class="space-y-1 border-t border-default pt-3 text-sm">
+                  <UBadge :color="check.status === 'verified' ? 'success' : check.status === 'mismatch' ? 'error' : 'warning'" variant="subtle">{{ checkLabels[check.status] }}</UBadge>
+                  <p class="whitespace-pre-wrap break-words">{{ check.requirement }}</p>
+                  <p class="whitespace-pre-wrap break-words text-muted">{{ check.actual }}</p>
+                </li>
+              </ol>
+            </template>
+          </UCollapsible>
+        </div>
         <div><h5 class="text-sm font-medium">Förväntat vid körningen</h5><p class="whitespace-pre-wrap text-sm text-muted">{{ run.snapshot.expected }}</p></div>
         <div class="rounded-lg border border-default bg-default p-4"><h5 class="mb-3 text-sm font-semibold">Faktiskt resultat</h5><div class="readable-content document-markdown break-words text-sm leading-relaxed"><ChatComark :value="runNarrative(run.result.actual)" /></div></div>
         <div v-if="run.result.unverified" class="rounded-lg bg-warning/10 p-3"><h5 class="font-medium text-warning">Ej verifierat</h5><p class="whitespace-pre-wrap text-sm">{{ run.result.unverified }}</p></div>

@@ -28,6 +28,7 @@
   },
   "scripts": {
     "test:unit": "node --test tests/*.test.mjs",
+    "test:regression": "node tests/regression.mjs",
     "postinstall": "nuxt prepare",
     "dev": "node scripts/check-dev-port.mjs && pnpm db:migrate && nuxt prepare && nuxt dev --port 3000",
     "build": "pnpm db:migrate && nuxt build",

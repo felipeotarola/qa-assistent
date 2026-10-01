@@ -7,7 +7,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createError } from 'h3';
 
 if (process.env.RUN_WORKSPACE_TESTS !== '1') throw new Error('Set RUN_WORKSPACE_TESTS=1');
@@ -22,7 +22,9 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
   return next(specifier, context);
 } });
 const schema = { ...await import('../server/db/schema/workspaces.ts'), ...await import('../server/db/schema/auth.ts'), ...await import('../server/db/schema/external.ts'), ...await import('../server/db/schema/test-requirements.ts') };
-const connection = postgres(process.env.DATABASE_URL, { prepare: false, max: 8 });
+// Match the application's small pool: publication must not request a third
+// connection while its lock and local apply transaction occupy both slots.
+const connection = postgres(process.env.POSTGRES_URL || process.env.POSTGRESQL_URL || process.env.DATABASE_URL, { prepare: false, max: 2 });
 const db = drizzle(connection);
 globalThis.requirementsTestDb = db;
 globalThis.requirementsTestSchema = schema;
@@ -60,6 +62,10 @@ try {
   await db.insert(schema.workspaceItems).values({id:itemId,workspaceId,title:'Fixture',content:plan});
   await db.insert(schema.workspaceItemVersions).values({id:randomUUID(),itemId,version:1,title:'Fixture',content:plan});
   const draft=await propose(1);
+  await db.transaction(async lock => {
+    await lock.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`requirement-publish:${workspaceId}`},0))`);
+    await assert.rejects(publishRequirement(userId,workspaceId,draft.id,1),e=>e.statusCode===409,'Busy publication returns immediately without occupying the whole pool');
+  });
   assert.equal(draft.appliedVersion,null);
   assert.equal((await getPlan()).version,1);
   issue.body += '\nChanged by another person';

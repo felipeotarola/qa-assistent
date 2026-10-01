@@ -40,6 +40,8 @@ try {
   assert.equal((await api('/api/internal/setup-result','POST',completed,true)).status,200);
   assert.equal((await api('/api/internal/setup-result','POST',result,true)).status,200);
   const [saved]=await database`select status,notification from pat_setup_jobs where id=${jobId}`;assert.equal(saved.status,'failed');assert.equal(saved.notification,'session_changed');
+  console.log('PASS environment API: ownership, encryption, names-only output, missing configuration and callback replay');
+  if (process.env.ENVIRONMENT_API_ONLY !== '1') {
   browser=await chromium.launch({channel:'msedge',headless:true});
   const context=await browser.newContext({viewport:{width:1440,height:1000}});
   await context.addCookies([...cookies].map(([name,value])=>({name,value,domain:'localhost',path:'/'})).concat([{name:'pat_workspace',value:workspaceId,domain:'localhost',path:'/'},{name:'agent-activity-pinned',value:'true',domain:'localhost',path:'/'}]));
@@ -62,6 +64,7 @@ try {
   await page.screenshot({animations:'disabled',path:process.env.TEMP+'/environment-form-narrow.png'});
   await dialog.getByRole('button',{name:'Stäng',exact:true}).click();
   console.log('Passed: ownership, encryption, names-only response, revision conflicts, scope/replay callbacks, masked form, local import/save-only and responsive modal. No VPS/model execution.');
+  }
 } finally {
   await browser?.close();await auth.auth.signOut({scope:'local'});await database`delete from pat_user where id=${userId}`;await admin.auth.admin.deleteUser(userId);await database.end();
 }
