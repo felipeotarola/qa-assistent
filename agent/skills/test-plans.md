@@ -4,6 +4,15 @@ description: Use before creating or editing test plans, executing test cases, cl
 
 # Test plans
 
+For campaigns or release checks, first read quality for the target, prerequisites,
+regression selection and compatible prior results. Confirm the actual target
+version, not just the desired one. Record that verified target in test_run start.
+Scope blockers to affected cases and continue independent cases. Keep unknown
+prerequisites unknown until observed. After a target change, checks reset and must
+be verified again. Keep case IDs stable for regressions; reruns create new run IDs.
+Propose follow-ups based on missing coverage and failures, without duplicating
+existing cases. A successful retest never automatically closes a Linear issue.
+
 Before executing a case, use test_requirement list for that plan and case.
 Read linked Material source versions and the current Linear requirement via
 external read when linked. Linear is the authority; local documents are dated

@@ -30,6 +30,7 @@ export class Sandboxes {
     try { return await pending; } finally { if (this.locks.get(id) === pending) this.locks.delete(id); }
   }
   async save(session) {
+    if (this.redact) session.processes = this.redact(session.id, session.processes);
     session.updatedAt = new Date().toISOString();
     const file = `${this.directory}/${session.id}.json`;
     await writeFile(file + '.tmp', JSON.stringify(session), { mode: 0o600 }); await rename(file + '.tmp', file);
@@ -119,7 +120,7 @@ export class Sandboxes {
         const process = s.processes.find(p => p.id === input.processId); if (!process) throw new Error('Process not found');
         if (input.action === 'kill') await exec(['node', '-e', "const f=require('fs');const p=JSON.parse(f.readFileSync(process.argv[1]));if(p.status==='running'&&p.pid>1){try{process.kill(-p.pid,'SIGKILL')}catch(e){if(e.code!=='ESRCH')throw e}}", `/tmp/qa-processes/${input.processId}.json`]);
         const result = await exec(['node', '-e', "const f=require('fs');const p=process.argv[1];console.log(f.existsSync(p)?f.readFileSync(p,'utf8'):'null')", `/tmp/qa-processes/${input.processId}.json`]);
-        const state = JSON.parse(result); if (state) Object.assign(process, state); await this.save(s); return process;
+        const state = JSON.parse(result); if (state) Object.assign(process, this.redact ? this.redact(s.id,state) : state); await this.save(s); return process;
       }
       const path = sandboxPath(input.path || '/workspace');
       if (input.action === 'read') {

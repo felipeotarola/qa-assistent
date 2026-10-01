@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { repoStatusLabels, repoTerminal, type RepositoryRun, type RepoJob } from '#shared/repository';
+import { repositoryReport } from '#shared/work-report';
 const props = defineProps<{ run: RepositoryRun }>();
 const emit = defineEmits<{ changed: []; saved: [] }>();
 const { activeId } = useWorkspaces();
@@ -16,6 +17,7 @@ async function loadLog(event: Event) {
   catch { error.value = 'Kunde inte läsa körloggen.'; }
 }
 const active = computed(() => !job.value || !repoTerminal(job.value.status));
+const report = computed(() => job.value ? repositoryReport(job.value) : null);
 const phases = ['queued', 'preparing', 'installing', 'running', 'cleaning'] as const;
 async function stop() {
   busy.value = true; error.value = '';
@@ -45,6 +47,7 @@ async function save() {
     <div class="space-y-3 border-t border-default p-4">
       <ol v-if="active" aria-label="Körningssteg" class="flex flex-wrap gap-2 text-xs text-muted"><li v-for="phase in phases" :key="phase" :aria-current="job?.status === phase ? 'step' : undefined" :class="{ 'font-semibold text-highlighted': job?.status === phase }">{{ repoStatusLabels[phase] }}</li></ol>
       <p role="status" class="text-sm">{{ job?.message || 'Väntar på aktuell status från VPS:en.' }}</p>
+      <div v-if="report" class="space-y-1 rounded-lg bg-muted p-3 text-sm"><p class="font-semibold">{{ report.title }}</p><p class="text-muted">{{ report.result }}</p><p><strong>Nästa steg:</strong> {{ report.next }}</p></div>
       <p v-if="job?.telemetry?.queuePosition && job.status === 'queued'" class="text-xs text-muted">Köplats {{ job.telemetry.queuePosition }}</p>
       <details v-if="job?.plan"><summary class="cursor-pointer text-sm">Körningsplan · {{ job.plan.runtime }}</summary><dl class="mt-2 space-y-2 text-xs"><div><dt class="text-muted">Arbetskatalog</dt><dd class="font-mono">{{ job.plan.directory }}</dd></div><div><dt class="text-muted">Installation och kommando</dt><dd class="whitespace-pre-wrap break-all font-mono">{{ [...job.plan.install, job.plan.command].map(command => command.join(' ')).join('\n') }}</dd></div></dl></details>
       <p v-if="job?.commit" class="break-all font-mono text-xs text-muted">{{ job.commit }} · {{ job.selectedScript || job.script }} {{ job.args?.join(' ') }} · exit {{ job.testExitCode ?? '—' }}</p>

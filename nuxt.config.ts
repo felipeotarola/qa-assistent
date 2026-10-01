@@ -8,6 +8,25 @@ const supabasePooler = databaseUrl ? new URL(databaseUrl).hostname.endsWith(".po
 
 export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@nuxt/eslint", "@comark/nuxt", "eve/nuxt", "@nuxthub/core", "@vercel/analytics"],
+  hooks: {
+    'nitro:config'(config) {
+      // Eve/Nuxt mounts only its transport prefix automatically. Custom channels
+      // keep their own namespace and must also reach the Eve service.
+      const path = '/workers/setup/notify';
+      const proxy = config.routeRules?.['/eve/v1/**']?.proxy;
+      const target = typeof proxy === 'string' ? proxy : proxy?.to;
+      if (target) {
+        config.routeRules ||= {};
+        config.routeRules[path] = { proxy: `${new URL(target).origin}${path}`, headers: { 'cache-control': 'no-store' } };
+      }
+      // Eve generates Services fields newer than Nitro's Vercel config types.
+      const vercel = config.vercel?.config as { routes?: unknown[]; services?: Record<string, { routes?: unknown[] }> } | undefined;
+      if (vercel?.services?.eve) {
+        vercel.routes = [{ src: '^/workers/setup/notify$', destination: { type: 'service', service: 'eve' } }, ...(vercel.routes || [])];
+        vercel.services.eve.routes = [{ src: '^/workers/setup/notify$', transforms: [{ type: 'request.path', op: 'set', args: path }] }, ...(vercel.services.eve.routes || [])];
+      }
+    },
+  },
   css: ["~/assets/css/main.css"],
   devtools: { enabled: true },
   compatibilityDate: "latest",

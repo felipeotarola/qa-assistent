@@ -73,3 +73,37 @@ test('recovery marks interrupted work without replaying', async t => {
   assert.equal(recovered.jobs.get(input.jobId).status, 'interrupted'); assert.equal(recovered.active.size, 0);
   await worker.rpc({ ...input, action: 'cancel' });
 });
+
+test('missing environment becomes a blocker, rejects invented processes and resumes once', async t => {
+  const {worker,input,state}=await fixture(t);
+  let applied=0,release;
+  worker.environments={values:new Map(),redact:(_id,value)=>value,inspect:async(_job,args)=>({...args,commit:'a'.repeat(40),httpStatus:500}),apply:async job=>{applied++;await new Promise(r=>{release=r;});return {...job.environment,httpStatus:200};}};
+  await worker.rpc(input);const job=worker.jobs.get(input.jobId);
+  const inspection=await worker.call(job,'inspect_environment',{});await worker.call(job,'process',{processId:inspection.processId});
+  const command='npm run dev',directory='/workspace/project';
+  const process=await worker.call(job,'execute',{command,directory});
+  const args={repoUrl:'https://github.com/example/project',root:directory,directory,command,port:3000,processId:process.processId,variables:[{name:'DATABASE_URL',reason:'Page data',required:true}]};
+  await assert.rejects(worker.call(job,'report_environment',{...args,processId:randomUUID()}),/must match/);
+  await worker.call(job,'report_environment',args);
+  await worker.finish(job,'completed','Done');
+  assert.equal(job.status,'needs_configuration');assert.equal(worker.active.size,0);
+  const request={...input,action:'configure',attemptId:randomUUID(),values:{DATABASE_URL:'private-fixture'}};
+  assert.equal((await worker.rpc(request)).status,'configuring');
+  await worker.rpc(request);assert.equal(applied,1);
+  assert.ok(!JSON.stringify(job).includes('private-fixture')); assert.ok(!JSON.stringify(state).includes('private-fixture'));
+  release();
+  for(let i=0;i<100&&worker.active.size;i++) await new Promise(r=>setTimeout(r,5));
+  assert.equal(job.status,'completed');assert.equal(job.environment.httpStatus,200);
+  await worker.rpc(request);assert.equal(applied,1);
+});
+
+test('worker restart preserves completed delivery identity instead of notifying again', async t => {
+  const {worker,input,sandboxes,directory}=await fixture(t);
+  await worker.rpc(input);const job=worker.jobs.get(input.jobId);
+  await worker.finish(job,'completed','Observed result');
+  const identity={eventId:job.eventId,updatedAt:job.updatedAt};
+  const recovered=new CodexWorker({directory,sandboxes,inspectionCommand:()=>'',allowedUser:input.userId});await recovered.init();
+  const saved=recovered.jobs.get(input.jobId);
+  assert.deepEqual({eventId:saved.eventId,updatedAt:saved.updatedAt},identity);
+  assert.equal(recovered.active.size,0);
+});

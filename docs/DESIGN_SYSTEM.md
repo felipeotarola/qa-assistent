@@ -133,6 +133,22 @@ Opening it reveals the existing browser card in Material. The Testing tab indica
 session, not merely an idle open browser, and stops during human takeover.
 Plan readiness describes the definition only, never a test execution outcome.
 
+`WorkspaceQuality` appears in Overview and Testing and uses the same persisted
+test runs and workspace quality settings. The selected environment, URL and
+release/commit scope the counts; older or unscoped results are shown as needing
+a retest, never carried forward as release evidence. Empty selections are
+explicitly historical, not a release approval. Result details link to the
+existing evidence and plan history.
+
+Test readiness is a separate, editable set of observed prerequisites. Checks
+can apply to all cases or selected cases; unknown is distinct from blocked.
+Changing the target resets checks to unknown. Notes must not contain credentials.
+Regression selection stores existing case IDs, not copied plans. Comparisons
+require matching case definitions and environments and documented versions.
+Actions dispatch to the workspace chat: verify prerequisites, run a bounded
+selection, suggest follow-ups, retest, or prepare a defect draft in Material.
+Preparing a draft never publishes to Linear or changes an issue's status.
+
 ## Accessibility and verification
 
 Preserve keyboard navigation, visible focus, accessible names, Escape behavior,
@@ -193,6 +209,26 @@ Nuxt UI selector keyboard accessible; do not turn illustrative motion into fake
 runtime status. No agent is started by interacting with the map.
 
 ## Agent activity
+
+Completion summaries appear above the composer in `ChatWorkReport`, including on
+the home page. They project persisted worker status from the existing activity
+feeds; they do not submit a chat message, run a model, restart a job or add a
+second polling loop. A summary names its workspace scope and distinguishes a
+finished worker from passing tests. Details remain in Pågående arbete. The
+optional review button fills the current draft and preserves its contents;
+Iris review is available only in the source chat, and Codex opens its existing
+details because its status tool is sandbox-scoped. Dismissal lasts for the app
+session; saved reports remain available after reload. No closed-workspace
+monitoring or guaranteed push delivery is implied.
+
+`shared/work-report.ts` classifies structured repository failure phases as setup,
+execution, interruption or unknown. Exit code alone never establishes a product
+defect. Unknown states never produce a completion summary. Incoming workspace
+responses must match the selected workspace before populating the summary.
+Reasoning uses `ChatReasoningDetails`, collapsed by default even while streaming;
+users may expand it explicitly. Normal agent reports lead with the result,
+material blockers and one recommended next step, with detailed evidence saved
+separately. Follow-up choices should normally be limited to one to three.
 
 Follow-up buttons use the existing `ChatSuggestions` component. They appear below
 the final assistant message after a successful turn and fill the composer without
@@ -260,3 +296,13 @@ The activity panel groups live VPS work above the chat timeline. Completed
 processes and older tool steps are collapsed by default, with explicit history
 controls. Opening/closing the panel never cancels execution; stop buttons are
 explicit. Live browser previews open the existing workspace browser controls.
+# Project environment configuration
+
+`ProjectEnvironment` lives in the shared **Pågående arbete** panel. It uses Nuxt UI
+modal, labeled password inputs and buttons, displays repo/commit/command context,
+and separates save-only from explicit save-and-continue. Existing values are never
+loaded into inputs; only configured names are returned. Import reads a local file
+as literal data, includes only requested keys and never submits automatically.
+Required and optional variables include their purpose. Forms clear on close and
+workspace change. Keep live browser controls in the same panel; a running app
+server alone must not label a completed agent job as active.

@@ -11,6 +11,7 @@ import { workerHealth } from '../execution/health.mjs';
 import { SandboxStorage } from '../execution/storage.mjs';
 import { Previews } from './preview.mjs';
 import { CodexWorker } from '../codex-worker/worker.mjs';
+import { EnvironmentManager } from '../codex-worker/environment.mjs';
 import { environmentInspectionCommand } from '../codex-worker/environment-inspection.mjs';
 
 const key = process.env.REPO_RUNNER_KEY;
@@ -20,7 +21,9 @@ const events = new ExecutionStore(`${directory}/events`);
 const budget = new ResourceBudget();
 const sandboxes = new Sandboxes({ directory: `${directory}/sandboxes`, events, budget });
 await sandboxes.init();
-const codex = new CodexWorker({ directory: `${directory}/codex`, sandboxes, inspectionCommand: environmentInspectionCommand });
+const environments = new EnvironmentManager({ directory: `${directory}/environment-redaction`, sandboxes });
+await environments.init();
+const codex = new CodexWorker({ directory: `${directory}/codex`, sandboxes, environments, inspectionCommand: environmentInspectionCommand });
 await codex.init();
 const previews = new Previews({ sandboxes, base: process.env.REPO_PUBLIC_URL });
 await previews.init();
@@ -29,6 +32,10 @@ const runner = new Runner({ directory, budget, storage: new SandboxStorage(`${di
 await runner.init();
 const health = workerHealth(directory, budget);
 const callbackConfigured = !!(process.env.REPO_APP_URL && process.env.INTERNAL_API_SECRET);
+const codexOutbox = new ResultOutbox({ directory: `${directory}/codex-delivery`, deliver: async event => {
+  const response = await fetch(`${process.env.REPO_APP_URL}/api/internal/setup-result`, { method:'POST', headers:{ authorization:`Bearer ${process.env.INTERNAL_API_SECRET}`, 'content-type':'application/json' }, body:JSON.stringify(event.result), signal:AbortSignal.timeout(15000) });
+  return response.status;
+} });
 let callbackProtocol = 0, protocolCheckedAt = 0;
 const outbox = new ResultOutbox({ directory: `${directory}/delivery`, deliver: async job => {
   if (job.plan) {
@@ -85,12 +92,13 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/sandbox' && req.method === 'POST') {
       const input = await readJson(req, 34000000);
+      if (environments.values.has(input.id) && ['spawn','read','write','remove'].includes(input.action)) return reply(res,409,{error:'This environment is configured with repository credentials. Agent shell/file access is disabled; use preview and redacted process status.'});
       if (codex.hasActive(input.id) && ['spawn', 'write', 'remove'].includes(input.action)) return reply(res, 409, { error: 'Codex is working in this sandbox. Read its status or cancel it before issuing other commands.' });
       if (input.action === 'ensure' && (runner.stopping || !(await health()).ready)) return reply(res, 503, { error: 'Worker is unavailable or draining' });
       return reply(res, 200, await sandboxes.rpc(input));
     }
     if (url.pathname === '/codex' && req.method === 'POST') {
-      const input = await readJson(req);
+      const input = await readJson(req, 160000);
       if (input.action === 'start' && runner.stopping) return reply(res, 503, { error: 'Worker is draining' });
       return reply(res, 200, await codex.rpc(input));
     }
@@ -130,6 +138,7 @@ server.listen(Number(process.env.REPO_RUNNER_PORT || 8090), process.env.REPO_RUN
 server.on('upgrade', (req, socket, head) => previews.upgrade(req, socket, head));
 void runner.drain().catch(error => console.error('Queue recovery failed:', error.message));
 const callback = setInterval(() => {
+  if (callbackConfigured) void codexOutbox.drain([...codex.jobs.values()].filter(job=>job.eventId).map(job=>({id:job.eventId,createdAt:job.updatedAt,result:{jobId:job.jobId,id:job.id,workspaceId:job.workspaceId,status:job.status,message:job.message,result:job.result,environment:job.environment,updatedAt:job.updatedAt}}))).catch(()=>console.error('Codex result delivery pending'));
   if (callbackConfigured) void outbox.drain([...runner.jobs.values()].filter(job => terminal(job.status))).catch(error => console.error('Result delivery failed:', error.message));
 }, 1000);
 callback.unref();

@@ -10,8 +10,9 @@ export default defineAgent({
       "step.started": (_event, ctx) => grundenModelSelection(
         ctx.session.auth.current?.attributes.chatModel,
         ctx.session.auth.current?.attributes.reasoning,
-        !!codexTurn.get().turnId || ctx.session.auth.current?.attributes.browserNotification === 'iris',
+        !!codexTurn.get().turnId,
         ctx.session.auth.current?.attributes.browserWorker === 'iris',
+        ctx.session.auth.current?.attributes.browserNotification === 'iris' || ctx.session.auth.current?.attributes.setupNotification === 'blocked',
       ),
     },
   }),

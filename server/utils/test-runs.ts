@@ -48,14 +48,14 @@ export async function testRunAction(userId: string, workspaceId: string, threadI
     if (action.action === 'start') {
       const [existing] = await tx.select().from(testRuns).where(and(eq(testRuns.workspaceId, workspaceId), eq(testRuns.requestId, action.requestId)));
       if (existing) {
-        if (existing.itemId !== action.itemId || existing.caseId !== action.caseId || existing.planVersion !== action.expectedVersion || existing.environment !== action.environment) throw createError({ statusCode: 409, statusMessage: 'Request ID already used for another run' });
+        if (existing.itemId !== action.itemId || existing.caseId !== action.caseId || existing.planVersion !== action.expectedVersion || existing.environment !== action.environment || !isDeepStrictEqual(existing.target ?? null, action.target ?? null)) throw createError({ statusCode: 409, statusMessage: 'Request ID already used for another run' });
         return existing;
       }
       const item = await ownedItem(userId, workspaceId, action.itemId);
       if (item.version !== action.expectedVersion) throw createError({ statusCode: 409, statusMessage: 'Read the current plan before starting' });
       const snapshot = item.content.kind === 'test_plan' && item.content.cases.find(c => c.id === action.caseId);
       if (!snapshot) throw createError({ statusCode: 404, statusMessage: 'Test case not found' });
-      const [run] = await tx.insert(testRuns).values({ id: randomUUID(), workspaceId, itemId: item.id, caseId: snapshot.id, planVersion: item.version, snapshot, environment: action.environment, requestId: action.requestId, threadId }).returning();
+      const [run] = await tx.insert(testRuns).values({ id: randomUUID(), workspaceId, itemId: item.id, caseId: snapshot.id, planVersion: item.version, snapshot, environment: action.environment, target: action.target ?? null, requestId: action.requestId, threadId }).returning();
       return run;
     }
     const [run] = await tx.select().from(testRuns).where(and(eq(testRuns.workspaceId, workspaceId), eq(testRuns.id, action.runId)));

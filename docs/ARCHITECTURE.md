@@ -175,6 +175,28 @@ check that the built server starts, not only that compilation succeeds.
 
 ## Eve docs
 
+### Workspace quality and test readiness
+
+`pat_workspace_quality` stores a versioned target, scoped prerequisite checks and
+regression selection. Authenticated `/api/workspaces/:id/quality` GET/PUT and the
+internal `quality` agent tool use the same ownership-checked service. Writes use
+optimistic revisions plus a workspace advisory lock. Changing the target clears
+prerequisite assertions. Checks are reported observations, not a background health
+monitor, and do not automatically prevent independent test executions.
+
+Test runs optionally record an explicit `target` (environment, URL, revision).
+The caller must verify that target; it is never copied automatically from a
+desired release. Legacy runs remain readable without inventing missing metadata.
+`shared/quality.ts` derives counts from current cases and compatible latest runs.
+Definition changes or another target require retesting. A started retry has no
+successful result. Comparisons retain old runs and require matching definitions,
+environment/URL and documented revisions; manual reviews remain distinguishable.
+
+Run `node --experimental-strip-types --test tests/quality.test.mjs` for projection
+tests. `RUN_QUALITY_TESTS=1 node --env-file=.env tests/quality.integration.mjs`
+uses a disposable account to verify scope, conflicts, reset behavior and run
+history. Never use synthetic fixture outcomes as product test evidence.
+
 ### Browser delegation: Iris
 
 The main agent V delegates multi-step browser tests with `browser_job`. Iris
@@ -209,3 +231,29 @@ ownership and cancellation. This opt-in test uses the configured pilot account,
 model provider and VPS browser and removes its disposable workspace afterwards.
 
 For channels, tools, connections, and deployment details, read Eve guides in `node_modules/eve/dist/docs/public/`.
+# Repository setup feedback and configuration
+
+Codex starts register a durable `pat_setup_jobs` record with workspace, thread,
+runtime, parent Eve session and sandbox identity. A startup task calls the worker's
+`report_environment` tool. The worker checks checkout identity, commit, observed
+start command/process and localhost HTTP. HTTP 500 with required configuration
+becomes `needs_configuration`, not a ready app or passing test. Optional variables
+for unrelated features do not gate the current task.
+
+Terminal events are retried from a disk-backed VPS outbox. The app authenticates
+the callback, verifies scope, ignores older results and persists before notifying.
+One terminal version can claim one Eve send attempt. A network-ambiguous send is
+shown as unconfirmed rather than automatically replaying a potentially accepted
+test continuation. Session changes prevent sending to an unrelated/new chat.
+Worker restart preserves terminal event timestamps; unfinished work is interrupted,
+not silently restarted. Historical jobs without a registered structured plan remain
+readable but cannot safely acquire configuration through this flow.
+
+The configuration form is scoped to workspace + canonical repository URL + test.
+Optimistic vault revisions prevent overwrites. Save-and-continue derives a stable
+attempt ID, verifies the same repo/commit again, reuses the installation, restarts
+the observed service, and probes HTTP. Retry of the same attempt never starts a
+second process. HTTP readiness is only a setup observation; V must still delegate
+and record the originally requested tests, checking for cancellation or changed
+instructions in the latest conversation. Blocked notifications have tools disabled
+and report the actionable missing configuration briefly.

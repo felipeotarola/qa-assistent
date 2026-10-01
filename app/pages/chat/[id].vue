@@ -203,6 +203,7 @@ function handleInputResponses(responses: Parameters<typeof respond>[0]) {
             @submit="handleSubmit"
           >
             <template #header>
+              <ChatWorkReport :disabled="isBusy || !!savedText || !!chatError" @suggestion="selectSuggestion" />
               <ChatRecoveryNotice
                 v-if="chatError || (savedText && !isBusy)"
                 :message="recoveryMessage"

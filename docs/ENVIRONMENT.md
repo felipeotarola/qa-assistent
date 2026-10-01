@@ -173,6 +173,47 @@ These paths are gitignored and should never be committed:
 For a clean development database, use a separate Supabase project or Neon branch.
 Do not reset the public schema of a shared database.
 
+## Repository test environment vault
+
+`ENV_VAULT_KEY` is the server-only encryption key (at least 32 characters). If
+unset, the application uses `OAUTH_ENCRYPTION_KEY`, then `BETTER_AUTH_SECRET`, with
+a separate HKDF context. Keep the selected key stable across all app runtimes that
+share this database; changing it without re-encrypting entries makes them unreadable.
+Never expose this key through Nuxt public config. Migration `0017` creates the
+RLS-enabled job and vault tables. Values are AES-256-GCM encrypted with the exact
+workspace/repository/test scope authenticated as additional data.
+
+Deploy the application **and** the updated `infra/repo-runner` / `infra/codex-worker`
+code before testing the complete flow. The VPS needs `REPO_APP_URL` pointing to the
+deployed app and the matching `INTERNAL_API_SECRET`. Terminal setup results use
+`/api/internal/setup-result`; the application queues the original Eve session at
+`/workers/setup/notify`. The local workspace also reconciles status while open.
+Local and production Eve sessions are distinct; a local closed tab cannot rely on
+a production callback to wake its local session.
+
+The VPS keeps encrypted redaction material under
+`REPO_RUNNER_DATA/environment-redaction`, encrypted using `REPO_RUNNER_KEY`. Keep
+this directory private and backed up with the worker data. Old values remain in
+the redaction set after rotation so historical output remains masked; encrypted
+redaction entries currently follow the runner data retention policy. Rotating the
+runner key requires migrating or retiring these entries first.
+
+Project values are separate from the app's own environment. Users enter only the
+requested variables in **Pågående arbete → Konfigurera testmiljön** or import a
+simple single-line `.env` file locally. Save-only does not execute anything.
+Save-and-continue explicitly grants those values to the displayed repository at
+the verified commit. The worker injects them into the restarted process over stdin;
+it does not write a `.env` into the checkout. Shell interpolation during import is
+disabled. Values are never returned by the settings API or sent in agent prompts.
+
+Repository code receives the granted values and can use them, including over its
+network. Use scoped test credentials. Once configured, new agent shell/file calls
+in that sandbox are blocked to prevent reading process environments. Preview,
+redacted process status, configuration and stop remain available. New code work
+needs a separate sandbox. Removing a saved value does not revoke it from an already
+running process; restart or stop the process and revoke the credential at its
+provider if needed.
+
 The Reasoning selector offers low, high and max for both Grunden models. Max is
 the default, matching the provider. The pat_chat_reasoning cookie remembers the
 selection; x-pat-reasoning carries it into the authenticated turn and the provider

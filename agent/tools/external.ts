@@ -7,6 +7,7 @@ export default defineTool({
   inputSchema: externalInputSchema,
   async execute(input, ctx) {
     const auth = ctx.session.auth.current;
+    if (auth?.attributes.browserWorker === 'iris' && !['destinations', 'list', 'read', 'history'].includes(input.action)) return { error: 'Iris may read linked requirements but cannot publish or update external issues. Return findings to V.' };
     const threadId = auth?.attributes.browserThreadId;
     if (auth?.authenticator !== "app" || typeof threadId !== "string" || !threadId) return { error: "External workspace tools require a signed-in web chat." };
     const response = await fetch(`${appOrigin()}/api/internal/external`, { method: "POST", headers: internalHeaders(), body: JSON.stringify({ userId: auth.principalId, threadId, callId: ctx.callId, input }), signal: ctx.abortSignal });

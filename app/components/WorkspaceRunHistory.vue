@@ -28,7 +28,7 @@ async function ask(task: string) {
     <UButton color="neutral" variant="ghost" icon="i-lucide-pencil-line" label="Förtydliga testfallet" :disabled="!available" @click="ask(`Hjälp mig förtydliga testfall ${caseId} utifrån senaste sparade körningens oklarheter. Läs med test_run list. Föreslå konkret vad som behöver förtydligas; fråga om kravet är oklart. Ändra aldrig tidigare körningsresultat.`)" />
     <USelect v-if="history.length > 1" v-model="chosen" aria-label="Välj tidigare körning" :items="history.map(r => ({ label: `${new Date(r.startedAt).toLocaleString('sv-SE')} · ${runLabels[r.result?.outcome ?? 'running']}`, value: r.id }))" class="w-full" />
     <template v-if="run">
-      <p class="break-all text-xs text-muted">{{ run.environment }} · plan v{{ run.planVersion }}</p>
+      <p class="break-all text-xs text-muted">{{ run.environment }} · plan v{{ run.planVersion }} · {{ run.target?.revision || 'Testad version ej dokumenterad' }}</p>
       <p class="text-xs text-muted">Körnings-ID: {{ run.id }}</p>
       <div v-if="run.result" class="space-y-3">
         <WorkspaceRunReview :key="run.id" :run="run" />

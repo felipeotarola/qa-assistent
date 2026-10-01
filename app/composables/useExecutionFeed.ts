@@ -1,12 +1,14 @@
 import type { ExecutionEvent } from '#shared/execution';
 import type { RepoJob } from '#shared/repository';
 import type { SandboxState } from '#shared/sandbox';
+import type { SetupView } from '#shared/project-environment';
 
 // Mounted once by the application shell. All cards consume these shared values.
 export function useExecutionFeed() {
   const { activeId, refresh, data } = useRepositoryRuns();
   const jobs = useState<Record<string, RepoJob>>('execution-jobs', () => ({}));
   const sandboxes = useState<SandboxState[]>('execution-sandboxes', () => []);
+  const setups = useState<{ workspaceId: string; jobs: SetupView[] }>('execution-setups', () => ({ workspaceId: '', jobs: [] }));
   const browserEvent = useState<ExecutionEvent | null>('execution-browser', () => null);
   const connected = useState<Record<string, boolean>>('execution-connected', () => ({}));
   const sources = new Map<string, { source: EventSource; expiresAt: number }>();
@@ -22,9 +24,13 @@ export function useExecutionFeed() {
     try {
       if (workspaceId && !document.hidden) {
         await refresh();
-        const sandboxResult = await $fetch<{ sessions: SandboxState[] }>(`/api/workspaces/${workspaceId}/sandboxes`).catch(() => null);
+        const [sandboxResult,setupResult] = await Promise.all([
+          $fetch<{ sessions: SandboxState[] }>(`/api/workspaces/${workspaceId}/sandboxes`).catch(() => null),
+          $fetch<{workspaceId:string;jobs:SetupView[]}>(`/api/workspaces/${workspaceId}/setup-jobs`).catch(() => null),
+        ]);
         if (current !== generation || stopped) return;
         if (sandboxResult) sandboxes.value = sandboxResult.sessions;
+        if (setupResult) setups.value = setupResult;
         const signature = `${browserId.value}:${data.value?.runs.map(run => run.id).join(',')}:${sandboxes.value.map(s => s.id).join(',')}`;
         if (signature !== subscribed || !sources.size || [...sources.values()].some(s => s.expiresAt - Date.now() < 30000)) {
           const { streams } = await $fetch<{ streams: { kind: string; url: string; expiresAt: number }[] }>(`/api/workspaces/${workspaceId}/execution-subscriptions`, { method: 'POST' });
@@ -63,7 +69,7 @@ export function useExecutionFeed() {
     finally { if (!stopped && current === generation) timer = setTimeout(() => { void poll().catch(() => {}); }, Math.min(30000, 4000 * 2 ** failures)); }
   }
   watch(activeId, () => {
-    generation++; close(); subscribed = ''; failures = 0; seen.clear(); jobs.value = {}; browserEvent.value = null; sandboxes.value = [];
+    generation++; close(); subscribed = ''; failures = 0; seen.clear(); jobs.value = {}; browserEvent.value = null; sandboxes.value = []; setups.value = {workspaceId:'',jobs:[]};
     clearTimeout(timer); if (!stopped) void poll().catch(() => {});
   });
   onMounted(() => { stopped = false; void poll().catch(() => {}); });

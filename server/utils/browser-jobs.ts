@@ -44,5 +44,5 @@ export async function browserJobAction(userId: string, threadId: string, input: 
 export async function listBrowserJobs(userId: string, workspaceId: string) {
   const { requireWorkspace } = await import('./workspaces');
   await requireWorkspace(userId, workspaceId);
-  return db.select({ id: schema.browserJobs.id, threadId: schema.browserJobs.threadId, sessionId: schema.browserJobs.sessionId, task: schema.browserJobs.task, status: schema.browserJobs.status, report: schema.browserJobs.report }).from(schema.browserJobs).innerJoin(schema.threads, eq(schema.browserJobs.threadId, schema.threads.id)).where(and(eq(schema.threads.workspaceId, workspaceId), eq(schema.browserJobs.runtime, runtimeScope()))).orderBy(desc(schema.browserJobs.createdAt)).limit(10);
+  return db.select({ id: schema.browserJobs.id, threadId: schema.browserJobs.threadId, sessionId: schema.browserJobs.sessionId, task: schema.browserJobs.task, status: schema.browserJobs.status, report: schema.browserJobs.report, updatedAt: schema.browserJobs.updatedAt }).from(schema.browserJobs).innerJoin(schema.threads, eq(schema.browserJobs.threadId, schema.threads.id)).where(and(eq(schema.threads.workspaceId, workspaceId), eq(schema.browserJobs.runtime, runtimeScope()))).orderBy(desc(schema.browserJobs.createdAt)).limit(10);
 }

@@ -5,6 +5,7 @@ import { imageReferences } from "#shared/workspace";
 import { useThreadList } from "~/composables/chat/useThreads";
 import WorkspaceOverview from './WorkspaceOverview.vue';
 import WorkspaceTesting from './WorkspaceTesting.vue';
+import { defaultQuality, type QualitySettings } from '#shared/quality';
 const { activeId, workspaces } = useWorkspaces();
 const route = useRoute();
 const router = useRouter();
@@ -43,6 +44,8 @@ const { threads } = useThreadList();
 const threadId = computed(() => typeof route.params.id === "string" ? route.params.id : threads.value.find(t => t.workspaceId === activeId.value)?.id ?? null);
 const items = ref<WorkspaceItem[]>([]);
 const runs = ref<import('#shared/test-run').TestRun[]>([]);
+const quality = ref<QualitySettings>(defaultQuality());
+provide('workspace-quality', quality);
 provide('workspace-test-runs', runs);
 provide('workspace-items', items);
 provide('workspace-open-item', (id: string) => { const item = items.value.find(i => i.id === id); if (item) openItem(item); });
@@ -123,12 +126,14 @@ async function refresh() {
   if (fetching) { refreshRequested = true; return; }
   fetching = true;
   try {
-    const [result, layout, runData] = await Promise.all([
+    const [result, layout, runData, qualityData] = await Promise.all([
       $fetch<{ items: WorkspaceItem[] }>(`/api/workspaces/${id}/items`, { query: { trash: deleted } }),
       $fetch<{ order: string[] }>(`/api/workspaces/${id}/layout`),
       $fetch<import("#shared/test-run").TestRun[]>(`/api/workspaces/${id}/runs`),
+      $fetch<QualitySettings>(`/api/workspaces/${id}/quality`),
     ]);
     if (!disposed && activeId.value === id && trash.value === deleted && revision === layoutRevision && !ordering.value && !draggingCard.value) { runs.value = JSON.stringify(runs.value) === JSON.stringify(runData) ? runs.value : runData;
+      if (qualityData.revision >= quality.value.revision) quality.value = qualityData;
       const existing = new Map(items.value.map(item => [item.id, item]));
       items.value = result.items.map(item => JSON.stringify(existing.get(item.id)) === JSON.stringify(item) ? existing.get(item.id)! : item); order.value = layout.order; loaded.value = true; error.value = ''; }
   }
@@ -138,7 +143,7 @@ async function refresh() {
     if (refreshRequested && !disposed) { refreshRequested = false; void refresh(); }
   }
 }
-watch(activeId, () => { loaded.value = false; runs.value = []; items.value = []; order.value = []; draggingCard.value = null; error.value = ""; void refresh(); });
+watch(activeId, () => { loaded.value = false; quality.value = defaultQuality(); runs.value = []; items.value = []; order.value = []; draggingCard.value = null; error.value = ""; void refresh(); });
 watch(trash, () => { loaded.value = false; items.value = []; error.value = ""; void refresh(); });
 async function poll() { await refresh(); if (!disposed) timer = setTimeout(poll, 3000); }
 onMounted(() => { void poll(); });
@@ -224,9 +229,9 @@ async function uploadFile(event: Event) {
         </div>
         <p v-if="loaded && !items.length" class="text-sm text-dimmed">Papperskorgen är tom.</p>
       </div>
-      <WorkspaceOverview v-if="loaded && !trash && view === 'overview'" :items="items" :browser-present="browserPresent" @open="openItem" @testing="view = 'testing'" @material="view = 'material'" />
+      <WorkspaceOverview v-if="activeId && loaded && !trash && view === 'overview'" :workspace-id="activeId" :items="items" :browser-present="browserPresent" @open="openItem" @testing="view = 'testing'" @material="view = 'material'" />
       <WorkspaceLinear v-if="activeId && !trash && view === 'linear'" :key="activeId" :workspace-id="activeId" />
-      <WorkspaceTesting v-if="loaded && !trash && view === 'testing'" :items="plans" @open="openItem" />
+      <WorkspaceTesting v-if="activeId && loaded && !trash && view === 'testing'" :workspace-id="activeId" :items="plans" @open="openItem" />
       <WorkspacePageHeader v-if="!trash && view === 'material'" title="Material" description="Gemensamma dokument, tabeller, bilder och filer för alla chattar.">
         <template #title-action>
           <UButton

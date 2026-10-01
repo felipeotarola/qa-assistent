@@ -6,7 +6,7 @@ import { codexTurn } from '../lib/codex-turn';
 import { isCodexBackground } from '../../shared/codex-handoff.mjs';
 
 export default defineTool({
-  description: 'Delegate a repository setup/start/diagnosis task to the owner-only Codex subscription pilot on VPS. Uses THIS Eve sandbox, with existing files and processes, and shows logs in the floating VPS card. start takes task; status/cancel take jobId. Returns immediately; running is not completed. While active, do NOT use bash/repository to perform the same work or change the sandbox. Read status before any retry. Once completed, read the report and use preview(port) for a verified running app. If pilot is not enabled or login is required, explain that; do not silently duplicate the job through another executor. Codex does not push or deploy.',
+  description: 'Delegate a repository setup/start/diagnosis task to the owner-only Codex subscription pilot on VPS. Uses THIS Eve sandbox, with existing files and processes, and shows logs in the Pågående arbete panel. start takes task; status/cancel take jobId. Returns immediately; running is not completed. While active, do NOT use bash/repository to perform the same work or change the sandbox. Read status before any retry. Once completed, read the report and use preview(port) for a verified running app. If pilot is not enabled or login is required, explain that; do not silently duplicate the job through another executor. Codex does not push or deploy.',
   inputSchema: z.object({ action: z.enum(['start', 'status', 'cancel']), task: z.string().min(1).max(12000).optional(), jobId: z.string().uuid().optional() }),
   async execute(input, ctx) {
     const auth = ctx.session.auth.current, threadId = auth?.attributes.browserThreadId;
@@ -15,13 +15,13 @@ export default defineTool({
     const sandbox = await ctx.getSandbox();
     const response = await fetch(`${appOrigin()}/api/internal/codex`, {
       method: 'POST', headers: internalHeaders(), signal: AbortSignal.any([ctx.abortSignal, AbortSignal.timeout(30000)]),
-      body: JSON.stringify({ ...input, userId: auth.principalId, threadId, sessionKey: sandbox.id, jobId: input.action === 'start' ? repositoryRequestId(threadId, ctx.callId) : input.jobId }),
+      body: JSON.stringify({ ...input, userId: auth.principalId, threadId, sessionKey: sandbox.id, parentSessionId:ctx.session.id,model:auth.attributes.chatModel,reasoning:auth.attributes.reasoning, jobId: input.action === 'start' ? repositoryRequestId(threadId, ctx.callId) : input.jobId }),
     });
     if (!response.ok) throw new Error((await response.json()).statusMessage || 'Codex worker request failed.');
     const result = await response.json();
     if (isCodexBackground(result)) {
       codexTurn.update(() => ({ turnId: ctx.session.turn.id }));
-      return { ...result, background: true, nextAction: 'End this turn with a brief acknowledgement. The user can continue chatting. Progress streams independently to the VPS card. Do not poll, wait in bash, or perform the delegated work. Read status only on a later user request.' };
+      return { ...result, background: true, nextAction: 'End this turn with a brief acknowledgement. The user can continue chatting. Progress streams independently to the Pågående arbete panel. Do not poll, wait in bash, or perform the delegated work. A background report returns to this chat when the registered setup job ends; use status only on a later user request.' };
     }
     return result;
   },

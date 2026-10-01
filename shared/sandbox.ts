@@ -1,3 +1,4 @@
+import type { EnvironmentPlan } from './project-environment';
 export interface SandboxState {
   id: string;
   workspaceId: string;
@@ -7,5 +8,5 @@ export interface SandboxState {
   updatedAt: string;
   expiresAt: number;
   processes: { id: string; status: string; stdout: string; stderr: string; exitCode: number | null }[];
-  codex?: { jobId: string; status: string; message: string; result?: string };
+  codex?: { jobId: string; status: string; message: string; result?: string; updatedAt?: string; environment?: EnvironmentPlan };
 }

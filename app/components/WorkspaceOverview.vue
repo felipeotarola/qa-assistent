@@ -4,7 +4,7 @@ import WorkspaceRunSummary from './WorkspaceRunSummary.vue';
 import type { WorkspaceItem } from '#shared/workspace';
 import { caseReady } from '#shared/test-plan';
 
-const props = defineProps<{ items: WorkspaceItem[]; browserPresent?: boolean }>();
+const props = defineProps<{ workspaceId: string; items: WorkspaceItem[]; browserPresent?: boolean }>();
 defineEmits<{ open: [item: WorkspaceItem]; testing: []; material: [] }>();
 const recent = computed(() => [...props.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
 const plans = computed(() => recent.value.filter(item => item.content.kind === 'test_plan'));
@@ -20,6 +20,7 @@ function readiness(item: WorkspaceItem) {
 <template>
   <div class="w-full space-y-8">
     <WorkspacePageHeader title="Fortsätt där ni var" description="Testplaner och gemensamt underlag, samlat för detta workspace." />
+    <WorkspaceQuality :key="workspaceId" :workspace-id="workspaceId" :items="items" @open="$emit('open', $event)" />
     <UButton v-if="browserPresent" label="Visa webbläsaren" icon="i-lucide-globe" color="neutral" variant="soft" @click="$emit('material')" />
     <section aria-label="Testplaner" class="space-y-3">
       <div class="flex items-center justify-between gap-2">

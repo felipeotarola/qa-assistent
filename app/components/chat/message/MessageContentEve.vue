@@ -53,17 +53,11 @@ const showThinking = computed(
     v-for="(part, index) in displayParts"
     :key="`${message.id}-part-${index}`"
   >
-    <UChatReasoning
+    <ChatReasoningDetails
       v-if="isReasoningUIPart(part)"
       :text="part.text"
       :streaming="isPartStreaming(part)"
-      chevron="leading"
-    >
-      <ChatComark
-        :value="part.text"
-        :streaming="isPartStreaming(part)"
-      />
-    </UChatReasoning>
+    />
 
     <template v-else-if="isToolUIPart(part) || isDynamicToolUIPart(part)">
       <ChatToolWeather

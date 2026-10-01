@@ -83,6 +83,7 @@ function onSubmit() {
             :ui="{ base: 'px-1.5', footer: 'flex-wrap gap-2' }"
             @submit="onSubmit"
           >
+            <template #header><ChatWorkReport @suggestion="input = [input.trim(), $event].filter(Boolean).join('\n')" /></template>
             <template #footer>
               <div class="flex flex-wrap items-center gap-2">
                 <ChatModelToggle v-model="selectedModel" />
