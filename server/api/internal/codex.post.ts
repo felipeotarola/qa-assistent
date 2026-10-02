@@ -7,13 +7,13 @@ import { db, schema } from '@nuxthub/db';
 import { eq } from 'drizzle-orm';
 import { runtimeScope } from '../../../shared/runtime-scope';
 import { resolveChatModel, resolveReasoning } from '../../../shared/chat-models';
-import { receiveSetupResult } from '../../utils/setup-jobs';
+import { ownedSetup, receiveSetupResult } from '../../utils/setup-jobs';
 import { repositoryMapTarget } from '../../../shared/repository-map';
 
 export default defineEventHandler(async event => {
   requireInternalRequest(event);
   const body = z.object({
-    userId: z.string().uuid(), threadId: z.string().uuid(), sessionKey: z.string().min(1).max(300),
+    userId: z.string().uuid(), threadId: z.string().uuid(), sessionKey: z.string().min(1).max(300).optional(),
     action: z.enum(['start', 'status', 'cancel']), jobId: z.string().uuid(), task: z.string().min(1).max(12000).optional(),
     parentSessionId: z.string().optional(), model: z.string().optional(), reasoning: z.string().optional(),
   }).parse(await readBody(event));
@@ -22,12 +22,20 @@ export default defineEventHandler(async event => {
   // Axel's child session may finish before the worker; notify the durable chat.
   if (body.action === 'start' && body.task && repositoryMapTarget(body.task)) body.parentSessionId = thread.sessionId || body.parentSessionId;
   if (body.action==='start') {
-    if (!body.parentSessionId || !body.task) throw createError({statusCode:400,statusMessage:'Parent session and task required'});
+    if (!body.parentSessionId || !body.task || !body.sessionKey) throw createError({statusCode:400,statusMessage:'Parent session, sandbox session and task required'});
     await db.insert(schema.setupJobs).values({id:body.jobId,workspaceId:thread.workspaceId,threadId:body.threadId,runtime:runtimeScope(),parentSessionId:body.parentSessionId,sessionKey:body.sessionKey,task:body.task,model:resolveChatModel(body.model),reasoning:resolveReasoning(body.reasoning)}).onConflictDoNothing();
     const [saved] = await db.select().from(schema.setupJobs).where(eq(schema.setupJobs.id,body.jobId));
     if (!saved || saved.threadId!==body.threadId || saved.task!==body.task || saved.sessionKey!==body.sessionKey || saved.parentSessionId!==body.parentSessionId) throw createError({statusCode:409,statusMessage:'Setup submission conflict'});
   }
-  const scope = sandboxScope(body.userId, body.threadId, body.sessionKey);
+  // Historical jobs keep their original sandbox identity even after this chat
+  // reconnects to a new generation. Looking up status must not allocate compute.
+  let scope;
+  if (body.action === 'start') scope = sandboxScope(body.userId, body.threadId, body.sessionKey!);
+  else {
+    const saved = await ownedSetup(body.userId, thread.workspaceId, body.jobId);
+    if (!await getThreadForUser(body.userId, saved.threadId)) throw createError({ statusCode: 404, statusMessage: 'Job not found' });
+    scope = sandboxScope(body.userId, saved.threadId, saved.sessionKey);
+  }
   let result;
   try {
     result = await repositoryRunner('/codex', { ...body, ...scope, workspaceId: thread.workspaceId });

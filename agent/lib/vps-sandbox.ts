@@ -33,7 +33,6 @@ export const vpsSandbox: SandboxBackend<Record<string, never>, Scope> = {
     let generation = typeof existingMetadata?.generation === 'string' ? existingMetadata.generation : '';
     let stateLost = false;
     const environmentKey = () => generation ? `${sessionKey}:${generation}` : sessionKey;
-    let ready = false;
     async function rpc<T>(input: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
       if (!scope?.userId || !scope.threadId) throw new Error('VPS sandbox requires an authenticated workspace chat.');
       const response = await fetch(`${appOrigin()}/api/internal/sandbox`, { method: 'POST', headers: internalHeaders(), body: JSON.stringify({ ...scope, sessionKey: environmentKey(), input }), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(40000)]) : AbortSignal.timeout(40000) });
@@ -43,10 +42,15 @@ export const vpsSandbox: SandboxBackend<Record<string, never>, Scope> = {
       }
       return response.json() as Promise<T>;
     }
-    async function ensure() {
-      if (ready) return;
+    let preparing: Promise<void> | undefined;
+    function ensure() {
+      // Readiness expires independently of Eve's cached handle. Revalidate before
+      // every new operation, coalescing concurrent users of this same handle.
+      return preparing ||= reconnect().finally(() => { preparing = undefined; });
+    }
+    async function reconnect() {
       for (let attempts = 0; attempts < 20; attempts++) {
-        try { await rpc({ action: 'ensure', templateKey }); ready = true; return; }
+        try { await rpc({ action: 'ensure', templateKey }); return; }
         catch (error) {
           if (!(error instanceof Error) || !error.message.startsWith('Sandbox lease ended.')) throw error;
           const previous = await rpc<{ id: string }>({ action: 'status' });
@@ -121,12 +125,12 @@ export const vpsSandbox: SandboxBackend<Record<string, never>, Scope> = {
       async removePath(options) { await ensure(); await rpc({ action: 'remove', path: session.resolvePath(options.path), recursive: options.recursive, force: options.force }, options.abortSignal); },
       async setNetworkPolicy() { throw new Error('The VPS worker enforces public internet only. Dynamic network-policy changes are not supported.'); },
     };
-    const stop = async () => { if (scope) { await rpc({ action: 'stop' }); ready = false; } };
+    const stop = async () => { if (scope) await rpc({ action: 'stop' }); };
     return {
       session,
       async useSessionFn(options) { if (options) scope = options; await ensure(); return session; },
       async captureState() { return { backendName: 'qaa-vps-v1', sessionKey, metadata: { scope, generation } }; },
-      async delete(options) { await rpc({ action: 'delete' }, options?.abortSignal); ready = false; },
+      async delete(options) { await rpc({ action: 'delete' }, options?.abortSignal); },
       stop, shutdown: stop,
     };
   },

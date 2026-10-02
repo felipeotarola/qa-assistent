@@ -4,6 +4,38 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { randomUUID } from 'node:crypto';
+import { ReadableStream } from 'node:stream/web';
+
+test('a cached or restored handle reconnects before work and renews each operation', async () => {
+  const source = readFileSync(new URL('../agent/lib/vps-sandbox.ts', import.meta.url), 'utf8');
+  const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const exports = {}, expired = randomUUID(), calls = [];
+  let status = 'ready';
+  vm.runInNewContext(js, { exports, Error, AbortSignal, Buffer, ReadableStream, TextEncoder, TextDecoder, setTimeout, require: name => name === 'node:crypto' ? { randomUUID } : { appOrigin: () => 'https://app.example', internalHeaders: () => ({}) }, fetch: async (_url, options) => {
+    const { sessionKey, input } = JSON.parse(options.body);
+    calls.push({ sessionKey, ...input });
+    if (input.action === 'status') return { ok: true, json: async () => ({ id: expired }) };
+    if (input.action === 'ensure') {
+      if (status === 'expired' && sessionKey === 'root') return { ok: false, json: async () => ({ statusMessage: 'Sandbox lease ended. Files unavailable.' }) };
+      status = 'ready';
+    } else assert.equal(status, 'ready', 'I/O must never use a stopped sandbox');
+    return { ok: true, json: async () => input.action === 'process' ? { status: 'completed', exitCode: 0, stdout: '', stderr: '' } : { data: null } };
+  } });
+  const options = { sessionKey: 'root', existingMetadata: { scope: { userId: randomUUID(), threadId: randomUUID() } } };
+  const handle = await exports.vpsSandbox.create(options);
+  assert.equal(calls.length, 0, 'Restoring a handle for status must not allocate compute');
+  await handle.useSessionFn();
+  status = 'stopped';
+  await handle.session.readTextFile({ path: '/workspace/package.json' });
+  assert.equal(calls.at(-2).action, 'ensure');
+  assert.equal(handle.session.id, 'root', 'Stopped environments reuse their filesystem');
+  status = 'expired';
+  const result = await handle.session.run({ command: 'true' });
+  assert.equal(handle.session.id, `root:${expired}`);
+  assert.match(result.stdout, /NEW empty environment/);
+  assert.equal(calls.filter(c => c.action === 'spawn').length, 1, 'No command is replayed');
+  assert.equal(calls.find(c => c.action === 'spawn').sessionKey, `root:${expired}`);
+});
 
 test('Eve production prewarm provisions skill files without allocating a user sandbox', async () => {
   const source = readFileSync(new URL('../agent/lib/vps-sandbox.ts', import.meta.url), 'utf8');

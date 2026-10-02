@@ -144,6 +144,13 @@ processes and a five-minute renewable lease. Stop retains files until expiry;
 delete/expiry removes the disk. An expired environment is replaced with an explicitly
 empty generation. Commands and files are never silently replayed or restored.
 
+Every new sandbox operation revalidates the lease, including cached Eve handles.
+Otto's start tool probes compute with a no-op before submitting work and then reads
+the current generation ID again. Status/cancel resolve the authorized saved job's
+original sandbox scope and do not allocate a new environment. To verify recovery
+against the real VPS with disposable fixtures, set `RUN_VPS_RECOVERY_TEST=1` and run
+`node --env-file=.env tests/vps-sandbox-recovery.integration.mjs`.
+
 Eve's production prewarm uploads its seed files (including bundled skills) to the
 authenticated worker `/templates` endpoint. Templates are immutable, bounded and
 persist on the VPS; each environment receives them once without overwriting existing
