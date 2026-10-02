@@ -14,6 +14,8 @@ const error = ref('');
 const notice = ref('');
 const editing = ref(false);
 const draft = ref(defaultQuality());
+const expandedCheck = ref<string>();
+const readinessOptions = [{ label: 'Inte kontrollerad', value: 'unknown' }, { label: 'Bekräftad', value: 'ready' }, { label: 'Blockerad', value: 'blocked' }];
 const filter = ref('all');
 const visibleCount = ref(8);
 let disposed = false;
@@ -29,9 +31,14 @@ function edit() {
   draft.value.config.regression = draft.value.config.regression.filter(key => keys.has(key));
   draft.value.config.checks = draft.value.config.checks.filter(check => !check.caseKeys.length || check.caseKeys.some(key => keys.has(key))).map(check => ({ ...check, caseKeys: check.caseKeys.filter(key => keys.has(key)) }));
   if (!draft.value.config.checks.length) draft.value.config.checks = ['Testmiljön svarar', 'Rätt version är tillgänglig', 'Testkonton och testdata', 'Nödvändiga tjänster och beroenden'].map(label => ({ id: crypto.randomUUID(), label, status: 'unknown', detail: '', caseKeys: [] }));
+  expandedCheck.value = undefined;
   error.value = ''; editing.value = true;
 }
-function addCheck() { draft.value.config.checks.push({ id: crypto.randomUUID(), label: '', status: 'unknown', detail: '', caseKeys: [] }); }
+function addCheck() {
+  const id = crypto.randomUUID();
+  draft.value.config.checks.push({ id, label: '', status: 'unknown', detail: '', caseKeys: [] });
+  expandedCheck.value = id;
+}
 async function save(value: QualitySettings) {
   const validation = qualityConfigSchema.safeParse(value.config);
   if (!validation.success) { error.value = validation.error.issues[0]?.message || 'Kontrollera uppgifterna.'; return false; }
@@ -109,23 +116,51 @@ function openPlan(itemId: string) { const item = props.items.find(item => item.i
     </div>
     <p v-else class="text-sm text-muted">Skapa en testplan, gärna från ett Linear-ärende, för att börja följa kvaliteten.</p>
     <p v-if="error && !editing" role="alert" class="text-sm text-error">{{ error }}</p><p v-if="notice" role="status" class="text-sm text-muted">{{ notice }}</p>
-    <UModal v-model:open="editing" title="Testberedskap" description="Dokumentera mål och förutsättningar. Spara aldrig lösenord eller API-nycklar här.">
-      <template #body><div class="space-y-5">
-        <UFormField label="Miljö" required><UInput v-model="draft.config.target.environment" placeholder="QA, staging eller produktion" class="w-full" /></UFormField>
-        <UFormField label="Testadress"><UInput v-model="draft.config.target.url" placeholder="https://…" class="w-full" /></UFormField>
-        <UFormField label="Version eller commit" required><UInput v-model="draft.config.target.revision" placeholder="Release-ID eller commit som ska verifieras" class="w-full" /></UFormField>
-        <p class="text-xs text-muted">Byte av miljö, adress eller version nollställer förutsättningarna till okända. Befintliga testresultat bevaras.</p>
-        <div v-for="(check, index) in draft.config.checks" :key="check.id" class="rounded-lg border border-default p-3 space-y-3">
-          <UFormField label="Förutsättning"><UInput v-model="check.label" class="w-full" /></UFormField>
-          <UFormField label="Status"><USelect v-model="check.status" :items="[{ label: 'Inte kontrollerad', value: 'unknown' }, { label: 'Bekräftad', value: 'ready' }, { label: 'Blockerad', value: 'blocked' }]" class="w-full" /></UFormField>
-          <UFormField label="Observation eller blockerare"><UTextarea v-model="check.detail" placeholder="Vad har kontrollerats, när och vad saknas? Inga hemligheter." class="w-full" /></UFormField>
-          <UFormField label="Berörda testfall" description="Tomt urval gäller alla testfall."><USelectMenu v-model="check.caseKeys" multiple value-key="value" :aria-label="`Berörda testfall: ${check.label}`" :items="summary.cases.map(c => ({ label: `${c.planTitle} · ${c.title}`, value: c.key }))" class="w-full" /></UFormField>
-          <UButton label="Ta bort förutsättning" color="neutral" variant="ghost" size="sm" @click="draft.config.checks.splice(index, 1)" />
-        </div>
-        <UButton label="Lägg till förutsättning" icon="i-lucide-plus" color="neutral" variant="outline" :disabled="draft.config.checks.length >= 30" @click="addCheck" />
+    <UModal v-model:open="editing" title="Testberedskap" description="Välj vad som ska testas och kontrollera att förutsättningarna finns.">
+      <template #body><div class="space-y-6">
+        <section aria-label="Testmål" class="space-y-3">
+          <h3 class="flex items-center gap-2 text-sm font-semibold"><UIcon name="i-lucide-crosshair" class="size-4 text-muted" />Testmål</h3>
+          <div class="grid gap-4 md:grid-cols-3">
+            <UFormField label="Miljö" required><UInput v-model="draft.config.target.environment" placeholder="T.ex. staging" class="w-full" /></UFormField>
+            <UFormField label="Testadress"><UInput v-model="draft.config.target.url" icon="i-lucide-link" placeholder="https://…" class="w-full" /></UFormField>
+            <UFormField label="Version eller commit" required><UInput v-model="draft.config.target.revision" placeholder="Release-ID eller commit" class="w-full" /></UFormField>
+          </div>
+          <p class="text-xs text-muted">Byter du testmål behöver förutsättningarna kontrolleras igen. Sparade testresultat bevaras.</p>
+        </section>
+        <section aria-label="Förutsättningar" class="space-y-3 border-t border-default pt-5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h3 class="flex items-center gap-2 text-sm font-semibold"><UIcon name="i-lucide-list-checks" class="size-4 text-muted" />Förutsättningar <span class="text-muted font-normal">{{ draft.config.checks.length }}</span></h3>
+            <UButton label="Lägg till" aria-label="Lägg till förutsättning" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :disabled="draft.config.checks.length >= 30" @click="addCheck" />
+          </div>
+          <p class="text-xs text-muted">Dokumentera observationer här. Lösenord och API-nycklar hör hemma i miljöns konfiguration.</p>
+          <div class="overflow-hidden rounded-xl border border-default divide-y divide-default">
+            <UCollapsible v-for="(check, index) in draft.config.checks" :key="check.id" :open="expandedCheck === check.id" @update:open="expandedCheck = $event ? check.id : undefined">
+              <UButton color="neutral" variant="ghost" class="w-full rounded-none p-3 text-left sm:px-4" :aria-label="`Redigera förutsättning: ${check.label || 'Ny förutsättning'}`">
+                <UIcon :name="check.status === 'ready' ? 'i-lucide-circle-check' : check.status === 'blocked' ? 'i-lucide-circle-alert' : 'i-lucide-circle-dashed'" class="size-4 shrink-0" :class="check.status === 'ready' ? 'text-success' : check.status === 'blocked' ? 'text-warning' : 'text-muted'" />
+                <span class="min-w-0 flex-1"><span class="block truncate font-medium">{{ check.label || 'Ny förutsättning' }}</span><span class="block text-xs font-normal text-muted">{{ check.caseKeys.length ? `${check.caseKeys.length} valda testfall` : 'Alla testfall' }}</span></span>
+                <UBadge :color="check.status === 'ready' ? 'success' : check.status === 'blocked' ? 'warning' : 'neutral'" variant="soft" size="sm">{{ readinessOptions.find(option => option.value === check.status)?.label }}</UBadge>
+                <UIcon name="i-lucide-chevron-down" class="size-4 shrink-0 text-muted" :class="{ 'rotate-180': expandedCheck === check.id }" />
+              </UButton>
+              <template #content>
+                <div class="space-y-4 border-t border-default bg-muted/40 p-3 sm:p-4">
+                  <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_14rem]">
+                    <UFormField label="Förutsättning"><UInput v-model="check.label" placeholder="Vad behöver finnas för att testa?" class="w-full" /></UFormField>
+                    <UFormField label="Status"><USelect v-model="check.status" :items="readinessOptions" class="w-full" /></UFormField>
+                  </div>
+                  <div class="grid gap-4 md:grid-cols-2">
+                    <UFormField label="Observation eller blockerare"><UTextarea v-model="check.detail" :rows="2" placeholder="Vad har kontrollerats och vad saknas?" class="w-full" /></UFormField>
+                    <UFormField label="Berörda testfall" hint="Valfritt"><USelectMenu v-model="check.caseKeys" multiple value-key="value" placeholder="Alla testfall" :aria-label="`Berörda testfall: ${check.label}`" :items="summary.cases.map(c => ({ label: `${c.planTitle} · ${c.title}`, value: c.key }))" class="w-full" /><p class="mt-1.5 text-xs text-muted">Lämna tomt för att gälla alla testfall.</p></UFormField>
+                  </div>
+                  <div class="flex justify-end"><UButton label="Ta bort" :aria-label="`Ta bort förutsättning: ${check.label || 'Ny förutsättning'}`" icon="i-lucide-trash-2" color="neutral" variant="ghost" size="sm" @click="draft.config.checks.splice(index, 1)" /></div>
+                </div>
+              </template>
+            </UCollapsible>
+          </div>
+          <p v-if="!draft.config.checks.length" class="text-sm text-muted">Lägg till det som behöver vara på plats innan testerna kan köras.</p>
+        </section>
         <p v-if="error" role="alert" class="text-sm text-error">{{ error }}</p>
       </div></template>
-      <template #footer><UButton label="Spara testberedskap" :loading="busy" @click="saveDraft" /><UButton label="Avbryt" color="neutral" variant="ghost" @click="editing = false" /></template>
+      <template #footer><div class="flex w-full justify-end gap-2"><UButton label="Avbryt" color="neutral" variant="ghost" @click="editing = false" /><UButton label="Spara testberedskap" :loading="busy" @click="saveDraft" /></div></template>
     </UModal>
   </section>
 </template>
