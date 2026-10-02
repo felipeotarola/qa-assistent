@@ -3,6 +3,7 @@ import { startNewChat } from "~/composables/chat/navigation";
 import { useThreadList } from "~/composables/chat/useThreads";
 import AgentActivityPanel from '~/components/AgentActivityPanel.vue';
 import SidebarNavigationGroup from '~/components/SidebarNavigationGroup.vue';
+import { brand } from '#shared/brand';
 
 const sidebarOpen = ref(false);
 provideWorkspaceAgent();
@@ -87,12 +88,12 @@ defineShortcuts({
       <template #header="{ collapsed }">
         <NuxtLink
           to="/?view=workspaces"
-          aria-label="QA Workspace"
+          :aria-label="brand.name"
           class="qaa-sidebar-home flex min-w-0 flex-1 items-center gap-2.5"
           :class="collapsed ? 'mx-auto' : ''"
         >
-          <span class="qaa-sidebar-brand"><AppLogo class="size-3.5" /></span>
-          <span v-if="!collapsed" class="min-w-0"><span class="block truncate text-sm font-semibold tracking-tight">QA Workspace</span><span class="qaa-sidebar-caption block truncate text-xs text-muted">Agenter & testning</span></span>
+          <span class="qaa-sidebar-brand"><AppLogo class="size-6" /></span>
+          <span v-if="!collapsed" class="min-w-0"><span class="block truncate text-sm font-semibold tracking-tight">{{ brand.name }}</span><span class="qaa-sidebar-caption block truncate text-xs text-muted">Agenter & testning</span></span>
         </NuxtLink>
 
         <UDashboardSidebarCollapse

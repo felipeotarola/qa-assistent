@@ -69,6 +69,7 @@ async function handleSubmit() {
   <div class="flex min-h-svh bg-default text-default">
     <section class="flex flex-1 items-center justify-center px-6 py-10">
       <div class="w-full max-w-sm">
+        <div class="mb-6"><BrandMark size="sm" /></div>
         <UCard class="w-full">
           <template #header>
             <h2 class="text-lg font-semibold text-highlighted">

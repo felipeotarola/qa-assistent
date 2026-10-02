@@ -40,7 +40,7 @@ export function useSiteSeo(options?: {
     twitterTitle: title,
     twitterDescription: description,
     twitterImage: ogImage,
-    twitterSite: site.twitter,
+    twitterSite: site.twitter || undefined,
   });
 
   useHead({
@@ -49,7 +49,7 @@ export function useSiteSeo(options?: {
       { name: "author", content: site.author },
       {
         name: "keywords",
-        content: "Eve, Nuxt, personal agent, AI assistant, Better Auth, Slack, iMessage, Linear, template",
+        content: "Syna, QA, testning, AI-agenter, testplaner, repositories, Linear",
       },
     ],
     script: [

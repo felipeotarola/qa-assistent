@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
+import { brand } from './shared/brand';
 const eveSharedDirectory = resolve(dirname(createRequire(import.meta.url).resolve("eve/client")), "../shared");
 const privateNoStore = { "cache-control": "private, no-store" } as const;
 const noStore = { "cache-control": "no-store" } as const;
@@ -95,22 +96,23 @@ export default defineNuxtConfig({
   app: {
     head: {
       htmlAttrs: { lang: "en" },
-      title: "V",
+      title: brand.name,
       titleTemplate: "%s",
       charset: "utf-8",
       viewport: "width=device-width, initial-scale=1",
       meta: [
         {
           name: "description",
-          content:
-            "Your personal AI agent. Chat on the web, Slack, or iMessage — query Linear and pick up where you left off.",
+          content: brand.description,
         },
         { name: "theme-color", content: "#1b1718" },
         { name: "color-scheme", content: "light dark" },
         { name: "robots", content: "index, follow" },
       ],
       link: [
-        { rel: "icon", href: "/favicon.ico" },
+        { rel: "icon", href: "/favicon.ico?v=syna", sizes: "16x16 32x32 48x48" },
+        { rel: "icon", href: "/syna.svg", type: "image/svg+xml" },
+        { rel: "apple-touch-icon", href: "/syna-apple-touch-icon.png", sizes: "180x180" },
       ],
     },
   },

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { agent } from '#shared/agent';
+import { brand } from '#shared/brand';
 import { isAgentRole } from '#shared/agent-identities';
 import { vpsToolGuides } from '#shared/vps-tool-guides';
 import AgentAvatar from '~/components/AgentAvatar.vue';
 import { agentCapabilities, mainAgentGuide } from '#shared/agent-capabilities';
 import type { ConnectorState } from '#shared/types/connector';
 
-useHead({ title: `Agenten · ${agent.name}` });
+useHead({ title: `Agenter · ${brand.name}` });
 const selected = ref<string>('main');
 const guides = [...agentCapabilities, ...vpsToolGuides];
 const capability = computed(() => selected.value === 'main' ? mainAgentGuide : guides.find(item => item.id === selected.value) ?? mainAgentGuide);

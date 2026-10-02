@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { agent } from "~~/shared/agent";
+import { brand } from '#shared/brand';
 
 defineProps<{
   size?: "sm" | "lg";
@@ -13,10 +13,10 @@ defineProps<{
   >
     <div class="space-y-3">
       <h1 class="text-3xl font-semibold tracking-tight text-highlighted sm:text-4xl">
-        {{ agent.name }}
+        {{ brand.name }}
       </h1>
       <p class="max-w-md text-sm leading-relaxed text-muted">
-        {{ agent.description }}
+        {{ brand.description }}
       </p>
     </div>
   </div>
@@ -25,9 +25,9 @@ defineProps<{
     v-else
     class="flex items-center gap-2.5"
   >
-    <AppLogo class="h-3.5 w-auto text-highlighted" />
+    <AppLogo class="size-7 text-highlighted" />
     <span class="text-sm font-semibold text-highlighted">
-      {{ agent.name }}
+      {{ brand.name }}
     </span>
   </div>
 </template>
