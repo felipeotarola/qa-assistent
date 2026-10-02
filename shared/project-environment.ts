@@ -24,6 +24,9 @@ export interface SetupView {
 }
 export const environmentValuesSchema = z.record(environmentName, z.string().min(1).max(4000).refine(value => !value.includes('\0'))).refine(value => Object.keys(value).length <= 30, 'Too many variables');
 export const configureEnvironmentSchema = z.object({ expectedRevision: z.number().int().nonnegative(), values: environmentValuesSchema, forget: z.array(environmentName).max(30).default([]), continue: z.boolean().default(false) });
+export const vaultRepositoryUrl = z.string().trim().transform(url => url.replace(/\/$/, '').replace(/\.git$/, '')).pipe(z.string().regex(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+$/));
+export const vaultEntrySchema = configureEnvironmentSchema.omit({ continue: true }).extend({ repoUrl: vaultRepositoryUrl });
+export interface VaultEntry { repoUrl: string; configuredNames: string[]; revision: number }
 
 // Import as data only: no shell expansion, sourcing or interpolation.
 export function parseEnvironmentFile(text: string): Record<string, string> {

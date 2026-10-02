@@ -1,7 +1,7 @@
 import { and, eq, desc, sql } from 'drizzle-orm';
 import { db, schema } from '@nuxthub/db';
 import { randomUUID } from 'node:crypto';
-import { setupResultSchema, configureEnvironmentSchema, type SetupResult, type SetupView } from '../../shared/project-environment';
+import { setupResultSchema, configureEnvironmentSchema, environmentValuesSchema, type SetupResult, type SetupView } from '../../shared/project-environment';
 import { requireWorkspace } from './workspaces';
 import { getThreadForUser } from './threads';
 import { runtimeScope } from '../../shared/runtime-scope';
@@ -89,6 +89,7 @@ export async function configureSetup(userId: string, workspaceId: string, id: st
     const [existing] = await tx.select().from(schema.projectEnvironments).where(and(eq(schema.projectEnvironments.workspaceId,workspaceId),eq(schema.projectEnvironments.repoUrl,plan.repoUrl),eq(schema.projectEnvironments.environment,'test')));
     if ((existing?.revision||0)!==body.expectedRevision) throw createError({statusCode:409,statusMessage:'Inställningarna har ändrats. Läs om innan du sparar.'});
     const values = Object.fromEntries(Object.entries({... (existing ? openEnvironment(existing.sealedValues,scope):{}),...body.values}).filter(([key])=>!body.forget.includes(key)));
+    if (!environmentValuesSchema.safeParse(values).success) throw createError({statusCode:400,statusMessage:'Högst 30 variabler kan sparas per repo.'});
     if (body.continue && plan.variables.some(v=>v.required&&!values[v.name])) throw createError({statusCode:400,statusMessage:'Fyll i obligatoriska variabler innan du fortsätter.'});
     const record = {sealedValues:sealEnvironment(values,scope),revision:(existing?.revision||0)+1,updatedAt:new Date()};
     const [saved] = existing ? await tx.update(schema.projectEnvironments).set(record).where(eq(schema.projectEnvironments.id,existing.id)).returning() : await tx.insert(schema.projectEnvironments).values({id:randomUUID(),workspaceId,repoUrl:plan.repoUrl,...record}).returning();

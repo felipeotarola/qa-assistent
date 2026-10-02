@@ -7,6 +7,7 @@ import WorkspaceOverview from './WorkspaceOverview.vue';
 import WorkspaceTesting from './WorkspaceTesting.vue';
 import { defaultQuality, type QualitySettings } from '#shared/quality';
 const { activeId, workspaces } = useWorkspaces();
+const vault = useWorkspaceVault();
 const route = useRoute();
 const router = useRouter();
 const connectionFetch = useRequestFetch();
@@ -205,6 +206,7 @@ async function uploadFile(event: Event) {
     <header class="flex min-h-(--ui-header-height) shrink-0 flex-wrap items-center gap-2 border-b border-default bg-default px-4 py-2">
       <UIcon name="i-lucide-layout-grid" class="size-4 text-dimmed" />
       <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ workspaces.find(w => w.id === activeId)?.name || 'Workspace' }}</span>
+      <UButton label="Vault" icon="i-lucide-key-round" aria-label="Öppna vault – API-nycklar och miljövariabler" variant="outline" size="sm" :disabled="!activeId" @click="activeId && vault.open(activeId)" />
       <UDropdownMenu :items="workspaceActions" :content="{ align: 'end' }" :ui="{ content: 'w-60' }">
         <UButton label="Verktyg" trailing-icon="i-lucide-chevron-down" color="neutral" variant="ghost" :disabled="!activeId" class="shrink-0" aria-label="Workspace-verktyg" />
       </UDropdownMenu>

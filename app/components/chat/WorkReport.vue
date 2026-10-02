@@ -3,6 +3,8 @@ defineProps<{ disabled?: boolean }>();
 const emit = defineEmits<{ suggestion: [prompt: string] }>();
 const { latest, dismiss } = useWorkReports();
 const { open } = useAgentActivity();
+const vault = useWorkspaceVault();
+const { activeId } = useWorkspaces();
 const expanded = ref(false);
 watch(() => latest.value?.id, () => { expanded.value = false; });
 const route = useRoute();
@@ -22,6 +24,7 @@ const canReview = computed(() => !!latest.value?.prompt && (!latest.value.thread
       <p class="text-xs"><strong>Nästa steg:</strong> {{ latest.next }}</p>
     </div>
     <div class="flex flex-wrap gap-2">
+      <UTooltip v-if="activeId && latest.actor === 'Otto'" text="Lägg in API-nycklar i Vault"><UButton icon="i-lucide-key-round" label="Vault" size="xs" variant="outline" @click="vault.open(activeId!)" /></UTooltip>
       <UTooltip v-if="canReview" text="Granska resultatet"><UButton class="composer-icon-control" icon="i-lucide-scan-eye" aria-label="Granska resultatet" size="xs" variant="soft" :disabled="disabled" @click="emit('suggestion', latest.prompt)"><span class="composer-control-label">Granska resultatet</span></UButton></UTooltip>
       <UTooltip text="Visa detaljer i Pågående arbete"><UButton class="composer-icon-control" icon="i-lucide-panel-right-open" aria-label="Visa detaljer i Pågående arbete" size="xs" variant="ghost" @click="open = true"><span class="composer-control-label">Visa detaljer</span></UButton></UTooltip>
       <UTooltip :text="expanded ? 'Dölj sammanfattning' : 'Visa sammanfattning'"><UButton class="composer-compact-icon" :icon="expanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" :aria-label="expanded ? 'Dölj sammanfattning' : 'Visa sammanfattning'" :aria-expanded="expanded" size="xs" variant="ghost" @click="expanded = !expanded" /></UTooltip>

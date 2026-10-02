@@ -2,6 +2,7 @@
 import { startNewChat } from "~/composables/chat/navigation";
 import { useThreadList } from "~/composables/chat/useThreads";
 import AgentActivityPanel from '~/components/AgentActivityPanel.vue';
+import WorkspaceVault from '~/components/WorkspaceVault.vue';
 import SidebarNavigationGroup from '~/components/SidebarNavigationGroup.vue';
 import { brand } from '#shared/brand';
 
@@ -20,6 +21,7 @@ watch(() => route.fullPath, () => {
 
 const { threads, pending, refresh } = useThreadList();
 const { activeId } = useWorkspaces();
+const vault = useWorkspaceVault();
 useExecutionFeed();
 const workspaceThreads = computed(() => threads.value.filter(t => t.workspaceId === activeId.value));
 async function openWorkspaceView(view: 'overview' | 'testing' | 'material') {
@@ -32,7 +34,7 @@ const workspaceNavigation = computed(() => [
   { label: 'Översikt', icon: 'i-lucide-house', view: 'overview' as const },
   { label: 'Testning', icon: 'i-lucide-list-checks', view: 'testing' as const },
   { label: 'Material', icon: 'i-lucide-folder-open', view: 'material' as const },
-].map(item => ({ ...item, disabled: !activeId.value, active: hasWorkspace.value && route.query.view !== 'workspaces' && (route.query.workspaceView || 'overview') === item.view, onSelect: () => openWorkspaceView(item.view) })));
+].map(item => ({ ...item, disabled: !activeId.value, active: hasWorkspace.value && route.query.view !== 'workspaces' && (route.query.workspaceView || 'overview') === item.view, onSelect: () => openWorkspaceView(item.view) })).concat([{ label: 'Vault', icon: 'i-lucide-key-round', view: 'overview', disabled: !activeId.value, active: false, onSelect: async () => { if (activeId.value) vault.open(activeId.value); sidebarOpen.value = false; } }]));
 watch(() => route.fullPath, () => { sidebarOpen.value = false; });
 const headerTitle = computed(() => route.path === "/"
   ? "New chat"
@@ -226,7 +228,7 @@ defineShortcuts({
         />
       </div>
     </div>
-    <ClientOnly><AgentActivityPanel /></ClientOnly>
+    <ClientOnly><AgentActivityPanel /><WorkspaceVault /></ClientOnly>
   </UDashboardGroup>
 </template>
 

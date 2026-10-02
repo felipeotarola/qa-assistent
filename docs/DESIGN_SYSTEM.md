@@ -106,6 +106,13 @@ connections and trash are always available. The existing view tabs remain
 navigation. `WorkspaceDestinations` is a controlled dialog opened from this
 menu; the upload input stays mounted outside the menu portal.
 
+Vault is a permanent workspace-header and sidebar action. `WorkspaceVault` is
+mounted once by the shell; job cards and Otto's chat report open this same dialog.
+It accepts repository-scoped variables before a setup plan exists. Saved values
+never return to the client; drafts stay local and are cleared on close or workspace
+change. Saving keys does not execute code. Continuing requires a verified setup
+plan and an explicit user action that grants only its listed variables.
+
 When a workspace has a Linear destination, its Linear tab reads the selected
 project through an authenticated, project/team-scoped endpoint. Overview,
 paginated issues and project documents remain provider data, not duplicated
