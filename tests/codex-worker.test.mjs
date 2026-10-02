@@ -6,6 +6,25 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { CodexWorker, visibleJob } from '../infra/codex-worker/worker.mjs';
 import { threadOptions } from '../infra/codex-worker/client.mjs';
+import { vaultContext } from '../infra/codex-worker/vault-context.mjs';
+
+test('vault inventory carries names, never values, and distinguishes unchecked inventory', () => {
+  const context = vaultContext({ entries: [{ repoUrl: 'https://github.com/example/repo', configuredNames: ['DATABASE_URL', 'NODE_OPTIONS'], values: { DATABASE_URL: 'private-value' } }], values: 'private-root' });
+  assert.match(context, /DATABASE_URL/);
+  assert.match(context, /NOT that they are applied/);
+  assert.ok(!context.includes('private-value') && !context.includes('private-root') && !context.includes('NODE_OPTIONS'));
+  assert.match(vaultContext(), /not checked/);
+  assert.match(vaultContext({ entries: [] }), /"entries":\[\]/);
+});
+
+test('worker keeps its vault snapshot on retry without submitting credentials', async t => {
+  const { worker, input } = await fixture(t);
+  const first = await worker.rpc({ ...input, vault: { entries: [{ repoUrl: 'https://github.com/example/repo', configuredNames: ['DATABASE_URL'], values: { DATABASE_URL: 'never-save-this' } }] } });
+  const retry = await worker.rpc({ ...input, vault: { entries: [] } });
+  assert.equal(first.vaultContext, retry.vaultContext);
+  assert.match(first.vaultContext, /DATABASE_URL/);
+  assert.ok(!JSON.stringify(worker.jobs.get(input.jobId)).includes('never-save-this'));
+});
 
 async function fixture(t) {
   const directory = await mkdtemp(join(tmpdir(), 'qaa-codex-'));

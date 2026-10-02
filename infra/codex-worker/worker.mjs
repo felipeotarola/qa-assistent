@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { CodexClient, threadOptions } from './client.mjs';
+import { vaultContext } from './vault-context.mjs';
 
 const terminal = job => !['starting', 'running', 'configuring'].includes(job.status);
 const uuid = value => typeof value === 'string' && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value);
@@ -80,7 +81,7 @@ export class CodexWorker {
       if (this.environments?.values.has(input.id)) throw new Error('This environment contains repository credentials. Use its existing configuration/preview controls; new agent shell tasks require a separate environment.');
       if (s.status !== 'ready') throw new Error('Sandbox is not running');
       if (this.active.size) throw new Error('Codex pilot is busy. Inspect the existing job before submitting another.');
-      const created = { jobId: input.jobId, id: input.id, owner: input.owner, workspaceId: input.workspaceId, userId: input.userId, task: input.task, status: 'starting', message: 'Codex förbereder uppdraget', processes: [], commands: {}, inspected: false, createdAt: new Date().toISOString() };
+      const created = { jobId: input.jobId, id: input.id, owner: input.owner, workspaceId: input.workspaceId, userId: input.userId, task: input.task, vaultContext: vaultContext(input.vault), status: 'starting', message: 'Codex förbereder uppdraget', processes: [], commands: {}, inspected: false, createdAt: new Date().toISOString() };
       this.jobs.set(created.jobId, created); this.active.set(created.jobId, {}); await this.save(created);
       void this.run(created).catch(() => this.finish(created, 'failed', 'Codex kunde inte slutföra uppdraget. Kontrollera inloggning och worker.')).catch(() => {});
       return visibleJob(created);
@@ -159,7 +160,7 @@ export class CodexWorker {
     });
     if (terminal(job)) return;
     job.status = 'running'; job.message = 'Codex arbetar med repot'; await this.update(job);
-    await client.request('turn/start', { threadId: result.thread.id, input: [{ type: 'text', text: job.task, text_elements: [] }] });
+    await client.request('turn/start', { threadId: result.thread.id, input: [{ type: 'text', text: `${job.task}\n\n${job.vaultContext || vaultContext()}`, text_elements: [] }] });
   }
   async finish(job, status, message) {
     if (terminal(job)) return;

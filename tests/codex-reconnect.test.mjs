@@ -89,6 +89,7 @@ function apiFixture({ denied = false } = {}) {
       return saved;
     }, receiveSetupResult: async () => {} },
     '../../../shared/repository-map': {},
+    '../../utils/project-vault': { listVaultEntries: async () => { throw new Error('Historical status must not inspect credentials'); } },
   }, { defineEventHandler: fn => fn, readBody: async body => body, createError: options => new Error(options.statusMessage) });
   return { handler, calls, body: { userId, threadId, jobId, action: 'status', sessionKey: 'new-generation' } };
 }

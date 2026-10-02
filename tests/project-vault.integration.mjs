@@ -23,7 +23,7 @@ async function identity() {
     const response = await fetch(origin + path, { method, headers: { cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join('; '), 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
     return { status: response.status, body: await response.json(), cache: response.headers.get('cache-control') };
   };
-  return { email, password, api };
+  return { email, password, api, userId: result.data.user.id };
 }
 try {
   const user = await identity(), other = await identity();
@@ -49,6 +49,16 @@ try {
   const updated = await user.api(path, 'PUT', { repoUrl, expectedRevision: 1, values: { TEST_KEY: 'updated-fixture' }, forget: ['TEST_URL'] });
   assert.equal(updated.status, 200); assert.deepEqual(updated.body.configuredNames, ['TEST_KEY']);
   assert.equal((await user.api(`/api/workspaces/${id}/setup-jobs`)).body.jobs.length, 0, 'Saving keys does not start work');
+  const thread = await user.api('/api/threads', 'POST', { workspaceId: id, title: 'Vault metadata verification' });
+  assert.equal(thread.status, 201);
+  const inventory = async userId => fetch(origin + '/api/internal/vault', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.INTERNAL_API_SECRET}` }, body: JSON.stringify({ userId, threadId: thread.body.thread.id }) });
+  assert.equal((await fetch(origin + '/api/internal/vault', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 401);
+  assert.equal((await inventory(other.userId)).status, 404);
+  const metadata = await inventory(user.userId);
+  assert.equal(metadata.status, 200);
+  const inventoryBody = await metadata.json();
+  assert.deepEqual(inventoryBody.entries[0].configuredNames, ['TEST_KEY']);
+  assert.ok(!JSON.stringify(inventoryBody).includes('updated-fixture'));
   console.log('PASS: encrypted persistence, masked responses, no-store, ownership, revision conflicts, reserved variables, deletion and no execution');
   if (process.env.KEEP_VAULT_FIXTURE === '1') {
     await writeFile('.data/vault-fixture.json', JSON.stringify({ email: user.email, password: user.password, workspaceId: id, users }));
@@ -57,7 +67,10 @@ try {
   }
 } finally {
   if (!keep) {
-    for (const id of workspaces) await db`delete from pat_workspaces where id=${id}`;
+    for (const id of workspaces) {
+      await db`delete from pat_threads where workspace_id=${id}`;
+      await db`delete from pat_workspaces where id=${id}`;
+    }
     for (const id of users) await admin.auth.admin.deleteUser(id);
   }
   await db.end();

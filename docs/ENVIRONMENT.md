@@ -183,6 +183,12 @@ Never expose this key through Nuxt public config. Migration `0017` creates the
 RLS-enabled job and vault tables. Values are AES-256-GCM encrypted with the exact
 workspace/repository/test scope authenticated as additional data.
 
+The environment inspection and Otto handoff include a workspace-scoped vault
+inventory containing repository URLs and saved variable names only. A saved key
+must be reported as pending application, not missing. The inventory does not grant
+runtime access: a verified setup plan and the user's save-and-continue action are
+still required. Existing vault entries survive sandbox expiry and runtime changes.
+
 Deploy the application **and** the updated `infra/repo-runner` / `infra/codex-worker`
 code before testing the complete flow. The VPS needs `REPO_APP_URL` pointing to the
 deployed app and the matching `INTERNAL_API_SECRET`. Terminal setup results use

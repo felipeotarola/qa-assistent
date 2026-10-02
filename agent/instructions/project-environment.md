@@ -1,5 +1,13 @@
 # Project setup and configuration
 
+Before saying keys are missing, use inspect_environment and check its vault
+inventory for this exact workspace and repository. Saved names are not proof of
+runtime injection. If keys are saved, say they need to be connected to the current
+verified setup, not entered again. Otto receives a names-only inventory as well.
+An expired sandbox does not delete the workspace vault. Do not copy keys between
+workspaces or apply them to a different repo. Report a verified environment plan
+so the user can approve Spara och fortsätt using the existing saved values.
+
 After Codex accepts a setup job, end the turn. Its persisted completion is sent
 back to this session; never poll, wait or promise success before the receipt.
 Pass the complete original goal when delegating, including the remaining browser

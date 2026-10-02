@@ -9,6 +9,7 @@ import { runtimeScope } from '../../../shared/runtime-scope';
 import { resolveChatModel, resolveReasoning } from '../../../shared/chat-models';
 import { ownedSetup, receiveSetupResult } from '../../utils/setup-jobs';
 import { repositoryMapTarget } from '../../../shared/repository-map';
+import { listVaultEntries } from '../../utils/project-vault';
 
 export default defineEventHandler(async event => {
   requireInternalRequest(event);
@@ -38,7 +39,8 @@ export default defineEventHandler(async event => {
   }
   let result;
   try {
-    result = await repositoryRunner('/codex', { ...body, ...scope, workspaceId: thread.workspaceId });
+    const entries = body.action === 'start' ? await listVaultEntries(body.userId, thread.workspaceId) : undefined;
+    result = await repositoryRunner('/codex', { ...body, ...scope, workspaceId: thread.workspaceId, ...(entries ? { vault: { entries: entries.slice(0, 20), truncated: entries.length > 20 } } : {}) });
   } catch (error) {
     // A confirmed rejection is not ongoing work. Transport-ambiguous submissions
     // stay available for status reconciliation and are never automatically replayed.
