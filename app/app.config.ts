@@ -1,4 +1,4 @@
-import { brand } from '../shared/brand';
+import { brand } from '#shared/brand';
 
 export default defineAppConfig({
   site: {
