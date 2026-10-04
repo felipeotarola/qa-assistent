@@ -11,8 +11,9 @@ import { REVIEWER_VERSION, REVIEW_MODEL, reviewRules, type ReviewInput, type Rev
 import { runtimeScope } from '../../shared/runtime-scope';
 
 export const hashReview = (input: unknown) => createHash('sha256').update(JSON.stringify(input)).digest('hex');
-export function autoReviewEnabled(workspaceId: string) {
-  return (process.env.RESULT_REVIEW_WORKSPACES || '').split(',').map(s => s.trim()).includes(workspaceId);
+export function autoReviewEnabled(_workspaceId: string) {
+  // Automatic review is part of finishing a test. Explicit emergency opt-out only.
+  return process.env.RESULT_REVIEW_ENABLED !== 'false';
 }
 type Reader = Pick<typeof db, 'select'>;
 export async function buildReviewInput(workspaceId: string, runId: string, reader: Reader = db): Promise<ReviewInput> {

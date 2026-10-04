@@ -3,11 +3,19 @@ import { agentIdentities } from '#shared/agent-identities';
 import AgentAvatar from './AgentAvatar.vue';
 import { assessmentLabels } from '#shared/result-assessment';
 const props = defineProps<{ workspaceId: string; runId: string; requirements: { id: string; requirement: string }[] }>();
-const { data, refresh, error: loadError } = useResultAssessments(false);
+const { refresh, error: loadError } = useResultAssessments(false);
 const requestFetch = useRequestFetch();
 const detail = useAsyncData(() => `result-assessment-${props.workspaceId}-${props.runId}`, () => requestFetch<{ assessments: import('#shared/result-assessment').AssessmentView[] }>(`/api/workspaces/${props.workspaceId}/assessments`, { query: { runId: props.runId } }));
-const current = computed(() => data.value?.workspaceId === props.workspaceId && data.value.assessments.some(a => a.runId === props.runId) ? data.value.assessments.find(a => a.runId === props.runId) : detail.data.value?.assessments[0]);
+const current = computed(() => detail.data.value?.assessments[0]);
 const busy = ref(false); const error = ref('');
+let timer: ReturnType<typeof setTimeout> | undefined;
+let disposed = false;
+async function pollDetail() {
+  try { if (['queued', 'running'].includes(current.value?.status || '')) await detail.refresh(); }
+  finally { if (!disposed) timer = setTimeout(pollDetail, 5000); }
+}
+onMounted(() => { timer = setTimeout(pollDetail, 5000); });
+onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
 async function request() {
   busy.value = true; error.value = '';
   try { await $fetch(`/api/workspaces/${props.workspaceId}/assessments`, { method: 'POST', body: { runId: props.runId } }); await Promise.all([refresh(), detail.refresh()]); }
@@ -20,6 +28,7 @@ async function request() {
     <p class="flex items-center gap-2 text-sm font-semibold"><AgentAvatar role="reviewer" class="size-9" />{{ agentIdentities.reviewer.name }} · Resultatgranskning</p>
     <p class="text-xs text-muted">Separat granskning av underlaget. Originalresultatet ändras inte.</p>
     <p v-if="loadError || detail.error.value || error" role="alert" class="text-sm text-error">{{ error || 'Granskningsstatus kunde inte hämtas.' }}</p>
+    <p v-else-if="!current && !detail.pending.value" class="text-sm text-muted">Inte granskad. Klara kan även granska blockerade och underkända resultat. Saknas underlag visar hon vad som behöver kompletteras.</p>
     <template v-if="current">
       <p v-if="current.stale" class="text-sm text-warning">Underlaget har ändrats eller tagits bort sedan denna granskning beställdes.</p>
       <p v-if="['queued', 'running'].includes(current.status)" role="status" class="text-sm">{{ current.status === 'running' ? 'Granskar resultat…' : 'Granskning köad' }}</p>
@@ -44,6 +53,6 @@ async function request() {
         </template></UCollapsible>
       </template>
     </template>
-    <UButton v-if="!current || current.stale || current.status === 'failed'" :label="current?.status === 'failed' && !current.stale ? 'Försök granska igen' : current ? 'Granska aktuellt underlag' : 'Granska resultat'" icon="i-lucide-scan-eye" variant="soft" :loading="busy" @click="request" />
+    <UButton v-if="!current || current.stale || current.status === 'failed'" :label="current?.status === 'failed' && !current.stale ? 'Försök granska igen' : current ? 'Granska aktuellt underlag' : 'Låt Klara granska'" icon="i-lucide-scan-eye" variant="soft" :loading="busy" :disabled="detail.pending.value || !!loadError || !!detail.error.value" @click="request" />
   </section>
 </template>

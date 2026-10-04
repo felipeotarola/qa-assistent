@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr';
 import { del } from '@vercel/blob';
 import postgres from 'postgres';
 import { Client } from 'eve/client';
+import { agentIdentities } from '../shared/agent-identities.ts';
 
 if (process.env.RUN_RESULT_REVIEW_TESTS !== '1') throw new Error('Set RUN_RESULT_REVIEW_TESTS=1; creates temporary fixtures and calls the review model.');
 const origin = 'http://localhost:3000';
@@ -41,6 +42,11 @@ try {
   const result = { outcome: 'passed', actual: 'All navigation links worked.', unverified: '', observations: [], evidenceItemIds: [evidence.id], checks: run.checks.map(c => ({ id: c.id, status: 'verified', actual: 'Navigation worked.' })) };
   const finished = await api('/api/internal/test-run', 'POST', { userId, threadId, action: 'finish', runId: run.id, result }, true);
   assert.equal(finished.status, 200);
+  assert.equal((await sql`select count(*)::int n from pat_result_assessments where run_id = ${run.id}`)[0].n, 1, 'FINISH automatically persists a review without an allowlist');
+  assert.equal((await api('/api/internal/test-run', 'POST', { userId, threadId, action: 'finish', runId: run.id, result }, true)).status, 200);
+  const requestedFromChat = await api('/api/internal/test-run', 'POST', { userId, threadId, action: 'assess', runId: run.id }, true);
+  assert.equal(requestedFromChat.status, 200);
+  assert.equal(requestedFromChat.data.assessments.length, 1);
   const path = `/api/workspaces/${a}/assessments`;
   assert.equal((await fetch(origin + path)).status, 401);
   assert.equal((await fetch(`${origin}/api/internal/result-reviews/drain`, { method: 'POST' })).status, 401);
@@ -82,7 +88,7 @@ try {
     if (events.filter(e => e.type === 'turn.completed').length >= 2) break;
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
-  assert.ok(JSON.stringify(events).includes('Resultatgranskaren har återrapporterat'));
+  assert.ok(JSON.stringify(events).includes(`${agentIdentities.reviewer.name}, resultatgranskaren, har återrapporterat`));
   assert.ok(events.filter(e => e.type === 'turn.completed').length >= 2, 'V must finish the review summary');
   assert.equal(events.filter(e => e.type === 'action.result').length, 0, 'Review feedback must not invoke tools');
   const priorTurns = events.filter(e => e.type === 'turn.started').length;
@@ -103,6 +109,22 @@ try {
   assert.equal(staleWrite.length, 0);
   assert.deepEqual((await sql`select result from pat_test_runs where id = ${run.id}`)[0].result, result);
   console.log('PASS changed evidence invalidates assessment; exhausted lease fails safely; stale worker cannot commit');
+  const blockedRun = (await api('/api/internal/test-run', 'POST', { userId, threadId, action: 'start', itemId: plan.id, caseId: plan.content.cases[0].id, expectedVersion: 1, requestId: randomUUID(), environment: 'Blocked fixture' }, true)).data;
+  const blockedResult = { outcome: 'blocked', actual: 'HTTP 500 prevents testing', unverified: 'All steps', observations: [], evidenceItemIds: [] };
+  assert.equal((await api('/api/internal/test-run', 'POST', { userId, threadId, action: 'finish', runId: blockedRun.id, result: blockedResult }, true)).status, 200);
+  assert.equal((await sql`select count(*)::int n from pat_result_assessments where run_id=${blockedRun.id}`)[0].n, 1);
+  let blocked;
+  for (let attempt = 0; attempt < 15; attempt++) {
+    [blocked] = await sql`select status,assessment,model from pat_result_assessments where run_id=${blockedRun.id}`;
+    if (blocked.status === 'completed') break;
+    await api('/api/internal/result-reviews/drain', 'POST', {}, true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  assert.equal(blocked.status, 'completed');
+  assert.equal(blocked.assessment.verdict, 'needs_evidence');
+  assert.equal(blocked.model, 'deterministic-rules');
+  assert.deepEqual((await sql`select result from pat_test_runs where id=${blockedRun.id}`)[0].result, blockedResult);
+  console.log('PASS blocked run automatically reviewed without model invocation or retest');
 } catch (error) { console.error('Integration failure:', error.message); throw error; } finally {
   if (session) await session.cancel().catch(() => {});
   const paths = await sql`select i.blob_path from pat_workspace_items i join pat_workspaces w on w.id=i.workspace_id where w.user_id=${userId} and i.blob_path is not null`;

@@ -7,7 +7,7 @@ import { ownedItem, requireWorkspace } from './workspaces';
 import { testRunActionSchema, runChecks, runVerificationError } from '../../shared/test-run';
 import { testRunReviews } from '../db/schema/test-requirements';
 import { runReviewSchema } from '../../shared/test-requirement';
-import { autoReviewEnabled, enqueueReview, listAssessments } from './result-assessments';
+import { autoReviewEnabled, enqueueReview, listAssessments, requestReview } from './result-assessments';
 import { testCaptures } from '../db/schema/test-captures';
 
 export async function listTestRuns(userId: string, workspaceId: string, itemId?: string) {
@@ -43,6 +43,10 @@ export async function testRunAction(userId: string, workspaceId: string, threadI
   const action = parsed.data;
   await requireWorkspace(userId, workspaceId);
   if (action.action === 'list') return listTestRuns(userId, workspaceId, action.itemId);
+  if (action.action === 'assess') {
+    await requestReview(userId, workspaceId, action.runId);
+    return { runId: action.runId, assessments: await listAssessments(userId, workspaceId, action.runId), note: 'Granskning beställd. Inga tester startas och originalresultatet ändras inte. Bekräfta bara en bedömning som faktiskt är klar.' };
+  }
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`workspace-content:${workspaceId}`}, 0))`);
     const key = action.action === 'start' ? action.requestId : action.runId;
@@ -64,7 +68,10 @@ export async function testRunAction(userId: string, workspaceId: string, threadI
     const [run] = await tx.select().from(testRuns).where(and(eq(testRuns.workspaceId, workspaceId), eq(testRuns.id, action.runId)));
     if (!run) throw createError({ statusCode: 404, statusMessage: 'Run not found' });
     if (run.result) {
-      if (isDeepStrictEqual(run.result, action.result)) return run;
+      if (isDeepStrictEqual(run.result, action.result)) {
+        if (autoReviewEnabled(workspaceId)) await enqueueReview(tx, userId, workspaceId, run.id, run.threadId);
+        return run;
+      }
       throw createError({ statusCode: 409, statusMessage: 'Final results are immutable. Start a new run.' });
     }
     const verificationError = runVerificationError(run.snapshot, action.result);

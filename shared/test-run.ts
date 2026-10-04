@@ -23,6 +23,7 @@ export const runResultSchema = z.object({
 }).refine(r => r.outcome !== 'passed' || (!r.unverified.trim() && r.observations.every(o => o.kind === 'note') && (!r.checks || r.checks.every(c => c.status === 'verified'))), 'Unverified requirements or unresolved observations cannot be passed');
 export const testRunActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('list'), itemId: z.string().uuid() }),
+  z.object({ action: z.literal('assess'), runId: z.string().uuid() }),
   z.object({ action: z.literal('start'), itemId: z.string().uuid(), caseId: z.string().uuid(), expectedVersion: z.union([z.number(), z.string().regex(/^[1-9]\d*$/).transform(Number)]).pipe(z.number().int().positive()), requestId: z.string().uuid(), environment: z.string().trim().min(1).max(1000), target: testTargetSchema.optional() }),
   z.object({ action: z.literal('finish'), runId: z.string().uuid(), result: z.union([
     runResultSchema,

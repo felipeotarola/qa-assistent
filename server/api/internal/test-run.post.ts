@@ -10,6 +10,6 @@ export default defineEventHandler(async event => {
   const thread = await getThreadForUser(userId, threadId);
   if (!thread?.workspaceId) throw createError({ statusCode: 404, statusMessage: 'Workspace not found' });
   const result = await testRunAction(userId, thread.workspaceId, threadId, body);
-  if (body.action === 'finish') event.waitUntil(processReviewQueue().catch(() => console.warn('[result-review] Queue kick deferred')));
+  if (body.action === 'finish' || body.action === 'assess') event.waitUntil(processReviewQueue().catch(() => console.warn('[result-review] Queue kick deferred')));
   return result;
 });

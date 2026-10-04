@@ -27,11 +27,14 @@ assessments never enter that table or `effectiveRunOutcome`.
 ## Enable and run
 
 Apply `pnpm db:migrate` before running updated routes. No VPS worker update is
-needed. On the Nuxt service set `RESULT_REVIEW_WORKSPACES` to a comma-separated
-allowlist of workspace UUIDs for automatic review of future finished tests.
-Default is no automatic review. An authenticated owner can request a review of
+needed. Automatic review is enabled for all future finished tests, including
+blocked, failed and interrupted runs. `RESULT_REVIEW_ENABLED=false` is an explicit
+operational opt-out; the former workspace allowlist is no longer needed.
+An authenticated owner can request a review of
 an existing finished run using **Granska resultat** in Testning without enabling
-the whole workspace. No historical results are automatically backfilled.
+the whole workspace. V can also use `test_run assess` with a finished run ID when
+the user requests review. Summarizing existing assessments remains read-only.
+No historical results are automatically backfilled.
 
 Finishing a test and enqueueing its automatic assessment share one transaction.
 HTTP handlers kick the queue using `event.waitUntil`; the queue remains durable
@@ -67,8 +70,8 @@ identified before notifying V; notifications send at most 20 results per batch.
 Original outcomes are
 unchanged if review fails. The reviewer never launches follow-up tests.
 
-Start with one workspace. Check real browser and repository evidence, errors,
-latency and model usage before expanding the allowlist. No model assessment is
+Monitor real browser and repository evidence, errors,
+latency and model usage as automatic reviews run. No model assessment is
 a guarantee of truth. Review references/coverage are validated by code; semantic
 accuracy must be evaluated against fixtures and real outcomes.
 
@@ -78,7 +81,7 @@ accuracy must be evaluated against fixtures and real outcomes.
 unknown references, exact coverage, contradiction aggregation and original
 result preservation. The opt-in integration/evaluation scripts cover real DB
 queue behavior and model responses. Run typecheck, lint and `pnpm build:agent`
-before deployment. Deploying is separate from enabling automatic review.
+before deployment. Automatic review is enabled by default after deployment.
 
 Opt-in verification (against the local dev server and configured test services):
 
@@ -100,4 +103,5 @@ Verified locally on 2026-10-01: 142 unit tests, all six model scenarios, integra
 with private evidence plus a real Eve summary (no tool calls), typecheck, lint,
 Nuxt production build and standalone Eve build. Browser-based visual acceptance
 is still outstanding: the connected browser timed out during Page.navigate.
-Automatic review remains disabled unless a workspace is explicitly allowlisted.
+Automatic review is now enabled by default; the original rollout verification
+above predates that default.

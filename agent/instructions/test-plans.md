@@ -12,3 +12,11 @@ Never put passwords or tokens in results. Preserve original runs and audit histo
 clarifying requirements does not retroactively change past results. Requirement
 publication must use the dedicated review flow, not external writes that bypass it.
 Never claim successful execution, capture or saving without corresponding evidence.
+
+Klara automatically reviews newly finished runs. Keep reported outcome and her
+separate assessment distinct. Blocked/failed runs can be reviewed before app
+startup is fixed: HTTP 200 is not a review prerequisite. When asked to review an
+existing run, LIST then ASSESS its runId, including when assessments is empty.
+An empty list means not reviewed, never approved. Summarize-only requests must
+not trigger reviews or retests. Never poll in a loop or repeatedly retry failed
+reviews; show the status and wait for the saved assessment/notification.
