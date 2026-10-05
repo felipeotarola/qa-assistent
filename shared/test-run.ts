@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { missionBindingSchema } from './mission-binding.ts';
 import type { TestCase } from './test-plan';
 import type { RunReview } from './test-requirement';
 import type { AssessmentView } from './result-assessment';
@@ -24,7 +25,7 @@ export const runResultSchema = z.object({
 export const testRunActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('list'), itemId: z.string().uuid() }),
   z.object({ action: z.literal('assess'), runId: z.string().uuid() }),
-  z.object({ action: z.literal('start'), itemId: z.string().uuid(), caseId: z.string().uuid(), expectedVersion: z.union([z.number(), z.string().regex(/^[1-9]\d*$/).transform(Number)]).pipe(z.number().int().positive()), requestId: z.string().uuid(), environment: z.string().trim().min(1).max(1000), target: testTargetSchema.optional() }),
+  z.object({ action: z.literal('start'), mission: missionBindingSchema.optional(), itemId: z.string().uuid(), caseId: z.string().uuid(), expectedVersion: z.union([z.number(), z.string().regex(/^[1-9]\d*$/).transform(Number)]).pipe(z.number().int().positive()), requestId: z.string().uuid(), environment: z.string().trim().min(1).max(1000), target: testTargetSchema.optional() }),
   z.object({ action: z.literal('finish'), runId: z.string().uuid(), result: z.union([
     runResultSchema,
     z.string().max(200000).transform((value, ctx) => {

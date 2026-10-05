@@ -5,6 +5,8 @@ import { db } from '@nuxthub/db';
 import { repositories, repositoryRuns } from '../db/schema/repositories';
 import { requireWorkspace } from './workspaces';
 import { repositoryActionSchema, repoTerminal, type RepoJob } from '../../shared/repository';
+import { runtimeScope } from '../../shared/runtime-scope';
+import { bindMissionSource, validateMissionBinding } from './missions';
 export async function saveRepositoryJob(job: RepoJob) {
   const [run] = await db.select().from(repositoryRuns).where(eq(repositoryRuns.id, job.id));
   if (!run) throw createError({ statusCode: 404, statusMessage: 'Run not found' });
@@ -49,11 +51,12 @@ export async function getRepositoryRun(userId: string, workspaceId: string, runI
   if (!run) throw createError({ statusCode: 404, statusMessage: 'Körningen saknas.' });
   return run;
 }
-export async function repositoryAction(userId: string, workspaceId: string, raw: unknown) {
+export async function repositoryAction(userId: string, workspaceId: string, raw: unknown, threadId?: string) {
   await requireWorkspace(userId, workspaceId);
   const parsed = repositoryActionSchema.safeParse(raw);
   if (!parsed.success) throw createError({ statusCode: 400, statusMessage: 'Kontrollera repository-URL, branch och script.' });
   const value = parsed.data;
+  if (value.action === 'start' && value.mission) { if (!threadId) throw createError({ statusCode: 400, statusMessage: 'Mission runs require a chat' }); await validateMissionBinding(userId, workspaceId, value.mission); }
   if (value.action === 'list') return listRepositories(userId, workspaceId);
   if (value.action === 'connect') {
     const { action: _action, ...config } = value;
@@ -69,9 +72,10 @@ export async function repositoryAction(userId: string, workspaceId: string, raw:
   const [repository] = await db.select().from(repositories).where(and(eq(repositories.id, value.repositoryId), eq(repositories.workspaceId, workspaceId)));
   if (!repository) throw createError({ statusCode: 404, statusMessage: 'Repository saknas.' });
   const config = { url: repository.url, ref: repository.ref, script: value.script ?? repository.script, mode: value.mode, workspaceId, ...(value.directory ? { directory: value.directory } : {}), ...(value.args?.length ? { args: value.args } : {}) };
-  await db.insert(repositoryRuns).values({ id: randomUUID(), workspaceId, repositoryId: repository.id, requestId: value.requestId, config }).onConflictDoNothing();
+  await db.insert(repositoryRuns).values({ id: randomUUID(), runtime: runtimeScope(), workspaceId, repositoryId: repository.id, requestId: value.requestId, config }).onConflictDoNothing();
   const [run] = await db.select().from(repositoryRuns).where(and(eq(repositoryRuns.workspaceId, workspaceId), eq(repositoryRuns.requestId, value.requestId)));
   if (!run || run.repositoryId !== repository.id || !isDeepStrictEqual(run.config, config)) throw createError({ statusCode: 409, statusMessage: 'Begäran har redan använts för en annan körning.' });
+  await bindMissionSource(userId, workspaceId, threadId ?? '', value.mission, 'repository', run.id);
   if (run.job && repoTerminal(run.job.status)) return run.job;
   let job: RepoJob;
   try {

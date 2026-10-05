@@ -4,6 +4,7 @@ import { vercelOidc } from "eve/channels/auth";
 import { createRequestSupabase } from "../../shared/supabase";
 import { CHAT_MODEL_HEADER, REASONING_HEADER, resolveChatModel, resolveReasoning } from "../../shared/chat-models";
 import { BROWSER_THREAD_HEADER } from "../../shared/browser";
+import { CHAT_MESSAGE_HEADER } from '../../shared/chat-recovery';
 
 function appSession(): AuthFn<Request> {
   return async (request) => {
@@ -16,6 +17,7 @@ function appSession(): AuthFn<Request> {
     return {
       attributes: {
         browserThreadId: request.headers.get(BROWSER_THREAD_HEADER) ?? "",
+        browserMessageId: /^[a-f0-9-]{36}$/i.test(request.headers.get(CHAT_MESSAGE_HEADER) ?? '') ? request.headers.get(CHAT_MESSAGE_HEADER)! : '',
         chatModel: resolveChatModel(request.headers.get(CHAT_MODEL_HEADER)),
         reasoning: resolveReasoning(request.headers.get(REASONING_HEADER)),
         email: data.user.email ?? "",

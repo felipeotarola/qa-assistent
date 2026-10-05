@@ -63,7 +63,7 @@ const images = computed(() => imageReferences(props.item.content));
 const editVersion = ref(0);
 const versions = ref<Array<{ version: number; title: string; content: ItemContent }>>([]);
 const base = computed(() => `/api/workspaces/${props.item.workspaceId}/items/${props.item.id}`);
-const isEditable = computed(() => ["text", "table", "test_plan", "diagram"].includes(props.item.content.kind));
+const isEditable = computed(() => !props.item.reportId && ["text", "table", "test_plan", "diagram"].includes(props.item.content.kind));
 function edit(content = props.item.content, name = props.item.title) {
   title.value = name; editVersion.value = props.item.version;
   if (content.kind !== "text" && content.kind !== "table" && content.kind !== "test_plan" && content.kind !== "diagram") return;
@@ -102,11 +102,12 @@ async function history() {
           <UButton label="Historik" size="sm" icon="i-lucide-history" variant="ghost" color="neutral" @click="history" />
           <USelect v-if="versions.length" placeholder="Återställ version…" :items="versions.map(v => ({ label: `Version ${v.version}`, value: v.version }))" aria-label="Återställ version" @update:model-value="value => { const v = versions.find(v => v.version === value); if (v) edit(v.content, v.title); }" />
         </template>
-        <a v-else :href="`${base}/file`" target="_blank" rel="noopener" class="text-sm underline">{{ item.content.kind === 'image' ? 'Öppna bild' : 'Ladda ner fil' }}</a>
+        <a v-else-if="!item.reportId" :href="`${base}/file`" target="_blank" rel="noopener" class="text-sm underline">{{ item.content.kind === 'image' ? 'Öppna bild' : 'Ladda ner fil' }}</a>
       </div>
     </template>
     <div class="h-full overflow-auto p-4" :class="expanded ? 'text-sm' : 'text-xs'">
-      <template v-if="expanded && editing">
+      <WorkspaceMissionReport v-if="item.reportId && expanded" :workspace-id="item.workspaceId" :report-id="item.reportId" />
+      <template v-else-if="expanded && editing">
         <UInput v-model="title" aria-label="Titel" class="mb-4 w-full" />
         <WorkspaceContentEditor v-model="draft" :workspace-id="item.workspaceId" />
       </template>

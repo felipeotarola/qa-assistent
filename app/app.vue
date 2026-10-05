@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const colorMode = useColorMode();
+const chatSessionRevisions = useState<Record<string, number>>('chat-session-revisions', () => ({}));
 
 const themeColor = computed(() => (colorMode.value === "dark" ? "#1b1718" : "#ffffff"));
 
@@ -17,7 +18,7 @@ useSiteSeo();
     <NuxtLoadingIndicator color="var(--ui-text-highlighted)" />
 
     <NuxtLayout>
-      <NuxtPage />
+      <NuxtPage :page-key="route => `${route.path}:${chatSessionRevisions[String(route.params.id)] ?? 0}`" />
     </NuxtLayout>
   </UApp>
 </template>

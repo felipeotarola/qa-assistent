@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { missionBindingSchema } from './mission-binding.ts';
 import type { ExecutionTelemetry } from './execution';
 export const repositorySchema = z.object({
   url: z.string().max(300).refine(value => /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(value), 'Ange en publik GitHub repository-URL utan token.'),
@@ -8,7 +9,7 @@ export const repositorySchema = z.object({
 export const repositoryActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('list') }),
   z.object({ action: z.literal('connect'), ...repositorySchema.shape }),
-  z.object({ action: z.literal('start'), repositoryId: z.string().uuid(), requestId: z.string().uuid(), mode: z.enum(['inspect', 'test']), script: repositorySchema.shape.script.unwrap().optional(), directory: z.string().max(200).optional(), args: z.array(z.string().max(300)).max(20).optional() }),
+  z.object({ action: z.literal('start'), mission: missionBindingSchema.optional(), repositoryId: z.string().uuid(), requestId: z.string().uuid(), mode: z.enum(['inspect', 'test']), script: repositorySchema.shape.script.unwrap().optional(), directory: z.string().max(200).optional(), args: z.array(z.string().max(300)).max(20).optional() }),
   z.object({ action: z.literal('cancel'), runId: z.string().uuid() }),
 ]);
 export type RepositoryAction = z.infer<typeof repositoryActionSchema>;

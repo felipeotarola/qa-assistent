@@ -10,13 +10,16 @@ import { projectActivity } from '#shared/agent-activity';
 import { latestChatSuggestions } from '#shared/chat-suggestions';
 
 const route = useRoute();
-const chatId = computed(() => route.params.id as string);
+// This component owns exactly one Eve subscription, even during route transitions.
+const threadId = route.params.id as string;
+const chatId = computed(() => threadId);
+const chatSessionRevisions = useState<Record<string, number>>('chat-session-revisions', () => ({}));
 
 // Fetched during the server render too, so the thread's durable session id is
 // known before the chat session binds to it.
 const requestFetch = useRequestFetch();
 
-const { data, error, pending: resumePending } = await useAsyncData(
+const { data, error, pending: resumePending, refresh: refreshThread } = await useAsyncData(
   () => `thread-${chatId.value}`,
   () => requestFetch<{ thread: ThreadRecord }>(`/api/threads/${chatId.value}`),
   { watch: [chatId] },
@@ -42,8 +45,13 @@ const {
   cancel,
   retry,
   savedText,
+  recovering,
   dismissSavedText,
-} = useChatSession(thread.value);
+} = useChatSession(thread.value, async (sessionId) => {
+  await refreshThread();
+  if (error.value || data.value?.thread.sessionId !== sessionId) throw new Error('Kunde inte uppdatera chattens anslutning.');
+  if (route.params.id === threadId) chatSessionRevisions.value[threadId] = (chatSessionRevisions.value[threadId] ?? 0) + 1;
+});
 const suggestions = computed(() => savedText.value || chatError.value ? [] : latestChatSuggestions(messages.value, status.value));
 
 const activity = useAgentActivity();
@@ -204,8 +212,12 @@ function handleInputResponses(responses: Parameters<typeof respond>[0]) {
           >
             <template #header>
               <ChatWorkReport :disabled="isBusy || !!savedText || !!chatError" @suggestion="selectSuggestion" />
+              <p v-if="recovering && (savedText || chatError)" role="status" class="flex items-center gap-2 text-sm text-muted">
+                <UIcon name="i-lucide-refresh-cw" class="motion-safe:animate-spin" />
+                Synkar chatten…
+              </p>
               <ChatRecoveryNotice
-                v-if="chatError || (savedText && !isBusy)"
+                v-if="!recovering && (chatError || (savedText && !isBusy))"
                 :message="recoveryMessage"
                 :saved-text="savedText"
                 @reconnect="retry()"

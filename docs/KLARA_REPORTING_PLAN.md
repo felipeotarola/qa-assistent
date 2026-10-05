@@ -1,6 +1,6 @@
 # Plan för Klaras uppdragsöversikt och rapporter
 
-Status: Förslag inför implementation. Kontrollerat mot det lokala repot 2026-10-04. Dokumentet beskriver planerade ändringar; det bekräftar inte vad som är driftsatt.
+Status: Implementerad och lokalt verifierad 2026-10-04. Se [implementation och drift](KLARA_REPORTING.md) för den levererade utformningen, genomförda kontroller och begränsningar. Detta dokument är den ursprungliga planen och bekräftar inte produktionsdrift.
 
 V ska planera, delegera och följa upp arbetet. Klara ska ha en samlad, spårbar bild av uppdraget, granska slutsatser och skriva rapporter med testresultat, källor, tabeller, grafer och diagram. Användaren ska kunna fortsätta prata med V medan Klara arbetar.
 

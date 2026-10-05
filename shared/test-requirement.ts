@@ -32,4 +32,4 @@ export const runReviewSchema = z.object({
   outcome: z.enum(['passed', 'failed', 'inconclusive']),
   reason: z.string().trim().min(10).max(5000),
 });
-export type RunReview = { id: string; outcome: 'passed' | 'failed' | 'inconclusive'; reason: string; userId: string; createdAt: string };
+export type RunReview = { id: string; outcome: 'passed' | 'failed' | 'inconclusive'; reason: string; userId: string; authorName?: string; createdAt: string };

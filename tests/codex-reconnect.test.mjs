@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
+import { missionBindingSchema } from '../shared/mission-binding.ts';
 
 function load(path, dependencies, globals = {}) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -22,6 +23,7 @@ function toolFixture(probeError) {
   let key = 'expired-generation';
   const tool = load('../agent/tools/codex.ts', {
     'eve/tools': { defineTool: value => value }, zod: { z },
+    '../../shared/mission-binding': { missionBindingSchema },
     '../lib/internal-api': { appOrigin: () => 'https://app.example', internalHeaders: () => ({}) },
     '../../shared/repository-request.mjs': { repositoryRequestId: () => 'stable-submission' },
     '../lib/codex-turn': { codexTurn: { update() {} } },
@@ -77,6 +79,8 @@ function apiFixture({ denied = false } = {}) {
   const saved = { threadId: 'original-thread', sessionKey: 'original-generation' };
   const handler = load('../server/api/internal/codex.post.ts', {
     zod: { z }, '../../utils/internal-api': { requireInternalRequest() {} },
+    '../../../shared/mission-binding': { missionBindingSchema },
+    '../../utils/missions': { validateMissionBinding: async () => { throw new Error('Status cannot change mission'); }, bindMissionSource: async () => { throw new Error('Status cannot bind a mission'); } },
     '../../utils/threads': { getThreadForUser: async () => ({ workspaceId }) },
     '../../utils/sandbox-scope': { sandboxScope: (user, thread, key) => ({ id: `${thread}:${key}`, owner: user }) },
     '../../utils/repositories': { repositoryRunner: async (_path, body) => { calls.push(body); return { status: 'completed' }; } },

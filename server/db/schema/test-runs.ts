@@ -5,6 +5,7 @@ import type { RunResult } from '../../../shared/test-run';
 import type { TestTarget } from '../../../shared/quality';
 
 export const testRuns = pgTable('pat_test_runs', {
+  runtime: text('runtime'),
   id: text('id').primaryKey(),
   workspaceId: text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
   itemId: text('item_id').notNull().references(() => workspaceItems.id, { onDelete: 'cascade' }),

@@ -8,5 +8,6 @@ export default defineEventHandler(async event => {
   const { userId, threadId } = z.object({ userId: z.string().uuid(), threadId: z.string().uuid() }).parse(body);
   const thread = await getThreadForUser(userId, threadId);
   if (!thread?.workspaceId) throw createError({ statusCode: 404, statusMessage: 'Workspace not found' });
-  return repositoryAction(userId, thread.workspaceId, body.input);
+  const result = await repositoryAction(userId, thread.workspaceId, body.input, threadId);
+  return result;
 });

@@ -83,6 +83,16 @@ personal-agent-template/
 3. Tool calls render in [`MessageContentEve.vue`](../app/components/chat/message/MessageContentEve.vue)
 4. Approvals and questions render through [`AgentInputRequest.vue`](../app/components/AgentInputRequest.vue)
 
+Each chat page owns one Eve subscription; switching chats disconnects the local
+stream without cancelling the backend turn. Outgoing messages carry an
+`x-pat-message-id` receipt ID. The authenticated history hook persists this ID
+on `message.received` immediately, and the history endpoint returns accepted IDs
+alongside the current runtime binding. Reopening a chat, focus, online events,
+and polling reconcile saved sends against those receipts and resume the stream
+without resubmitting work. A late runtime binding remounts only the chat page.
+Composer drafts are stored separately. Legacy text-only send copies are retired
+only when their exact text is already in that chat's durable history.
+
 ### Memory recall
 
 1. Eve resolves the `profile` slot's scope to the authenticated principal ([`agent/memory/profile.ts`](../agent/memory/profile.ts))

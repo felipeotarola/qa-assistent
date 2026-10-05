@@ -18,12 +18,18 @@ export async function chatHistory(userId: string, threadId: string) {
   return (await chatHistorySnapshot(userId, threadId)).messages;
 }
 export async function chatHistorySnapshot(userId: string, threadId: string) {
-  if (!await getThreadForUser(userId, threadId)) throw createError({ statusCode: 404, statusMessage: "Thread not found" });
+  const thread = await getThreadForUser(userId, threadId);
+  if (!thread) throw createError({ statusCode: 404, statusMessage: "Thread not found" });
   const roots = db.select({ sessionId: schema.chatRuntimes.sessionId }).from(schema.chatRuntimes).where(eq(schema.chatRuntimes.threadId, threadId));
   const events = await db.select({ sessionId: schema.chatEvents.sessionId, event: schema.chatEvents.event }).from(schema.chatEvents).innerJoin(schema.threads, eq(schema.chatEvents.threadId, schema.threads.id)).where(and(eq(schema.chatEvents.threadId, threadId), eq(schema.threads.userId, userId), inArray(schema.chatEvents.sessionId, roots))).orderBy(asc(schema.chatEvents.emittedAt), asc(schema.chatEvents.id));
   const cursors = new Map<string, string>();
   for (const row of events) cursors.set(row.sessionId, row.event.meta.id);
-  return { messages: projectChatHistory(events), cursors: [...cursors].map(([sessionId, eventId]) => ({ sessionId, eventId })) };
+  const acceptedMessageIds = events.flatMap(({ event }) => {
+    if (event.type !== 'message.received') return [];
+    const id = (event.data as typeof event.data & { clientMessageId?: string }).clientMessageId;
+    return typeof id === 'string' ? [id] : [];
+  });
+  return { messages: projectChatHistory(events), cursors: [...cursors].map(([sessionId, eventId]) => ({ sessionId, eventId })), sessionId: thread.sessionId, acceptedMessageIds };
 }
 
 export async function isChatRoot(userId: string, threadId: string, sessionId: string) {

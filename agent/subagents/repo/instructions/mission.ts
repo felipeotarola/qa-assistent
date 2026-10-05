@@ -1,0 +1,2 @@
+import { defineInstructions } from 'eve/instructions';
+export default defineInstructions({ markdown: 'When V supplies a mission binding (missionId and taskId), preserve it on every repository/codex/research start. It identifies the existing assignment, not a new task to duplicate. Include all returned saved job/material IDs in your concise response. If no binding was supplied, do not invent one or guess from time or title.' });

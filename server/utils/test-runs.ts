@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { runtimeScope } from '../../shared/runtime-scope';
 import { isDeepStrictEqual } from 'node:util';
 import { and, eq, desc, sql, inArray } from 'drizzle-orm';
 import { db } from '@nuxthub/db';
@@ -61,7 +62,7 @@ export async function testRunAction(userId: string, workspaceId: string, threadI
       if (item.version !== action.expectedVersion) throw createError({ statusCode: 409, statusMessage: 'Read the current plan before starting' });
       const snapshot = item.content.kind === 'test_plan' && item.content.cases.find(c => c.id === action.caseId);
       if (!snapshot) throw createError({ statusCode: 404, statusMessage: 'Test case not found' });
-      const [run] = await tx.insert(testRuns).values({ id: randomUUID(), workspaceId, itemId: item.id, caseId: snapshot.id, planVersion: item.version, snapshot, environment: action.environment, target: action.target ?? null, requestId: action.requestId, threadId }).returning();
+      const [run] = await tx.insert(testRuns).values({ id: randomUUID(), runtime: runtimeScope(), workspaceId, itemId: item.id, caseId: snapshot.id, planVersion: item.version, snapshot, environment: action.environment, target: action.target ?? null, requestId: action.requestId, threadId }).returning();
       if (!run) throw createError({ statusCode: 500, statusMessage: 'Run could not be created' });
       return { ...run, checks: runChecks(run.snapshot) };
     }

@@ -4,11 +4,14 @@ import { getThreadForUser } from './threads';
 import { runtimeScope } from '../../shared/runtime-scope';
 import { appOrigin, internalHeaders } from '../../agent/lib/internal-api';
 import { resolveChatModel, resolveReasoning } from '../../shared/chat-models';
+import type { MissionBinding } from '../../shared/mission-binding';
+import { bindMissionSource, validateMissionBinding, sourceMissionBinding } from './missions';
 
-export async function browserJobAction(userId: string, threadId: string, input: { action: 'start' | 'status' | 'cancel'; jobId: string; task?: string; parentSessionId?: string; model?: string; reasoning?: string }) {
+export async function browserJobAction(userId: string, threadId: string, input: { action: 'start' | 'status' | 'cancel'; jobId: string; task?: string; parentSessionId?: string; model?: string; reasoning?: string; mission?: MissionBinding }) {
   const thread = await getThreadForUser(userId, threadId);
   if (!thread?.workspaceId) throw createError({ statusCode: 404, statusMessage: 'Workspace not found' });
   const workspaceId = thread.workspaceId;
+  if (input.action === 'start') await validateMissionBinding(userId, workspaceId, input.mission);
   await db.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`iris:${thread.workspaceId}:${runtimeScope()}`}, 0))`);
     let [job] = await tx.select().from(schema.browserJobs).where(and(eq(schema.browserJobs.id, input.jobId), eq(schema.browserJobs.threadId, threadId), eq(schema.browserJobs.runtime, runtimeScope())));
@@ -21,6 +24,7 @@ export async function browserJobAction(userId: string, threadId: string, input: 
     if (!job) throw createError({ statusCode: 404, statusMessage: 'Job not found' });
     if (input.action === 'start' && input.task !== job.task) throw createError({ statusCode: 409, statusMessage: 'Job ID already used for another task' });
   });
+  if (input.action === 'start') await bindMissionSource(userId, workspaceId, threadId, input.mission, 'browser', input.jobId);
   return db.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`iris-job:${input.jobId}`}, 0))`);
     let [job] = await tx.select().from(schema.browserJobs).where(and(eq(schema.browserJobs.id, input.jobId), eq(schema.browserJobs.threadId, threadId), eq(schema.browserJobs.runtime, runtimeScope())));
@@ -29,7 +33,8 @@ export async function browserJobAction(userId: string, threadId: string, input: 
     if (active && ((input.action === 'start' && !job.sessionId) || input.action === 'cancel')) {
       await tx.update(schema.browserJobs).set({ status: input.action === 'cancel' ? 'cancelled' : 'running', updatedAt: new Date() }).where(eq(schema.browserJobs.id, job.id));
       try {
-      const response = await fetch(`${appOrigin()}/eve/v1/workers/iris`, { method: 'POST', headers: internalHeaders(), signal: AbortSignal.timeout(30000), body: JSON.stringify({ action: input.action, jobId: job.id, task: job.task, userId, threadId, model: job.model, reasoning: job.reasoning }) });
+      const mission = await sourceMissionBinding(workspaceId, 'browser', job.id);
+      const response = await fetch(`${appOrigin()}/eve/v1/workers/iris`, { method: 'POST', headers: internalHeaders(), signal: AbortSignal.timeout(30000), body: JSON.stringify({ action: input.action, jobId: job.id, task: job.task, userId, threadId, model: job.model, reasoning: job.reasoning, mission }) });
       if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error(`Iris dispatch returned HTTP ${response.status} without a confirmed receipt`);
       const result = await response.json() as { sessionId?: string };
       [job] = await tx.update(schema.browserJobs).set({ ...(result.sessionId ? { sessionId: result.sessionId } : {}), status: input.action === 'cancel' ? 'cancelled' : 'running', updatedAt: new Date() }).where(eq(schema.browserJobs.id, job.id)).returning();

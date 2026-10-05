@@ -27,7 +27,7 @@ async function copyExample() {
     <template #header><AppNavbar embedded><template #title><h1 class="text-sm font-semibold">Agenten</h1></template></AppNavbar></template>
     <template #body>
       <div class="app-page space-y-6">
-        <WorkspacePageHeader title="Dina agenter och deras verktyg" description="Huvudagenten samordnar, Iris testar i webbläsaren och Axel arbetar med kod. Otto sköter VPS-miljön och Klara granskar underlaget från sparade testkörningar.">
+        <WorkspacePageHeader title="Dina agenter och deras verktyg" description="Huvudagenten samordnar, Iris testar i webbläsaren och Axel arbetar med kod. Otto sköter VPS-miljön. Klara granskar underlag och skriver rapporter om hela uppdraget.">
           <UButton to="/?view=workspaces" label="Öppna ett workspace" icon="i-lucide-arrow-up-right" variant="outline" color="neutral" />
         </WorkspacePageHeader>
 

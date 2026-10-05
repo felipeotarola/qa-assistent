@@ -7,6 +7,7 @@ export const repositories = pgTable('pat_repositories', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, t => [uniqueIndex('pat_repository_url_idx').on(t.workspaceId, t.url)]).enableRLS();
 export const repositoryRuns = pgTable('pat_repository_runs', {
+  runtime: text('runtime'),
   id: text('id').primaryKey(), workspaceId: text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
   repositoryId: text('repository_id').notNull().references(() => repositories.id, { onDelete: 'cascade' }),
   requestId: text('request_id').notNull(), config: jsonb('config').$type<{ url: string; ref: string; script: string; mode: 'inspect' | 'test'; args?: string[]; directory?: string; workspaceId?: string }>().notNull(),

@@ -22,9 +22,11 @@ function collapse() {
 function reveal(target?: string) { focusTarget.value = target; open.value = true; }
 const panelOpen = computed({ get: () => open.value, set: value => { if (value) reveal(); else collapse(); } });
 const { activeId } = useWorkspaces();
+const { data: missions } = useMissions(true);
+const missionReports = computed(() => missions.value?.missions.flatMap(m => m.reports) ?? []);
 const { data: assessments } = useResultAssessments();
 const reviewJobs = computed(() => assessments.value?.workspaceId === activeId.value ? assessments.value.assessments : []);
-const reviewBusy = computed(() => reviewJobs.value.some(j => ['queued', 'running'].includes(j.status)));
+const reviewBusy = computed(() => [...reviewJobs.value, ...missionReports.value].some(j => ['queued', 'running'].includes(j.status)));
 const reviewDone = computed(() => reviewJobs.value.filter(j => ['completed', 'failed'].includes(j.status)).length);
 const { data: browserJobs, refresh: refreshBrowserJobs } = useBrowserJobs();
 const irisBusy = computed(() => browserJobs.value?.jobs.some(job => ['starting', 'running'].includes(job.status)));
@@ -45,7 +47,7 @@ watchEffect(() => {
 const browser = useState<BrowserView | null>('activity-browser', () => null);
 const browserRequest = useState<string | null>('activity-browser-request', () => null);
 const backgroundBusy = computed(() => irisBusy.value || setupJobs.value.some(j=>['starting','running','configuring'].includes(j.status)) || sandboxes.value.some(s => ['starting', 'running', 'configuring'].includes(s.codex?.status || '') || !s.codex && s.processes.some(p => p.status === 'running')) || repositories.value?.runs.some(r => !r.job || !repoTerminal(r.job.status)));
-const hasWork = computed(() => !!reviewJobs.value.length || !!setupJobs.value.length || !!browserJobs.value?.jobs.length || !!snapshot.value || !!browser.value || !!sandboxes.value.length || !!repositories.value?.runs.length);
+const hasWork = computed(() => !!missionReports.value.length || !!reviewJobs.value.length || !!setupJobs.value.length || !!browserJobs.value?.jobs.length || !!snapshot.value || !!browser.value || !!sandboxes.value.length || !!repositories.value?.runs.length);
 watch(irisBusy, (value, old) => { if (value && !old && !collapsed.value) open.value = true; });
 watch(reviewBusy, (value, old) => { if (value && !old && !collapsed.value) open.value = true; });
 const showSteps = ref(false);
@@ -88,7 +90,7 @@ const railItems = computed(() => {
   const setupIds = new Set(setupJobs.value.map(j => j.result?.jobId || j.id));
   add('vps', 'Otto · VPS', 'i-lucide-container', [...setupJobs.value.map(j => j.status), ...localSandboxes.filter(s => !s.codex || !setupIds.has(s.codex.jobId)).map(s => s.codex?.status || 'idle')], 'vps');
   add('repository', 'Axel · Repokörningar', 'i-lucide-git-branch', (repositories.value?.runs || []).filter(r => !r.job || r.job.workspaceId === activeId.value).map(r => r.job?.status || 'starting'), 'repository');
-  add('reviewer', 'Klara · Granskningar', 'i-lucide-scan-eye', reviewJobs.value.map(j => j.status), 'reviewer');
+  add('reviewer', 'Klara · Granskningar och rapporter', 'i-lucide-scan-eye', [...reviewJobs.value, ...missionReports.value].map(j => j.status), 'reviewer');
   if (browser.value) items.push({ id: 'browser', label: 'Livewebbläsare', icon: 'i-lucide-globe', status: browser.value.control === 'human' ? 'waiting' : 'idle', detail: browser.value.control === 'human' ? 'Du styr webbläsaren' : browser.value.title || 'Session tillgänglig' });
   return items;
 });
@@ -123,6 +125,7 @@ watch(() => snapshot.value?.threadId, () => { draft.value = undefined; saveError
   </div>
   <AgentActivitySurface v-model:open="panelOpen" :docked="wide && hasWork" :focus-target="focusTarget">
       <template #rail><AgentActivityRail :items="railItems" @expand="reveal" /></template>
+      <WorkspaceMissions compact />
       <div class="mb-5 space-y-4">
         <section v-if="reviewJobs.length" id="activity-section-reviewer" tabindex="-1" class="space-y-1 rounded-lg border border-default p-3" aria-label="Resultatgranskning"><p class="flex items-center gap-2 text-sm font-semibold"><AgentAvatar role="reviewer" class="size-9" />{{ agentIdentities.reviewer.name }} · Resultatgranskning</p><p class="text-sm" role="status">{{ reviewBusy ? 'Granskar resultat' : 'Resultatgranskning' }} · {{ reviewDone }} av {{ reviewJobs.length }} avslutade</p><p class="text-xs text-muted">Bedömningarna finns under respektive testkörning i Testning. {{ reviewJobs.filter(j => j.status === 'failed').length }} kunde inte slutföras.</p></section>
         <p v-if="backgroundBusy" class="flex items-center gap-2 text-xs text-muted" role="status"><span class="size-2 rounded-full bg-success motion-safe:animate-pulse" />Arbete pågår på VPS · Du kan fortsätta chatta</p>

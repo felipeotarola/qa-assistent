@@ -8,7 +8,7 @@ export default defineTool({
     const auth = ctx.session.auth.current;
     const threadId = auth?.attributes.browserThreadId;
     if (auth?.authenticator !== 'app' || typeof threadId !== 'string') return { error: 'Requires a web chat' };
-    const response = await fetch(`${appOrigin()}/api/internal/test-run`, { method: 'POST', headers: internalHeaders(), signal: ctx.abortSignal, body: JSON.stringify({ userId: auth.principalId, threadId, ...input }) });
+    const response = await fetch(`${appOrigin()}/api/internal/test-run`, { method: 'POST', headers: internalHeaders(), signal: ctx.abortSignal, body: JSON.stringify({ userId: auth.principalId, threadId, ...input, browserJobId: auth.attributes.browserJobId }) });
     if (!response.ok) return { error: (await response.json().catch(() => ({}))).statusMessage || 'Run was not saved; do not claim success', status: response.status };
     return response.json();
   },

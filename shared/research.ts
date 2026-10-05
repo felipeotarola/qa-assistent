@@ -1,2 +1,3 @@
 import { z } from "zod";
-export const researchSchema = z.object({ url: z.string().url().max(4096), screenshot: z.boolean().default(false) });
+import { missionBindingSchema } from './mission-binding.ts';
+export const researchSchema = z.object({ url: z.string().url().max(4096), screenshot: z.boolean().default(false), mission: missionBindingSchema.optional() });

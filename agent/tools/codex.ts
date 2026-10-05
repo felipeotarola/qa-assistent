@@ -1,5 +1,6 @@
 import { defineTool } from 'eve/tools';
 import { z } from 'zod';
+import { missionBindingSchema } from '../../shared/mission-binding';
 import { appOrigin, internalHeaders } from '../lib/internal-api';
 import { repositoryRequestId } from '../../shared/repository-request.mjs';
 import { codexTurn } from '../lib/codex-turn';
@@ -8,7 +9,7 @@ import { repositoryMapTask } from '../../shared/repository-map';
 
 export default defineTool({
   description: 'Delegate a repository setup/start/diagnosis task to the owner-only Codex subscription pilot on VPS. Uses THIS Eve sandbox, with existing files and processes, and shows logs in the Pågående arbete panel. start takes task; status/cancel take jobId. Returns immediately; running is not completed. While active, do NOT use bash/repository to perform the same work or change the sandbox. Read status before any retry. Once completed, read the report and use preview(port) for a verified running app. If pilot is not enabled or login is required, explain that; do not silently duplicate the job through another executor. Codex does not push or deploy.',
-  inputSchema: z.object({ action: z.enum(['start', 'status', 'cancel']), task: z.string().min(1).max(12000).optional(), jobId: z.string().uuid().optional(), mode: z.enum(['setup', 'repository_map']).optional().describe('repository_map: read-only architecture map saved in Material. Include repositoryUrl and task scope (max 9000 characters).'), repositoryUrl: z.string().optional() }),
+  inputSchema: z.object({ action: z.enum(['start', 'status', 'cancel']), mission: missionBindingSchema.optional(), task: z.string().min(1).max(12000).optional(), jobId: z.string().uuid().optional(), mode: z.enum(['setup', 'repository_map']).optional().describe('repository_map: read-only architecture map saved in Material. Include repositoryUrl and task scope (max 9000 characters).'), repositoryUrl: z.string().optional() }),
   async execute(input, ctx) {
     const auth = ctx.session.auth.current, threadId = auth?.attributes.browserThreadId;
     if (auth?.authenticator !== 'app' || !auth.principalId || typeof threadId !== 'string') throw new Error('Codex requires an authenticated workspace chat.');

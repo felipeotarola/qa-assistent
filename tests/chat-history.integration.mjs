@@ -31,11 +31,15 @@ try {
   const { thread } = await api(local, "/api/threads", "POST", { title: "Shared history fixture" });
   const workspaceName = `QA-${randomUUID().slice(0, 8)}`;
   await sql`update pat_workspaces set name = ${workspaceName} where id = ${thread.workspaceId} and user_id = ${userId}`;
-  const client = origin => new Client({ host: origin, headers: { cookie: cookie(), "x-pat-browser-thread": thread.id, "x-pat-chat-model": "glm-5.3-flash", "x-pat-reasoning": "low" } });
+  let receipt = randomUUID();
+  const client = origin => new Client({ host: origin, headers: { cookie: cookie(), "x-pat-browser-thread": thread.id, "x-pat-chat-model": "glm-5.3-flash", "x-pat-reasoning": "low", 'x-pat-message-id': receipt } });
   const marker = `Sommar-${randomUUID().slice(0, 8)}`;
   const first = await client(local).sessions.create({ message: `Projektets testkod är ${marker}. Svara Noterat och namnet på det workspace vi arbetar i. Spara inget i minne eller workspace, använd inga verktyg.` });
   assert.notEqual((await first.response.result()).status, "failed");
   const initial = (await api(local, `/api/threads/${thread.id}`)).thread;
+  const savedReceipt = await api(local, `/api/threads/${thread.id}/history`);
+  assert.ok(savedReceipt.acceptedMessageIds.includes(receipt), 'The authenticated send receipt survives disconnect/navigation');
+  assert.equal(savedReceipt.sessionId, first.session.state.sessionId, 'History carries the authoritative runtime binding');
   assert.equal(initial.sessionId, first.session.state.sessionId, "Server hook saves runtime binding without browser callbacks");
   assert.ok(initial.history.some(row => row.message.parts.some(p => p.type === "text" && p.text.includes(marker))));
   assert.ok(initial.history.some(row => row.message.role === "assistant" && row.message.parts.some(p => p.type === "text" && p.text.includes(workspaceName))), "Agent receives the current workspace name without being told in the user message");
@@ -59,13 +63,18 @@ try {
   const stale = await fetch(`${secondOrigin}/api/threads/${thread.id}`, { method: "PATCH", headers: { cookie: cookie(), "content-type": "application/json" }, body: JSON.stringify({ sessionId: first.session.state.sessionId }) });
   assert.equal(stale.status, 409, "Old browser tabs cannot restore a foreign runtime's session ID");
   const returnMarker = `Vinter-${randomUUID().slice(0, 8)}`;
+  receipt = randomUUID();
   const second = await client(secondOrigin).sessions.create({ message: `Projektets andra testkod är ${returnMarker}. Vad är projektets första testkod som jag nämnde tidigare i den här chatten? Svara endast med den första koden. Spara inget i minne eller workspace. Använd inga verktyg.` });
   const outcome = await second.response.result();
+  const transferred = await (await internal({ sessionId: second.session.state.sessionId })).json();
+  assert.ok(transferred.context.includes(marker), 'Archive API supplies the exact original message to the new runtime');
   if (outcome.status === "failed") console.log(outcome.events.filter(e => ["step.failed", "turn.failed", "session.failed"].includes(e.type)).map(e => ({ type: e.type, code: e.data.code, message: e.data.message, details: e.data.details })));
   assert.notEqual(outcome.status, "failed");
   const final = (await api(secondOrigin, `/api/threads/${thread.id}`)).thread;
+  assert.ok((await api(secondOrigin, `/api/threads/${thread.id}/history`)).acceptedMessageIds.includes(receipt), 'A later runtime preserves its own receipt');
   assert.equal(final.sessionId, second.session.state.sessionId);
-  assert.ok(final.history.some(row => row.sessionId === second.session.state.sessionId && row.message.role === "assistant" && row.message.parts.some(p => p.type === "text" && p.text.includes(marker))), "New runtime receives the archived conversation as model context");
+  const quotedCode = final.history.filter(row => row.sessionId === second.session.state.sessionId && row.message.role === 'assistant').flatMap(row => row.message.parts.filter(p => p.type === 'text').map(p => p.text)).join('').trim();
+  assert.equal(quotedCode, marker, 'The new runtime must quote the exact archived code, without mixing workspace IDs or contradictory guesses');
   const repeated = (await api(secondOrigin, `/api/threads/${thread.id}`)).thread;
   assert.equal(repeated.history.length, final.history.length, "Reload must not duplicate archived messages");
   if (secondOrigin !== local) {

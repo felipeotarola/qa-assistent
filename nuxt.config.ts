@@ -8,12 +8,12 @@ const databaseUrl = process.env.POSTGRES_URL || process.env.POSTGRESQL_URL || pr
 const supabasePooler = databaseUrl ? new URL(databaseUrl).hostname.endsWith(".pooler.supabase.com") : false;
 
 export default defineNuxtConfig({
-  modules: ["@nuxt/ui", "@nuxt/eslint", "@comark/nuxt", "eve/nuxt", "@nuxthub/core", "@vercel/analytics"],
+  modules: ["@nuxt/ui", "@nuxt/eslint", "@comark/nuxt", "eve/nuxt", "@nuxthub/core"],
   hooks: {
     'nitro:config'(config) {
       // Eve/Nuxt mounts only its transport prefix automatically. Custom channels
       // keep their own namespace and must also reach the Eve service.
-      const paths = ['/workers/setup/notify', '/workers/result-review/notify'];
+      const paths = ['/workers/setup/notify', '/workers/result-review/notify', '/workers/mission-report/notify'];
       const proxy = config.routeRules?.['/eve/v1/**']?.proxy;
       const target = typeof proxy === 'string' ? proxy : proxy?.to;
       if (target) {

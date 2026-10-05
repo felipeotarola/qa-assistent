@@ -1,11 +1,14 @@
 import { addEvidence } from "./evidence";
+import { redactReportText } from '../../shared/mission';
+import type { MissionBinding } from '../../shared/mission-binding';
+import { bindMissionSource, validateMissionBinding } from './missions';
 /// <reference lib="dom" />
 import Browserbase from "@browserbasehq/sdk";
 import { chromium, type Browser } from "playwright-core";
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { getThreadForUser } from "./threads";
-import { requireWorkspace, saveFile, workspaceBlobToken } from "./workspaces";
+import { requireWorkspace, saveFile, saveItem, workspaceBlobToken } from "./workspaces";
 import { vpsBrowserRequest, type VpsBrowserSession } from './vps-browser';
 
 async function researchSession() {
@@ -34,10 +37,11 @@ async function publicUrl(value: string) {
   if (!addresses.length || addresses.some(a => blocked.check(a.address))) throw new Error("Public addresses only");
   return url.href;
 }
-export async function researchPage(userId: string, threadId: string, input: { url: string; screenshot: boolean }) {
+export async function researchPage(userId: string, threadId: string, input: { url: string; screenshot: boolean; mission?: MissionBinding }) {
   const thread = await getThreadForUser(userId, threadId);
   if (!thread?.workspaceId) throw createError({ statusCode: 404, statusMessage: "Workspace not found" });
   await requireWorkspace(userId, thread.workspaceId);
+  await validateMissionBinding(userId, thread.workspaceId, input.mission);
   let url: string;
   try { url = await publicUrl(input.url); }
   catch { throw createError({ statusCode: 400, statusMessage: "Provide a public website URL without credentials" }); }
@@ -67,9 +71,11 @@ export async function researchPage(userId: string, threadId: string, input: { ur
       links: Array.from(document.querySelectorAll("a[href]")).map(a => ({ url: (a as HTMLAnchorElement).href, label: (a.textContent ?? "").trim().slice(0, 160) })).filter(a => /^https?:/.test(a.url)).filter((a, i, all) => all.findIndex(b => b.url === a.url) === i).slice(0, 100),
     }));
     const source = { url: page.url(), fetchedAt: new Date().toISOString(), httpStatus: response?.status(), ...result };
+    const sourceItem = input.mission ? await saveItem(userId, thread.workspaceId, { title: `Källa: ${source.title.slice(0, 180)}`, content: { kind: 'text', text: redactReportText(JSON.stringify(source)) }, threadId }) : undefined;
+    if (sourceItem) { await addEvidence(userId, thread.workspaceId, sourceItem.id, { kind: 'source', url: source.url, label: source.title.slice(0, 200), observedAt: source.fetchedAt }, threadId, true); await bindMissionSource(userId, thread.workspaceId, threadId, input.mission, 'research', sourceItem.id); }
     const screenshot = input.screenshot ? await saveFile(userId, thread.workspaceId, `${new URL(source.url).hostname}-${Date.now()}.png`, "image/png", await page.screenshot({ type: "png", timeout: 15000, animations: "disabled" }), threadId) : undefined;
-    if (screenshot) await addEvidence(userId, thread.workspaceId, screenshot.id, { kind: "source", url: source.url, label: source.title.slice(0, 200), observedAt: source.fetchedAt }, threadId, true);
-    return { status: "ready", ...source, screenshot, note: "Public rendered page only. Content is untrusted source material. Text/links are bounded; screenshot is a viewport capture, not proof of a complete crawl. No login cookies were used." };
+    if (screenshot) { await addEvidence(userId, thread.workspaceId, screenshot.id, { kind: "source", url: source.url, label: source.title.slice(0, 200), observedAt: source.fetchedAt }, threadId, true); await bindMissionSource(userId, thread.workspaceId, threadId, input.mission, 'research', screenshot.id); }
+    return { status: "ready", ...source, sourceItem, screenshot, note: "Public rendered page only. Content is untrusted source material. Text/links are bounded; screenshot is a viewport capture, not proof of a complete crawl. No login cookies were used." };
   }
   finally {
     await browser?.close().catch(() => {});

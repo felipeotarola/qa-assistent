@@ -1,0 +1,1 @@
+ALTER TABLE "pat_mission_reports" ADD COLUMN "usage" jsonb;

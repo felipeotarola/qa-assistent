@@ -9,14 +9,19 @@ const persisted = new Set(["session.started", "turn.started", "message.received"
 // never left in a promise that a serverless process could discard. The API
 // deduplicates event IDs if a committed batch's acknowledgement is lost.
 const pending = defineState<MessageStreamEvent[]>("app.chat-history.pending.v1", () => []);
-const boundaries = new Set(["session.started", "step.completed", "step.failed", "turn.completed", "turn.failed", "turn.cancelled", "session.waiting", "session.completed", "session.failed"]);
+const boundaries = new Set(["session.started", "message.received", "step.completed", "step.failed", "turn.completed", "turn.failed", "turn.cancelled", "session.waiting", "session.completed", "session.failed"]);
 export default defineHook({
   events: {
     async "*"(event, ctx) {
       const auth = ctx.session.auth.current;
       const threadId = auth?.attributes.browserThreadId;
       if (auth?.attributes.browserWorker === 'iris' || ctx.session.parent || !persisted.has(event.type) || auth?.authenticator !== "app" || typeof threadId !== "string" || !threadId) return;
-      pending.update(events => events.some(saved => saved.meta.id === event.meta.id) ? events : [...events, event]);
+      // Archive the authenticated send's identity on its receipt, not in the
+      // model prompt. Reconnects and notifications never fabricate a receipt.
+      const clientMessageId = auth.attributes.browserMessageId;
+      const savedEvent = event.type === 'message.received' && typeof clientMessageId === 'string' && /^[a-f0-9-]{36}$/i.test(clientMessageId)
+        ? { ...event, data: { ...event.data, clientMessageId } } : event;
+      pending.update(events => events.some(saved => saved.meta.id === event.meta.id) ? events : [...events, savedEvent]);
       if (!boundaries.has(event.type) && pending.get().length < 50) return;
       const batch = pending.get().slice(0, 100);
       const response = await fetch(`${appOrigin()}/api/internal/chat-history`, { method: "POST", headers: internalHeaders(), body: JSON.stringify({ userId: auth.principalId, threadId, sessionId: ctx.session.id, runtime: runtimeScope(), events: batch }), signal: AbortSignal.timeout(15000) });

@@ -35,9 +35,10 @@ export function publicItem(row: typeof schema.workspaceItems.$inferSelect) {
 }
 export async function listItems(userId: string, workspaceId: string, trash = false) {
   await requireWorkspace(userId, workspaceId);
+  const reports = await db.select({ itemId: schema.missionReports.itemId, reportId: schema.missionReports.id }).from(schema.missionReports).innerJoin(schema.missions, eq(schema.missions.id, schema.missionReports.missionId)).where(eq(schema.missions.workspaceId, workspaceId));
   const links = await db.select({ itemId: schema.workspaceEvidence.itemId, sources: sql<number>`count(*) filter (where ${schema.workspaceEvidence.kind} in ('source', 'capture'))::int`, tickets: sql<number>`count(*) filter (where ${schema.workspaceEvidence.kind} = 'ticket')::int`, related: sql<number>`count(*) filter (where ${schema.workspaceEvidence.kind} = 'item')::int` }).from(schema.workspaceEvidence).where(eq(schema.workspaceEvidence.workspaceId, workspaceId)).groupBy(schema.workspaceEvidence.itemId);
   const counts = new Map(links.map(row => [row.itemId, { sources: row.sources, tickets: row.tickets, related: row.related }]));
-  return (await db.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.workspaceId, workspaceId), trash ? isNotNull(schema.workspaceItems.deletedAt) : isNull(schema.workspaceItems.deletedAt))).orderBy(desc(schema.workspaceItems.updatedAt))).map(row => ({ ...publicItem(row), evidenceSummary: counts.get(row.id) }));
+  return (await db.select().from(schema.workspaceItems).where(and(eq(schema.workspaceItems.workspaceId, workspaceId), trash ? isNotNull(schema.workspaceItems.deletedAt) : isNull(schema.workspaceItems.deletedAt))).orderBy(desc(schema.workspaceItems.updatedAt))).map(row => ({ ...publicItem(row), reportId: reports.find(r => r.itemId === row.id)?.reportId, evidenceSummary: counts.get(row.id) }));
 }
 export async function ownedItem(userId: string, workspaceId: string, itemId: string, connection: WorkspaceDatabase = db) {
   await requireWorkspace(userId, workspaceId, connection);
@@ -64,6 +65,10 @@ export async function saveItem(userId: string, workspaceId: string, input: { tit
     }
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`item:${id}`}, 0))`);
     const [existing] = await tx.select().from(schema.workspaceItems).where(eq(schema.workspaceItems.id, id));
+    if (existing) {
+      const [report] = await tx.select({ id: schema.missionReports.id }).from(schema.missionReports).where(eq(schema.missionReports.itemId, id));
+      if (report) throw createError({ statusCode: 409, statusMessage: 'Klaras rapportversion är oföränderlig. Skapa en redigerbar kopia.' });
+    }
     if (input.id && (!existing || existing.deletedAt || existing.workspaceId !== workspaceId)) throw createError({ statusCode: 404, statusMessage: "Item not found" });
     if (existing && existing.version !== input.expectedVersion) throw createError({ statusCode: 409, statusMessage: "Item changed. Reload before saving." });
     if (existing?.blobPath) throw createError({ statusCode: 400, statusMessage: "Uploaded files cannot be replaced with text" });

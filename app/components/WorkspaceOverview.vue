@@ -21,6 +21,7 @@ function readiness(item: WorkspaceItem) {
   <div class="w-full space-y-8">
     <WorkspacePageHeader title="Fortsätt där ni var" description="Testplaner och gemensamt underlag, samlat för detta workspace." />
     <WorkspaceQuality :key="workspaceId" :workspace-id="workspaceId" :items="items" @open="$emit('open', $event)" />
+    <WorkspaceMissions :key="`missions-${workspaceId}`" />
     <UButton v-if="browserPresent" label="Visa webbläsaren" icon="i-lucide-globe" color="neutral" variant="soft" @click="$emit('material')" />
     <section aria-label="Testplaner" class="space-y-3">
       <div class="flex items-center justify-between gap-2">

@@ -5,6 +5,8 @@ export interface ArchivedMessage { sessionId: string; at: string; message: EveMe
 export interface ChatHistorySnapshot {
   messages: ArchivedMessage[];
   cursors: { sessionId: string; eventId: string }[];
+  sessionId?: string | null;
+  acceptedMessageIds?: string[];
 }
 export const archivedEventTypes = new Set([
   "session.started", "turn.started", "message.received", "message.completed", "reasoning.completed",

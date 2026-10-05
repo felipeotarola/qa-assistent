@@ -4,7 +4,7 @@ export const agentIdentities = {
   repository: { name: 'Axel', role: 'Repository & kodtester' },
   browser: { name: 'Iris', role: 'Webbläsartester' },
   vps: { name: 'Otto', role: 'VPS & arbetsmiljö' },
-  reviewer: { name: 'Klara', role: 'Resultatgranskning' },
+  reviewer: { name: 'Klara', role: 'Granskning & rapporter' },
 } as const;
 export type AgentRole = keyof typeof agentIdentities;
 export function isAgentRole(id: string): id is AgentRole {

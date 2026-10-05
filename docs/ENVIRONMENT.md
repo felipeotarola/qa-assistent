@@ -225,3 +225,15 @@ the default, matching the provider. The pat_chat_reasoning cookie remembers the
 selection; x-pat-reasoning carries it into the authenticated turn and the provider
 sends it as reasoning_effort. Invalid values fall back to max. Both selectors
 are disabled while a reply is in progress and changes apply to the next message.
+
+## Klara mission reports and anonymous sharing
+
+Mission reports reuse `GRUNDEN_API_TOKEN`, private workspace Blob storage and the
+internal API. Optional switches `MISSIONS_ENABLED`, `MISSION_REPORTS_ENABLED`
+and `MISSION_AUTOMATIC_REPORTS` disable their respective features when set to
+`false`. Use `MISSION_AUTOMATIC_REPORTS=false` during the initial production pilot.
+`REPORT_SHARE_PEPPER` is a stable server-only secret for PIN and client hashing;
+it falls back to `INTERNAL_API_SECRET`. Rotating it invalidates existing PIN
+verification. Apply migrations 0019–0021 before deploying the app and agent.
+See [Klara reporting](KLARA_REPORTING.md) for queue limits, recovery, sharing
+boundaries and reproducible integration/browser checks.
