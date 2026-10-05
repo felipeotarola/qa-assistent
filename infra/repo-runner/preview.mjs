@@ -2,6 +2,7 @@ import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomBytes } from 'node:crypto';
+import { allowedOrigins } from '../execution/http.mjs';
 const run = promisify(execFile);
 const exec = async (command, args) => (await run(command, args, { timeout: 30000, maxBuffer: 1000000 })).stdout.trim();
 const ip = value => /^172\.30\.0\.\d{1,3}$/.test(value);
@@ -40,7 +41,7 @@ export class Previews {
       const target = await this.execute('docker', ['inspect', '-f', '{{(index .NetworkSettings.Networks "qa-repo-net").IPAddress}}', `qa-sandbox-${sandbox.id}`]);
       if (!ip(target)) throw new Error('Sandbox is not on the assigned worker network');
       current.origin = `http://${target}:${port}`;
-      await this.execute('docker', ['run', '-d', '--name', current.name, '--label', 'qa.preview=true', '--init', '--network', 'qa-repo-net', '--memory', '1g', '--memory-swap', '1g', '--cpus', '1', '--pids-limit', '256', '--shm-size', '256m', '--security-opt', 'seccomp=/opt/qa-browser/seccomp.json', '--cap-drop', 'ALL', '--cap-add', 'SYS_CHROOT', '-e', `BROWSER_SERVICE_KEY=${current.key}`, '-e', `BROWSER_PUBLIC_URL=${this.base}/preview/${sandbox.id}`, '-e', `BROWSER_PREVIEW_ORIGIN=${current.origin}`, '-e', 'BROWSER_MAX_SESSIONS=1', process.env.PREVIEW_BROWSER_IMAGE || 'qa-browser:execution']);
+      await this.execute('docker', ['run', '-d', '--name', current.name, '--label', 'qa.preview=true', '--init', '--network', 'qa-repo-net', '--memory', '1g', '--memory-swap', '1g', '--cpus', '1', '--pids-limit', '256', '--shm-size', '256m', '--security-opt', 'seccomp=/opt/qa-browser/seccomp.json', '--cap-drop', 'ALL', '--cap-add', 'SYS_CHROOT', '-e', `BROWSER_SERVICE_KEY=${current.key}`, '-e', `BROWSER_PUBLIC_URL=${this.base}/preview/${sandbox.id}`, '-e', `BROWSER_PREVIEW_ORIGIN=${current.origin}`, '-e', `EXECUTION_ORIGINS=${allowedOrigins().join(',')}`, '-e', 'BROWSER_MAX_SESSIONS=1', process.env.PREVIEW_BROWSER_IMAGE || 'qa-browser:execution']);
       current.host = await this.execute('docker', ['inspect', '-f', '{{(index .NetworkSettings.Networks "qa-repo-net").IPAddress}}', current.name]);
       if (!ip(current.host) || current.host === target) throw new Error('Invalid preview worker network identity');
       current.rule = ['-s', `${current.host}/32`, '-d', `${target}/32`, '-p', 'tcp', '--dport', String(port), '-j', 'ACCEPT'];

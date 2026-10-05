@@ -8,12 +8,13 @@ import WebSocket, { WebSocketServer } from 'ws';
 import { FrameHub } from './frame-hub.mjs';
 import { ExecutionStore } from '../execution/store.mjs';
 import { issueSubscription, verifySubscription, serveEvents } from '../execution/stream.mjs';
-import { readJson, allowedOrigins } from '../execution/http.mjs';
+import { readJson, allowedOrigins, frameAncestorsPolicy } from '../execution/http.mjs';
 
 const key = process.env.BROWSER_SERVICE_KEY;
 const base = process.env.BROWSER_PUBLIC_URL;
 if (!key || key.length < 32 || !base) throw new Error('Configure service key and public URL');
 const viewer = await readFile(new URL('./viewer.html', import.meta.url));
+const viewerPolicy = `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; ${frameAncestorsPolicy()}`;
 const sockets = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 * 1024 });
 const maxSessions = Number(process.env.BROWSER_MAX_SESSIONS || 3);
 if (!Number.isInteger(maxSessions) || maxSessions < 1 || maxSessions > 20) throw new Error('BROWSER_MAX_SESSIONS must be between 1 and 20');
@@ -73,7 +74,7 @@ const server = http.createServer(async (req, res) => {
       return await serveEvents(req, res, events, claims);
     }
     if (url.pathname === '/viewer' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; frame-ancestors http://localhost:3000 http://127.0.0.1:3000 https://qa-assistent.vercel.app" });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': viewerPolicy });
       return res.end(viewer);
     }
     if (!matches(req.headers.authorization, `Bearer ${key}`)) return reply(res, 401, { error: 'Unauthorized' });

@@ -2,10 +2,15 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import WebSocket from 'ws';
+import { allowedOrigins } from '../execution/http.mjs';
 const base = process.env.BROWSER_TEST_URL || 'http://127.0.0.1:8080';
 const connectUrl = url => url.replace(/^wss?:\/\/[^/]+/, base.replace(/^http/, 'ws'));
 const request = (path, method = 'GET', auth = true) => fetch(base + path, { method, headers: auth ? { authorization: `Bearer ${process.env.BROWSER_SERVICE_KEY}` } : {} });
 assert.equal((await request('/health', 'GET', false)).status, 401);
+const viewerResponse = await request('/viewer', 'GET', false);
+assert.equal(viewerResponse.status, 200);
+const ancestors = viewerResponse.headers.get('content-security-policy').split(';').map(part => part.trim()).find(part => part.startsWith('frame-ancestors '));
+assert.equal(ancestors, `frame-ancestors ${allowedOrigins().join(' ') || "'none'"}`, 'Viewer must allow the configured app domains without accepting arbitrary ancestors');
 const created = await request('/sessions', 'POST');
 assert.equal(created.status, 201, await created.clone().text());
 const session = await created.json();

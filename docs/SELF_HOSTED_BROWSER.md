@@ -24,8 +24,14 @@ The private HTTP address requires Tailscale. The service also has a public
 HTTPS endpoint through Tailscale Funnel for production:
 `https://qaa-vps-1.tail22aa3b.ts.net`. Production uses this address for
 `BROWSER_SERVICE_URL`, and the VPS uses it for `BROWSER_PUBLIC_URL`, so live
-view and CDP connections use WSS. The iframe permits localhost:3000 and
-`https://qa-assistent.vercel.app`.
+view and CDP connections use WSS. The iframe and event subscriptions share the
+`EXECUTION_ORIGINS` allowlist. Defaults include localhost/127.0.0.1:3000,
+`https://qa-assistent.vercel.app` and `https://qa.felipeotarola.com`.
+For another app domain, set a comma-separated list of exact HTTP(S) origins on
+both workers; the repository worker forwards it to local-preview containers.
+Overrides replace the defaults; an empty list denies embedding/subscriptions.
+Wildcards, credentials, paths, query strings and fragments are rejected. A missing
+app origin produces a browser CSP refusal even while agent screenshots work.
 
 Funnel is configured with
 `tailscale funnel --bg --yes http://100.122.229.15:8080`.
