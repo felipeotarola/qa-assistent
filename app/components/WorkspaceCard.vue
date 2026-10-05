@@ -10,8 +10,9 @@ function collapse() {
 </script>
 
 <template>
+  <!-- Keep preview controls below expanded sibling cards, regardless of DOM order. -->
   <section
-    class="workspace-card flex min-h-0 flex-col overflow-hidden border border-default bg-default"
+    class="workspace-card isolate flex min-h-0 flex-col overflow-hidden border border-default bg-default"
     :class="expanded ? 'workspace-card-expanded absolute inset-3 z-10 sm:inset-5' : 'relative w-full min-w-0 hover:border-accented'"
     :aria-label="title"
     @keydown.esc.stop="collapse"
