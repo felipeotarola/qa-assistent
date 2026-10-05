@@ -7,15 +7,15 @@ import { ExecutionStore } from '../execution/store.mjs';
 import { environmentInspectionCommand } from './environment-inspection.mjs';
 import { CodexWorker } from './worker.mjs';
 const { Sandboxes } = await import(process.env.QAA_RUNNER_MODULE || '../repo-runner/sandbox.mjs');
-const id = randomUUID(), directory = `/var/lib/qa-codex-smoke-${id}`;
+const id = randomUUID(), userId = randomUUID(), directory = `/var/lib/qa-codex-smoke-${id}`;
 const scope = { id, workspaceId: randomUUID(), owner: 'b'.repeat(64) };
 const events = new ExecutionStore(`${directory}/events`);
 const sandboxes = new Sandboxes({ directory: `${directory}/sandboxes`, events, budget: new ResourceBudget() });
-const worker = new CodexWorker({ directory: `${directory}/jobs`, sandboxes, inspectionCommand: environmentInspectionCommand, allowedUser: 'smoke-test' });
+const worker = new CodexWorker({ directory: `${directory}/jobs`, sandboxes, inspectionCommand: environmentInspectionCommand, accessMode: 'shared' });
 let timer;
 try {
   await sandboxes.init(); await worker.init(); await sandboxes.rpc({ ...scope, action: 'ensure' });
-  const job = await worker.rpc({ ...scope, userId: 'smoke-test', action: 'start', jobId: randomUUID(), task: 'Inspect the environment with inspect_environment and read the completed output first. Then start a tiny Node HTTP server on 0.0.0.0 port 3107 which responds QAA_CODEX_OK. No external repos, installs or dependencies. Verify HTTP response using node fetch in a second command. Report verified port and response in Swedish. Leave the server running. Do not attempt to read host files.' });
+  const job = await worker.rpc({ ...scope, userId, action: 'start', jobId: randomUUID(), task: 'Inspect the environment with inspect_environment and read the completed output first. Then start a tiny Node HTTP server on 0.0.0.0 port 3107 which responds QAA_CODEX_OK. No external repos, installs or dependencies. Verify HTTP response using node fetch in a second command. Report verified port and response in Swedish. Leave the server running. Do not attempt to read host files.' });
   timer = setInterval(() => { void sandboxes.tick().catch(() => {}); }, 1000);
   const deadline = Date.now() + 150000;
   while (Date.now() < deadline && ['starting', 'running'].includes(worker.jobs.get(job.jobId).status)) await new Promise(resolve => setTimeout(resolve, 1000));

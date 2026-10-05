@@ -27,6 +27,21 @@ the private VPS browser. Keep these server-only. See
 [VPS browser setup and limitations](./SELF_HOSTED_BROWSER.md).
 Without this selector, the existing Browserbase configuration remains in use.
 
+## Otto access (optional)
+
+For Otto access, configure the following on both the app/Eve service and the VPS
+runner (server-only):
+
+| Variable | Meaning |
+|----------|---------|
+| `CODEX_ACCESS_MODE` | `shared`: all authenticated app users; `pilot`: one configured user; `disabled`: no new Otto jobs |
+| `CODEX_PILOT_USER_ID` | Authenticated app UUID, used only in pilot/legacy mode |
+
+An omitted mode keeps legacy pilot behavior when a valid pilot UUID is present;
+otherwise Otto is disabled. Invalid modes disable admissions. Shared mode retains
+per-user/workspace job, file and Vault isolation and one active task globally.
+See [Otto worker deployment and access](./CODEX_WORKER.md).
+
 ## Database
 
 ### `DATABASE_URL` (required everywhere)

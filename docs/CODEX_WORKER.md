@@ -1,7 +1,7 @@
-# Codex subscription pilot
+# Otto VPS worker
 
 Eve can delegate repository setup or diagnosis through the `codex` tool. This
-is an optional, owner-only worker. The existing repository runner, Eve sandbox,
+is an optional worker with shared capacity and isolated user environments. The existing repository runner, Eve sandbox,
 browser sessions and preview remain available. No OpenAI API-key fallback.
 
 ## Execution boundary
@@ -29,8 +29,32 @@ replay tasks or processes. The VPS card shows progress, logs and the final repor
 
 Codex completion means the agent finished reporting, not that tests passed.
 The report must distinguish installation, static checks, HTTP readiness and tests.
-Tasks do not automatically wake an idle Eve conversation in this first pilot;
-Eve can read `codex(action: status, jobId)` and the UI continues updating.
+Registered setup jobs send their result back to the parent chat. Eve can also
+read `codex(action: status, jobId)` and the UI continues updating. Submission or
+worker completion alone does not establish application readiness.
+
+## Access and shared capacity
+
+Set `CODEX_ACCESS_MODE` in **both the runner and app/Eve environment**:
+
+| Mode | New tasks and configuration |
+|------|-----------------------------|
+| `shared` | All authenticated app accounts with access to their own thread/workspace |
+| `pilot` | Only the UUID in `CODEX_PILOT_USER_ID` |
+| `disabled` | No new work |
+
+An omitted mode preserves a valid legacy pilot UUID; without one it is disabled.
+Unknown modes fail closed. `shared` explicitly overrides the legacy pilot UUID.
+The runner enforces admissions. Agent instructions re-evaluate access each turn.
+After admissions are disabled, owners may still inspect or cancel their own jobs.
+
+The service shares the VPS and its configured model subscription capacity, never
+the model login, sandbox files, processes, reports or Vault values. Authentication,
+thread ownership and sandbox/job ownership checks remain mandatory. A second
+concurrent request receives a busy response without another user's job details;
+it is **not queued**. One active Otto job globally remains the limit. Shared access
+does not remove the guard against starting new shell tasks in a sandbox containing
+injected credentials.
 
 ## Provision and authenticate
 
@@ -41,13 +65,11 @@ Eve can read `codex(action: status, jobId)` and the UI continues updating.
    container, Material, or logs. This consumes the signed-in subscription limits.
 3. Deploy `infra/codex-worker/*.mjs` to `/opt/codex-worker/`, the shared inspection
    module to `/opt/execution/environment-inspection.mjs`, and the updated runner.
-4. Set `CODEX_PILOT_USER_ID` to the authenticated app user's UUID in the private
-   runner `service.env` and app/Eve environment. The runner setting enforces
-   authorization; the app setting selects the pilot automatically for that caller.
-   Omitting the runner setting disables all task submissions. The caller
-   identity is taken from Eve authentication and validated against the app's
-   thread record; it is not a model argument. Do not share one personal login
-   with other application users.
+4. Set `CODEX_ACCESS_MODE=shared` in the private runner `service.env` and app/Eve
+   environment to enable all authenticated app users. For restricted rollout,
+   use `pilot` with `CODEX_PILOT_USER_ID`. The caller identity comes from Eve
+   authentication and is validated against the app's thread record; it is not
+   a model argument. Model login credentials remain private to the service user.
 5. Restart the runner when no user environment is active. Deploy the Nuxt/Eve
    changes separately. The existing browser service needs no changes.
 
@@ -62,7 +84,8 @@ environment, starts a tiny HTTP app, independently verifies its response and
 absence of controller credentials, checks events, and removes its own resources.
 Use `/opt/qa-repo-runner/node` where Node is not on the host PATH.
 
-`pnpm test:unit` checks account restrictions, scope, replay, inspection gating,
+`pnpm test:unit` checks shared/pilot/disabled access, two-user sandbox and Vault
+isolation, cross-user denials, global capacity, replay, inspection gating,
 cancellation and recovery without model calls. Re-run live protocol verification
 before any CLI upgrade. Do not assume future experimental protocol compatibility.
 

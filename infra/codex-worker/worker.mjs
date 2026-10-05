@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { CodexClient, threadOptions } from './client.mjs';
 import { vaultContext } from './vault-context.mjs';
+import { canUseCodex, resolveCodexAccess } from './access.mjs';
 
 const terminal = job => !['starting', 'running', 'configuring'].includes(job.status);
 const uuid = value => typeof value === 'string' && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value);
@@ -22,8 +23,9 @@ export function visibleJob(job) {
   return visible;
 }
 export class CodexWorker {
-  constructor({ directory, sandboxes, inspectionCommand, environments, Client = CodexClient, allowedUser = process.env.CODEX_PILOT_USER_ID }) {
-    Object.assign(this, { directory, sandboxes, inspectionCommand, environments, Client, allowedUser });
+  constructor({ directory, sandboxes, inspectionCommand, environments, Client = CodexClient, allowedUser = process.env.CODEX_PILOT_USER_ID, accessMode = process.env.CODEX_ACCESS_MODE }) {
+    Object.assign(this, { directory, sandboxes, inspectionCommand, environments, Client });
+    this.access = resolveCodexAccess(accessMode, allowedUser);
     this.jobs = new Map(); this.active = new Map(); this.lock = Promise.resolve(); this.writes = new Map();
   }
   async init() {
@@ -50,7 +52,10 @@ export class CodexWorker {
     const previous = this.lock;
     let release; this.lock = new Promise(resolve => { release = resolve; }); await previous;
     try {
-      if (!this.allowedUser || input.userId !== this.allowedUser) throw new Error('Codex subscription pilot is not enabled for this account');
+      if (!uuid(input.userId)) throw new Error('An authenticated app user is required');
+      // Turning off admissions must not prevent owners from inspecting or
+      // cancelling work already accepted under the previous access policy.
+      if (['start', 'configure'].includes(input.action) && !canUseCodex(input.userId, this.access)) throw new Error('Otto is not enabled for this account');
       const s = this.sandboxes.owned(input.id, input.owner);
       if (s.workspaceId !== input.workspaceId) throw new Error('Sandbox not found');
       if (!uuid(input.jobId)) throw new Error('Invalid job ID');
@@ -80,7 +85,7 @@ export class CodexWorker {
       }
       if (this.environments?.values.has(input.id)) throw new Error('This environment contains repository credentials. Use its existing configuration/preview controls; new agent shell tasks require a separate environment.');
       if (s.status !== 'ready') throw new Error('Sandbox is not running');
-      if (this.active.size) throw new Error('Codex pilot is busy. Inspect the existing job before submitting another.');
+      if (this.active.size) throw new Error('Otto shared capacity is busy. Try again after the current task finishes; no new job was started.');
       const created = { jobId: input.jobId, id: input.id, owner: input.owner, workspaceId: input.workspaceId, userId: input.userId, task: input.task, vaultContext: vaultContext(input.vault), status: 'starting', message: 'Codex förbereder uppdraget', processes: [], commands: {}, inspected: false, createdAt: new Date().toISOString() };
       this.jobs.set(created.jobId, created); this.active.set(created.jobId, {}); await this.save(created);
       void this.run(created).catch(() => this.finish(created, 'failed', 'Codex kunde inte slutföra uppdraget. Kontrollera inloggning och worker.')).catch(() => {});

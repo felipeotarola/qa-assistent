@@ -4,3 +4,8 @@ node_modules
 .output
 .nitro
 dist
+.data
+.nuxt
+.workflow-data
+.env
+.env.*
