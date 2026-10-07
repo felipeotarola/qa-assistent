@@ -1,0 +1,24 @@
+{
+  "protocol": "syna-evidence-acceptance-v1",
+  "catalogVersion": "2026-10-05",
+  "taskId": "REP-05",
+  "variant": "normal",
+  "sourceHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "runtime": "autonomy-test:replace-with-owned-runtime",
+  "model": "glm-5.3-flash",
+  "reasoning": "low",
+  "observationSeconds": 1500,
+  "trials": [
+    {
+      "workspaceId": "replace-with-isolated-input-workspace",
+      "accountFile": ".data/autonomy-isolation/ordinary-user.json",
+      "selection": [
+        { "type": "test", "id": "replace-passed-run", "label": "Startsidan, den sparade körningen från måndag klockan 10" },
+        { "type": "test", "id": "replace-failed-run", "label": "Kontaktlänken, den sparade körningen från måndag klockan 10" },
+        { "type": "test", "id": "replace-incomplete-run", "label": "Sökningen, den sparade körningen från måndag klockan 10" }
+      ],
+      "seedHash": null,
+      "originArtifacts": []
+    }
+  ]
+}

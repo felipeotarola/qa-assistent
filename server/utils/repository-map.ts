@@ -11,7 +11,7 @@ export async function saveRepositoryMap(userId: string, job: typeof schema.setup
     const receiptId = `repository-map:${job.id}`;
     const [receipt] = await tx.select().from(schema.workspaceEvidence).where(eq(schema.workspaceEvidence.id, receiptId));
     if (receipt) return receipt.itemId;
-    const item = await saveItem(userId, job.workspaceId, { title: `${content.repository!.url.split('/').pop()} — repokarta`, content, threadId: job.threadId }, tx);
+    const item = await saveItem(userId, job.workspaceId, { title: `${content.repository!.url.split('/').pop()} — repokarta`, content, threadId: job.threadId }, tx, { provenance: { version: 1, origin: 'agent', producer: 'agent-authored', sourceType: 'setup', sourceId: job.id, observedAt: null } });
     await tx.insert(schema.workspaceEvidence).values({ id: receiptId, workspaceId: job.workspaceId, itemId: item.id, itemVersion: item.version, kind: 'origin', label: 'Axels repositoryanalys', threadId: job.threadId });
     return item.id;
   });

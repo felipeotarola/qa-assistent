@@ -1,5 +1,6 @@
 import githubExtension from "@github-tools/eve-extension";
 import { CONNECT_USER_ISSUER, GITHUB_CONNECTOR } from "../../shared/connect.js";
+import { denyIrisCapability } from '../lib/iris-capabilities';
 
 // The mount namespace comes from this filename, so tools reach the model as
 // `github__listPullRequests`, `github__createIssue`, and so on.
@@ -13,10 +14,13 @@ export default githubExtension({
     // and every signed-in user would read repositories they never connected.
     // The issuer must match the one `appSession()` authenticates with, or the
     // grant Settings created is not the one the agent looks up.
-    subject: ctx => ({
+    subject: ctx => {
+      denyIrisCapability(ctx);
+      return {
       type: "user",
       id: ctx.session.auth.current!.principalId,
       issuer: ctx.session.auth.current?.issuer ?? CONNECT_USER_ISSUER,
-    }),
+      };
+    },
   },
 });

@@ -1,9 +1,11 @@
 import { defineSandbox } from 'eve/sandbox';
 import { vpsSandbox } from './lib/vps-sandbox';
+import { denyIrisCapability } from './lib/iris-capabilities';
 
 export default defineSandbox({
   backend: vpsSandbox,
   async onSession({ use, ctx }) {
+    denyIrisCapability(ctx);
     const auth = ctx.session.auth.current;
     const threadId = auth?.attributes.browserThreadId;
     if (auth?.authenticator !== 'app' || !auth.principalId || typeof threadId !== 'string') throw new Error('VPS sandbox requires an authenticated workspace chat.');

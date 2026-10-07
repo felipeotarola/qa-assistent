@@ -1,14 +1,15 @@
 import { and, eq, desc, sql, isNull, isNotNull } from "drizzle-orm";
 import { db, schema } from "@nuxthub/db";
-import { put, del } from "@vercel/blob";
+import { createHash } from 'node:crypto';
+import { put, del, workspaceStorageToken } from './evidence-storage';
 import type { ItemContent } from "../../shared/workspace";
 import { imageReferences, documentText } from "../../shared/workspace";
+import { evidenceProvenanceSchema, type EvidenceProvenance } from '../../shared/evidence-provenance';
 export type WorkspaceDatabase = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type EvidenceWriteOptions = { provenance?: EvidenceProvenance | null };
 
 export function workspaceBlobToken() {
-  const token = process.env.WORKSPACE_BLOB_READ_WRITE_TOKEN;
-  if (!token) throw createError({ statusCode: 503, statusMessage: "Configure WORKSPACE_BLOB_READ_WRITE_TOKEN for a private Blob store" });
-  return token;
+  return workspaceStorageToken();
 }
 
 export async function requireWorkspace(userId: string, id: string, connection: WorkspaceDatabase = db) {
@@ -46,8 +47,11 @@ export async function ownedItem(userId: string, workspaceId: string, itemId: str
   if (!item || item.deletedAt) throw createError({ statusCode: 404, statusMessage: "Item not found" });
   return item;
 }
-export async function saveItem(userId: string, workspaceId: string, input: { title: string; content: ItemContent; id?: string; expectedVersion?: number; blobPath?: string; threadId?: string }, connection: WorkspaceDatabase = db) {
+export async function saveItem(userId: string, workspaceId: string, input: { title: string; content: ItemContent; id?: string; expectedVersion?: number; blobPath?: string; threadId?: string }, connection: WorkspaceDatabase = db, options: EvidenceWriteOptions = {}) {
   await requireWorkspace(userId, workspaceId, connection);
+  // Never infer provenance from content, links, thread identity or the previous
+  // version. A writer must attest this version through a trusted call boundary.
+  const provenance = options.provenance ? evidenceProvenanceSchema.parse(options.provenance) : null;
   return connection.transaction(async tx => {
     const id = input.id ?? crypto.randomUUID();
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace-content:${workspaceId}`}, 0))`);
@@ -73,12 +77,17 @@ export async function saveItem(userId: string, workspaceId: string, input: { tit
     if (existing && existing.version !== input.expectedVersion) throw createError({ statusCode: 409, statusMessage: "Item changed. Reload before saving." });
     if (existing?.blobPath) throw createError({ statusCode: 400, statusMessage: "Uploaded files cannot be replaced with text" });
     if (existing && existing.content.kind !== input.content.kind) throw createError({ statusCode: 400, statusMessage: "Keep the object's content type when updating" });
+    // Only an ordinary new plan version adopts the current parser. Reading or
+    // starting an older case must keep its exact original snapshot semantics.
+    const content: ItemContent = input.content.kind === 'test_plan'
+      ? { ...input.content, cases: input.content.cases.map(testCase => ({ ...testCase, checksVersion: 2 })) }
+      : input.content;
     const version = (existing?.version ?? 0) + 1;
-    const values = { title: input.title, content: input.content, version, updatedAt: new Date() };
+    const values = { title: input.title, content, provenance, version, updatedAt: new Date() };
     const [saved] = existing
       ? await tx.update(schema.workspaceItems).set(values).where(eq(schema.workspaceItems.id, id)).returning()
       : await tx.insert(schema.workspaceItems).values({ id, workspaceId, ...values, blobPath: input.blobPath }).returning();
-    await tx.insert(schema.workspaceItemVersions).values({ id: crypto.randomUUID(), itemId: id, version, title: input.title, content: input.content });
+    await tx.insert(schema.workspaceItemVersions).values({ id: crypto.randomUUID(), itemId: id, version, title: input.title, content, provenance });
     if (input.threadId) {
       const [thread] = await tx.select().from(schema.threads).where(and(eq(schema.threads.id, input.threadId), eq(schema.threads.userId, userId), eq(schema.threads.workspaceId, workspaceId)));
       if (!thread) throw createError({ statusCode: 404, statusMessage: "Thread not found" });
@@ -107,7 +116,7 @@ export async function setItemDeleted(userId: string, workspaceId: string, itemId
   });
 }
 
-export async function saveFile(userId: string, workspaceId: string, name: string, mime: string, bytes: Buffer, threadId?: string, connection: WorkspaceDatabase = db) {
+export async function saveFile(userId: string, workspaceId: string, name: string, mime: string, bytes: Buffer, threadId?: string, connection: WorkspaceDatabase = db, options: EvidenceWriteOptions = {}) {
   await requireWorkspace(userId, workspaceId, connection);
   if (!bytes.length || bytes.length > 4 * 1024 * 1024) throw createError({ statusCode: 413, statusMessage: "Files must be between 1 byte and 4 MB" });
   const filename = name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 150) || "file";
@@ -115,7 +124,8 @@ export async function saveFile(userId: string, workspaceId: string, name: string
   const token = workspaceBlobToken();
   const blob = await put(`pat/workspaces/${workspaceId}/${crypto.randomUUID()}/${filename}`, bytes, { token, access: "private", contentType: mime, addRandomSuffix: true });
   try {
-    return await saveItem(userId, workspaceId, { title: filename, content: { kind: safeImage ? "image" : "file", filename, mime, size: bytes.length }, blobPath: blob.pathname, threadId }, connection);
+    const provenance: EvidenceProvenance = { ...(options.provenance ?? { version: 1, origin: 'unknown', producer: 'unknown', observedAt: null }), sha256: createHash('sha256').update(bytes).digest('hex') };
+    return await saveItem(userId, workspaceId, { title: filename, content: { kind: safeImage ? "image" : "file", filename, mime, size: bytes.length }, blobPath: blob.pathname, threadId }, connection, { provenance });
   }
   catch (error) { await del(blob.pathname, { token }).catch(() => {}); throw error; }
 }

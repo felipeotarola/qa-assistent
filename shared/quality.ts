@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import type { WorkspaceItem } from './workspace';
 import { caseReady, type TestCase } from './test-plan.ts';
-import { effectiveRunOutcome, type TestRun, testTargetSchema, type TestTarget } from './test-run.ts';
+import { effectiveRunOutcome, type TestRun, testTargetSchema } from './test-run.ts';
+import { sameTarget, hasTargetIdentity } from './test-target.ts';
+export { sameTarget } from './test-target.ts';
 
 export type { TestTarget } from './test-run';
 export const qualityConfigSchema = z.object({
@@ -21,17 +23,14 @@ export function defaultQuality(): QualitySettings {
   return { revision: 0, updatedAt: null, config: { target: { environment: '', url: '', revision: '' }, checks: [], regression: [] } };
 }
 export const caseKey = (itemId: string, caseId: string) => `${itemId}:${caseId}`;
-export function sameTarget(a: TestTarget, b: TestTarget) {
-  return a.environment === b.environment && a.url === b.url && a.revision === b.revision;
-}
 export function sameCase(a: TestCase, b: TestCase) {
-  return ['id', 'title', 'type', 'preconditions', 'steps', 'expected'].every(key => a[key as keyof TestCase] === b[key as keyof TestCase]);
+  return ['id', 'title', 'type', 'preconditions', 'steps', 'expected', 'entryUrl', 'checksVersion'].every(key => a[key as keyof TestCase] === b[key as keyof TestCase]);
 }
 export const qualityLabels = { passed: 'Godkänt', failed: 'Underkänt', inconclusive: 'Oklart', blocked: 'Blockerat', interrupted: 'Avbrutet', running: 'Pågår', untested: 'Inte testat', stale: 'Behöver testas om' };
 export type QualityStatus = keyof typeof qualityLabels;
 export function qualitySummary(items: WorkspaceItem[], runs: TestRun[], config: QualityConfig) {
   const targetSet = !!(config.target.environment || config.target.url || config.target.revision);
-  const targetComplete = !!(config.target.environment && config.target.revision);
+  const targetComplete = hasTargetIdentity(config.target);
   const runsByCase = new Map<string, TestRun[]>();
   for (const run of runs) {
     const key = caseKey(run.itemId, run.caseId);

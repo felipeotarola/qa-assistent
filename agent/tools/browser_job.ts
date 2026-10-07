@@ -1,3 +1,4 @@
+import { denyIrisCapability } from '../lib/iris-capabilities';
 import { defineTool } from 'eve/tools';
 import { z } from 'zod';
 import { missionBindingSchema } from '../../shared/mission-binding';
@@ -8,6 +9,7 @@ export default defineTool({
   description: 'Delegate live browser tests to Iris in a durable background Eve session. start requires complete task with test plan ID, scope and URL. Returns immediately: end your turn so the user can continue chatting. status/cancel require jobId. No polling loop. Progress and final report appear in Pågående arbete.',
   inputSchema: z.object({ action: z.enum(['start', 'status', 'cancel']), mission: missionBindingSchema.optional(), task: z.string().min(1).max(16000).optional(), jobId: z.string().uuid().optional() }),
   async execute(input, ctx) {
+    denyIrisCapability(ctx);
     const auth = ctx.session.auth.current;
     if (auth?.authenticator !== 'app' || typeof auth.attributes.browserThreadId !== 'string' || auth.attributes.browserWorker) throw new Error('Requires the main workspace chat.');
     const response = await fetch(`${appOrigin()}/api/internal/browser-jobs`, { method: 'POST', headers: internalHeaders(), signal: ctx.abortSignal, body: JSON.stringify({ ...input, userId: auth.principalId, threadId: auth.attributes.browserThreadId, parentSessionId: ctx.session.id, model: auth.attributes.chatModel, reasoning: auth.attributes.reasoning, jobId: input.action === 'start' ? repositoryRequestId(auth.attributes.browserThreadId, ctx.callId) : input.jobId }) });

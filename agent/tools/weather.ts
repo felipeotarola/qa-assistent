@@ -1,3 +1,4 @@
+import { denyIrisCapability } from '../lib/iris-capabilities';
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 
@@ -83,7 +84,8 @@ export default defineTool({
       }),
     ),
   }),
-  async execute({ location }) {
+  async execute({ location }, ctx) {
+    denyIrisCapability(ctx);
     const place = await geocode(location);
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", String(place.latitude));

@@ -14,6 +14,7 @@ export async function saveQuality(userId: string, workspaceId: string, input: un
   const parsed = qualityUpdateSchema.safeParse(input);
   if (!parsed.success) throw createError({ statusCode: 400, statusMessage: parsed.error.issues.map(issue => issue.message).join('; ').slice(0, 500) });
   const value = parsed.data;
+  if (value.config.target.scope) throw createError({ statusCode: 400, statusMessage: 'Observationsscope skapas av uppdraget. Ange en verklig releaseversion för gemensam testberedskap.' });
   await requireWorkspace(userId, workspaceId);
   return db.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`quality:${workspaceId}`}, 0))`);

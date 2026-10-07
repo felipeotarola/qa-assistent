@@ -1,3 +1,4 @@
+import { stampUserRequest } from '../../shared/mission-request-context';
 import { defineHook } from "eve/hooks";
 import { appOrigin, internalHeaders } from "../lib/internal-api";
 import { runtimeScope } from "../../shared/runtime-scope";
@@ -19,8 +20,11 @@ export default defineHook({
       // Archive the authenticated send's identity on its receipt, not in the
       // model prompt. Reconnects and notifications never fabricate a receipt.
       const clientMessageId = auth.attributes.browserMessageId;
-      const savedEvent = event.type === 'message.received' && typeof clientMessageId === 'string' && /^[a-f0-9-]{36}$/i.test(clientMessageId)
-        ? { ...event, data: { ...event.data, clientMessageId } } : event;
+      let savedEvent: MessageStreamEvent = event.type === 'message.received' && typeof clientMessageId === 'string' && /^[a-f0-9-]{36}$/i.test(clientMessageId)
+        ? { ...event, data: { ...event.data, clientMessageId } } as MessageStreamEvent : event;
+      const userRequest = !ctx.session.parent && stampUserRequest(event, { userId: auth.principalId, threadId,
+        sessionId: ctx.session.id, runtime: runtimeScope(), turnId: ctx.session.turn.id }, auth.attributes);
+      if (savedEvent.type === 'message.received' && userRequest) savedEvent = { ...savedEvent, data: { ...savedEvent.data, userRequest } } as MessageStreamEvent;
       pending.update(events => events.some(saved => saved.meta.id === event.meta.id) ? events : [...events, savedEvent]);
       if (!boundaries.has(event.type) && pending.get().length < 50) return;
       const batch = pending.get().slice(0, 100);

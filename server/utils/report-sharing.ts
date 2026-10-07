@@ -2,7 +2,7 @@ import { randomBytes, randomInt, randomUUID, scrypt as derive, timingSafeEqual, 
 import { promisify } from 'node:util';
 import { and, eq, isNull, sql, desc, gt } from 'drizzle-orm';
 import { db, schema } from '@nuxthub/db';
-import { get } from '@vercel/blob';
+import { get } from './evidence-storage';
 import type { H3Event } from 'h3';
 import { reportShares, reportShareSessions, reportShareAttempts, reportShareAudit } from '../db/schema/report-shares';
 import { missionReports, missions } from '../db/schema/missions';

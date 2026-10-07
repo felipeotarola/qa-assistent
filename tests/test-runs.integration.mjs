@@ -42,12 +42,14 @@ try {
   const created = await api('/api/internal/workspace','POST',{userId,threadId:t,input:{action:'create',title:'Run fixture',content:plan}},true);
   assert.equal(created.status,200);
   const item = created.data.item;
+  assert.deepEqual(item.content, { ...plan, cases: plan.cases.map(testCase => ({ ...testCase, checksVersion: 2 })) });
   const call = (input,threadId=t) => api('/api/internal/test-run','POST',{userId,threadId,...input},true);
   const input = {action:'start',itemId:item.id,caseId,expectedVersion:1,requestId:randomUUID(),environment:'Fixture / no live website'};
   assert.equal((await call({...input,expectedVersion:99})).status,409);
   assert.equal((await call(input,other)).status,404);
   const started = await call(input);
   assert.equal(started.status,200,JSON.stringify(started.data));
+  assert.deepEqual(started.data.snapshot, item.content.cases[0]);
   const id=started.data.id;
   assert.equal((await call(input)).data.id,id);
   assert.equal((await call({...input,environment:'Different'})).status,409);
@@ -61,7 +63,7 @@ try {
   assert.equal((await call({action:'finish',runId:id,result:{...result,actual:'Overwritten'}})).status,409);
   const read = await api('/api/internal/workspace','POST',{userId,threadId:t,input:{action:'read',itemId:item.id}},true);
   assert.equal(read.data.item.version,1);
-  assert.deepEqual(read.data.item.content,plan);
+  assert.deepEqual(read.data.item.content,item.content);
   const second=await call({...input,requestId:randomUUID()});
   assert.equal(second.status,200);
   assert.deepEqual(second.data.checks.map(c=>c.id),['step-1','expected']);

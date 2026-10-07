@@ -1,0 +1,40 @@
+// Explicitly authorized real Docker/Git preflight in the already running owned
+// WSL. No application service, network, alias, runtime env or model changes.
+import assert from 'node:assert/strict';
+import { spawn, execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve, dirname, sep } from 'node:path';
+import { promisify } from 'node:util';
+import { transportDockerfile, validateTransportPlan } from './helpers/repo-transport-linux.mjs';
+import { repoHash } from './helpers/repo-benchmark-contract.mjs';
+
+assert.equal(process.argv[2], '--execute', 'Explicit network-free fixture preflight required');
+const file = resolve(process.argv[3] || ''); assert.ok(file.startsWith(resolve('.data/autonomy-isolation/repo-fixtures') + sep));
+const original = validateTransportPlan(JSON.parse(await readFile(file, 'utf8'))), linux = JSON.parse(await readFile('.data/autonomy-isolation/linux/fixture.json', 'utf8'));
+assert.equal(linux.name, original.distro); assert.equal(resolve(linux.path), resolve('.data/autonomy-isolation/linux', linux.name));
+const id = randomUUID(), plan = { ...original, id, root: '/var/lib/syna-autonomy/repo-fixtures/' + id, imageTag: 'syna-repo-fixture:' + id, baseTag: '127.0.0.1:9/syna-repo-fixture-base:' + id };
+const bundles = Object.fromEntries(await Promise.all(plan.repositories.map(async repo => { const bytes = await readFile(resolve(dirname(file), repo.name + '.bundle')); assert.equal(repoHash(bytes), repo.bundleSha256); return [repo.name, bytes.toString('base64')]; })));
+const server = await readFile('tests/fixtures/repo-benchmark/git-server.mjs');
+const proof = String.raw`
+import assert from 'node:assert/strict';import {execFile}from'node:child_process';import{promisify}from'node:util';import * as fs from'node:fs/promises';import{createGitFixtureServer}from'/fixture/git-server.mjs';
+const p=JSON.parse(await fs.readFile('/fixture/proof-plan.json','utf8')),run=promisify(execFile),git=async(args,env=process.env)=>(await run('git',args,{env,timeout:15000,encoding:'utf8'})).stdout.trim();
+assert.equal(process.getuid(),1000);await fs.mkdir('/tmp/repos');await fs.mkdir('/tmp/checkouts');
+for(const r of p.repositories){assert.equal(await git(['ls-remote','--get-url',r.url]),r.transportUrl);await git(['clone','--bare','/fixture/'+r.name+'.bundle','/tmp/repos/'+r.name+'.git']);}
+const server=createGitFixtureServer('/tmp/repos');await new Promise(ok=>server.listen(0,'127.0.0.1',ok));const results=[];
+try{for(const r of p.repositories){const dir='/tmp/checkouts/'+r.name;await fs.mkdir(dir);const env={PATH:process.env.PATH,HOME:'/tmp',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_TERMINAL_PROMPT:'0'};await git(['-C',dir,'init','-q'],env);await git(['-C',dir,'remote','add','origin','http://127.0.0.1:'+server.address().port+'/'+r.name],env);await git(['-C',dir,'fetch','--depth=1','origin',r.commit],env);assert.equal(await git(['-C',dir,'rev-parse','FETCH_HEAD'],env),r.commit);assert.equal(await git(['-C',dir,'rev-parse','FETCH_HEAD^{tree}'],env),r.tree);assert.equal(await git(['-C',dir,'rev-parse','--is-shallow-repository'],env),'true');results.push({name:r.name,commit:r.commit,tree:r.tree,shallow:true});}console.log(JSON.stringify({uid:process.getuid(),mappingResolved:true,repositories:results,network:'none',transportScope:'Loopback smart HTTP only; external qa-repo-net route not exercised'}));}finally{server.closeAllConnections();await new Promise(ok=>server.close(ok));}
+`;
+const platform = Object.fromEntries(Object.entries(process.env).filter(([key]) => /^(?:path|pathext|systemroot|windir|comspec|temp|tmp)$/i.test(key)));
+const running = (await promisify(execFile)('wsl.exe', ['--list', '--running', '--quiet'], { env: platform, windowsHide: true, encoding: 'utf16le' })).stdout.replace(/\0/g, ''); assert.ok(running.split(/\r?\n/).map(x => x.trim()).includes(linux.name));
+const script = String.raw`
+import assert from'node:assert/strict';import{execFile}from'node:child_process';import{promisify}from'node:util';import*as fs from'node:fs/promises';const env={PATH:'/opt/syna-autonomy/node/bin:/usr/sbin:/usr/bin:/sbin:/bin',HOME:'/nonexistent',DOCKER_HOST:'unix:///var/run/docker.sock'};const exec=promisify(execFile),run=async a=>(await exec('docker',a,{env,encoding:'utf8',timeout:180000,maxBuffer:4000000})).stdout.trim();let raw='';for await(const b of process.stdin)raw+=b;const x=JSON.parse(raw),p=x.plan,root='/tmp/syna-repo-transport-preflight-'+p.id;assert.equal(process.getuid(),0);assert.equal(JSON.parse(await run(['info','--format','{{json .}}'])).DockerRootDir,'/var/lib/syna-autonomy/docker');assert.match(p.id,/^[a-f0-9-]{36}$/);assert.equal(JSON.parse(await run(['image','inspect',p.baseImage]))[0].Id,p.baseImage);await fs.mkdir(root,{mode:0o755});for(const [name,b64]of Object.entries(x.files)){assert.ok(/^(?:Dockerfile|proof\.mjs|proof-plan\.json|git-server\.mjs|(?:library|keyless|configured)\.bundle)$/.test(name));await fs.writeFile(root+'/'+name,Buffer.from(b64,'base64'),{flag:'wx',mode:0o444});}const tags=(await run(['image','ls','--format','{{.Repository}}:{{.Tag}}'])).split('\n');assert.ok(!tags.includes(p.baseTag)&&!tags.includes(p.imageTag));await run(['image','tag',p.baseImage,p.baseTag]);assert.equal(JSON.parse(await run(['image','inspect',p.baseTag]))[0].Id,p.baseImage);let result;try{await run(['build','--pull=false','--network=none','--tag',p.imageTag,'-f',root+'/Dockerfile',root]);const image=JSON.parse(await run(['image','inspect',p.imageTag]))[0],base=JSON.parse(await run(['image','inspect',p.baseTag]))[0];assert.equal(base.Id,p.baseImage);assert.deepEqual(image.RootFS.Layers.slice(0,base.RootFS.Layers.length),base.RootFS.Layers);assert.equal(image.Config.User,'1000:1000');const output=await run(['run','--rm','--name','syna-repo-preflight-'+p.id,'--label','syna.isolation='+p.distro,'--label','syna.repo.fixture='+p.id,'--runtime=runsc','--network=none','--user=1000:1000','--read-only','--tmpfs','/tmp:rw,nosuid,nodev,size=64m,uid=1000,gid=1000','--memory=512m','--memory-swap=512m','--pids-limit=128','--cpus=1','--cap-drop=ALL','--security-opt=no-new-privileges','--mount','type=bind,src='+root+',dst=/fixture,readonly',p.imageTag,'node','/fixture/proof.mjs']);result={passed:true,id:p.id,baseImage:base.Id,image:image.Id,proof:JSON.parse(output),root,cleanup:{containerAbsent:!(await run(['ps','--all','--format','{{.Names}}'])).split('\n').includes('syna-repo-preflight-'+p.id)},retained:{imageTag:p.imageTag,baseTag:p.baseTag}};}catch(e){result={passed:false,id:p.id,root,error:e.message,retained:{imageTag:p.imageTag,baseTag:p.baseTag}};}console.log(JSON.stringify(result));
+`;
+const files = { Dockerfile: Buffer.from(transportDockerfile(plan)).toString('base64'), 'proof.mjs': Buffer.from(proof).toString('base64'), 'proof-plan.json': Buffer.from(JSON.stringify(plan)).toString('base64'), 'git-server.mjs': server.toString('base64'), ...Object.fromEntries(Object.entries(bundles).map(([name, bytes]) => [name + '.bundle', bytes])) };
+const result = await new Promise((yes, no) => {
+  const child = spawn('wsl.exe', ['-d', linux.name, '-u', 'root', '--exec', '/opt/syna-autonomy/node/bin/node', '--input-type=module', '-e', script], { env: platform, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  let out = '', err = ''; child.stdout.on('data', b => out += b); child.stderr.on('data', b => err += b); child.on('error', no);
+  child.on('close', code => { if (code) no(new Error(err)); else { try { yes(JSON.parse(out)); } catch (error) { no(error); } } }); child.stdin.end(JSON.stringify({ plan, files }));
+});
+const artifact = resolve('.data/autonomy-isolation', `repo-transport-preflight-${id}.json`);
+await writeFile(artifact, JSON.stringify({ ...result, sourceSha256: repoHash(server), modelCalls: 0, observedAt: new Date().toISOString() }, null, 2) + '\n', { flag: 'wx' });
+console.log(JSON.stringify({ artifact, ...result })); process.exitCode = result.passed ? 0 : 1;

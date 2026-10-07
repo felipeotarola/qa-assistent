@@ -252,3 +252,25 @@ it falls back to `INTERNAL_API_SECRET`. Rotating it invalidates existing PIN
 verification. Apply migrations 0019–0021 before deploying the app and agent.
 See [Klara reporting](KLARA_REPORTING.md) for queue limits, recovery, sharing
 boundaries and reproducible integration/browser checks.
+
+## Autonomous QA missions (staged implementation)
+
+`AUTONOMOUS_MISSIONS_ENABLED=true` is an explicit opt-in. Without it the
+new controller cannot admit autonomous execution. Apply the app's prefixed
+migrations 0022–0029 before enabling it, and deploy matching app, Eve,
+browser and repository/Codex worker protocols. An HTTP listener alone does
+not prove that executor admission callbacks can reach the application.
+`MISSION_AUTOMATIC_REPORTS` controls the older report path; it does not
+enable autonomous continuation. `GRUNDEN_MIN_REQUEST_INTERVAL_MS` optionally
+spaces provider calls through shared PostgreSQL (0–30,000 ms). Queue admission
+waits at most 120 seconds, bounded sooner by caller cancellation or its deadline.
+After waiting, execution authority and budget are checked again before a physical
+call. This does not guarantee RPM, token-rate limits or fairness between waiters,
+and it does not retry rejected model calls with unknown consumption.
+
+See [autonomy rollout](AUTONOMY_ROLLOUT.md) for exact flags, authorization,
+Vault consent, scheduler ownership, migrations, rollback and outstanding
+acceptance gates. These changes are under isolated verification. No
+production enablement is implied by this configuration reference. Never run
+the root `dev` or `build` scripts against a database assumed to be local:
+both migrate, and NuxtHub can compile its database connection into output.

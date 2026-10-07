@@ -2,8 +2,12 @@ import { spawn } from 'node:child_process';
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { inspectionCommand, executionPlan } from './preflight.mjs';
+import { missionExecution } from '../../shared/mission-execution.mjs';
+import { ExecutorAdmission, executionHash } from '../execution/admission.mjs';
 
 export const terminal = status => ['passed', 'failed', 'blocked', 'cancelled', 'review'].includes(status);
+const cleanupPending = job => job.cleanup?.confirmed === false || job.cleanup?.confirmed !== true && job.telemetry?.failureKind === 'cleanup';
+const cleanupAttempts = 3, cleanupIntervalMs = 30000;
 export function validate(input) {
   if (!input || !/^[a-f0-9-]{36}$/.test(input.id || '')) throw new Error('Invalid run ID');
   const url = new URL(input.url);
@@ -17,7 +21,12 @@ export function validate(input) {
   if (input.args !== undefined && (!Array.isArray(input.args) || input.args.length > 20 || input.args.some(arg => typeof arg !== 'string' || arg.length > 300 || arg.includes('\0')))) throw new Error('Invalid test arguments');
   if (input.directory && input.directory !== '.' && (!/^[\w][\w./-]{0,199}$/.test(input.directory) || input.directory.split('/').some(p => p === '..' || !p))) throw new Error('Invalid project directory');
   if (input.workspaceId && !/^[a-f0-9-]{36}$/.test(input.workspaceId)) throw new Error('Invalid workspace');
-  return { ...(input.directory ? { directory: input.directory } : {}), ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}), ...(input.args?.length ? { args: input.args } : {}), id: input.id, url: `https://github.com${url.pathname.replace(/\/$/, '').replace(/\.git$/, '')}`, ref, script, mode };
+  const execution = input.execution === undefined ? null : missionExecution(input.execution);
+  if (execution && Object.keys(input).some(key => !['id', 'url', 'ref', 'script', 'mode', 'args', 'directory', 'workspaceId', 'execution', 'expectedCommit'].includes(key))) throw new Error('Unknown autonomous repository request field');
+  if (execution && execution.dispatchId !== input.id) throw new Error('Run ID must equal execution dispatch ID');
+  if (input.expectedCommit !== undefined && (typeof input.expectedCommit !== 'string' || !/^[a-f0-9]{40}$/.test(input.expectedCommit))) throw new Error('Invalid expected commit');
+  if (execution && mode === 'test' && !input.expectedCommit) throw new Error('Autonomous tests require the inspected commit');
+  return { ...(execution ? { execution } : {}), ...(input.expectedCommit ? { expectedCommit: input.expectedCommit } : {}), ...(input.directory ? { directory: input.directory } : {}), ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}), ...(input.args?.length ? { args: input.args } : {}), id: input.id, url: `https://github.com${url.pathname.replace(/\/$/, '').replace(/\.git$/, '')}`, ref, script, mode };
 }
 const command = (args, signal, onData) => new Promise((resolve, reject) => {
   const child = spawn('docker', args, { signal, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -30,10 +39,11 @@ const command = (args, signal, onData) => new Promise((resolve, reject) => {
   child.on('close', code => resolve({ code, output }));
 });
 export class Runner {
-  constructor({ directory, timeoutMs = 600000, execute = command, fixture = null, onState = async () => {}, budget = null, storage = null }) {
+  constructor({ directory, timeoutMs = 600000, execute = command, fixture = null, onState = async () => {}, budget = null, storage = null, admission = new ExecutorAdmission(), now = Date.now, cleanupTimeoutMs = 30000 }) {
     this.directory = directory; this.timeoutMs = timeoutMs;
     this.execute = execute; this.fixture = fixture; this.jobs = new Map(); this.controllers = new Map(); this.busy = false;
-    this.onState = onState; this.writes = new Map(); this.stopping = false; this.budget = budget; this.lastWorkspace = null; this.storage = storage;
+    this.onState = onState; this.writes = new Map(); this.stopping = false; this.budget = budget; this.lastWorkspace = null; this.storage = storage; this.admission = admission;
+    this.now = now; this.cleanupTimeoutMs = cleanupTimeoutMs; this.cleanupLocks = new Map();
   }
   async save(job) {
     job.revision = (job.revision || 0) + 1;
@@ -54,20 +64,22 @@ export class Runner {
     for (const file of await readdir(this.directory)) {
       if (!/^[a-f0-9-]{36}\.json$/.test(file)) continue;
       const job = JSON.parse(await readFile(`${this.directory}/${file}`, 'utf8'));
+      if (file !== `${job.id}.json`) throw new Error('Saved job identity does not match its file');
+      if (job.cleanup?.resourceId && job.cleanup.resourceId !== job.id) throw new Error('Saved cleanup resource identity changed');
       this.jobs.set(job.id, job);
-      if ((!terminal(job.status) && job.status !== 'queued') || job.telemetry?.failureKind === 'cleanup') {
-        const removed = await this.execute(['rm', '-f', `qa-repo-${job.id}`], AbortSignal.timeout(30000));
-        if (removed.code !== 0 && !removed.output.includes('No such container')) throw new Error('Interrupted container could not be removed; worker admission remains disabled');
-        await this.storage?.remove(job.id);
+      const interruptedBeforeCleanup = !terminal(job.status) && !['queued', 'cleaning'].includes(job.status) && !cleanupPending(job) && !job.cleanupRetry;
+      if (!terminal(job.status) && job.status !== 'queued') {
         job.status = 'blocked'; job.message = 'Körningen avbröts när testtjänsten startades om. Starta en ny körning.';
         job.telemetry = { ...job.telemetry, failureKind: 'interrupted' };
+        if (!job.cleanup?.confirmed) job.cleanup = { resourceId: job.id, confirmed: false, observedAt: new Date().toISOString() };
         job.finishedAt = new Date().toISOString(); await this.save(job);
       }
+      if (cleanupPending(job) && !await this.cleanup(job, interruptedBeforeCleanup)) throw new Error('Interrupted container could not be removed; worker admission remains disabled');
     }
   }
   async submit(input) {
     const config = validate(input);
-    const fingerprint = createHash('sha256').update(JSON.stringify(config)).digest('hex');
+    const fingerprint = config.execution ? executionHash(config) : createHash('sha256').update(JSON.stringify(config)).digest('hex');
     const previous = this.jobs.get(config.id);
     if (previous) { if (previous.fingerprint !== fingerprint) throw new Error('Run ID already used'); return previous; }
     if ([...this.jobs.values()].filter(j => !terminal(j.status)).length >= 20) throw new Error('Test queue is full');
@@ -77,10 +89,56 @@ export class Runner {
     void this.drain().catch(error => { console.error('Repository queue stopped:', error.message); }); return job;
   }
   async cancel(id) {
-    const job = this.jobs.get(id); if (!job || terminal(job.status)) return job;
+    const job = this.jobs.get(id); if (!job) return job;
+    if (terminal(job.status)) { if (cleanupPending(job) && !this.controllers.has(id)) await this.cleanup(job); return job; }
     if (this.controllers.has(id)) { job.telemetry.cancellationRequested = true; this.controllers.get(id).abort(); await this.save(job); }
-    else { job.status = 'cancelled'; job.message = 'Avbruten'; job.finishedAt = new Date().toISOString(); await this.save(job); }
+    else { job.status = 'cancelled'; job.message = 'Avbruten'; job.finishedAt = new Date().toISOString(); if (job.execution) job.cleanup = { resourceId: job.id, confirmed: true, observedAt: job.finishedAt }; await this.save(job); }
     return job;
+  }
+  /** Cleanup is an idempotent physical removal, never a replay of repository
+   * commands. Reserve each attempt durably before effects, including on restart. */
+  async cleanup(job, initial = false) {
+    if (this.jobs.get(job.id) !== job || !/^[a-f0-9-]{36}$/.test(job.id)) throw new Error('Unknown cleanup identity');
+    if (job.cleanup?.resourceId && job.cleanup.resourceId !== job.id) throw new Error('Cleanup resource identity changed');
+    if (job.execution) {
+      const config = validate(Object.fromEntries(['id', 'url', 'ref', 'script', 'mode', 'args', 'directory', 'workspaceId', 'execution', 'expectedCommit'].filter(key => job[key] !== undefined).map(key => [key, job[key]])));
+      if (executionHash(config) !== job.fingerprint) throw new Error('Cleanup execution identity changed');
+    }
+    if (job.cleanup?.confirmed) return true;
+    if (this.cleanupLocks.has(job.id)) return this.cleanupLocks.get(job.id);
+    const saved = job.cleanupRetry, now = this.now();
+    // Old terminal cleanup failures already consumed their original attempt.
+    const count = saved?.attempts ?? (!initial && terminal(job.status) && cleanupPending(job) ? 1 : 0);
+    if (!Number.isSafeInteger(count) || count < 0 || saved && (!Number.isFinite(Date.parse(saved.nextAttemptAt)) || !Number.isFinite(Date.parse(saved.attemptedAt)))) throw new Error('Invalid cleanup retry history');
+    const nextAttemptAt = saved ? Date.parse(saved.nextAttemptAt) : count ? Date.parse(job.cleanup?.observedAt || job.finishedAt || job.updatedAt) + cleanupIntervalMs : 0;
+    if (!Number.isFinite(nextAttemptAt)) throw new Error('Invalid cleanup retry timestamp');
+    if (count >= cleanupAttempts || now < nextAttemptAt) return false;
+    const abort = new AbortController(); let timer;
+    // Keep the lock until the physical operation actually settles, even when the
+    // caller's bounded wait expires. A hung storage removal is an admin blocker.
+    const work = Promise.resolve().then(async () => {
+      job.cleanupRetry = { attempts: count + 1, attemptedAt: new Date(now).toISOString(), nextAttemptAt: new Date(now + cleanupIntervalMs).toISOString(), exhausted: count + 1 >= cleanupAttempts };
+      job.cleanup = { resourceId: job.id, confirmed: false, observedAt: new Date(now).toISOString() };
+      await this.save(job); abort.signal.throwIfAborted();
+      const name = `qa-repo-${job.id}`;
+      const removed = await this.execute(['rm', '-f', name], abort.signal);
+      abort.signal.throwIfAborted();
+      if (removed.code !== 0 && !new RegExp(`No such container:\\s*${name}(?:\\s|$)`).test(removed.output)) return false;
+      await this.storage?.remove(job.id); abort.signal.throwIfAborted();
+      // Expose a positive receipt only after its durable write, never while a
+      // concurrent GET can still observe an uncommitted confirmation.
+      const confirmed = { ...job, cleanup: { resourceId: job.id, confirmed: true, observedAt: new Date(this.now()).toISOString() } };
+      const persisted = this.save(confirmed);
+      job.revision = confirmed.revision; job.updatedAt = confirmed.updatedAt;
+      await persisted; abort.signal.throwIfAborted();
+      job.cleanup = confirmed.cleanup;
+      this.budget?.release(job.id);
+      return true;
+    }).catch(() => false);
+    const response = Promise.race([work, new Promise(resolve => { timer = setTimeout(() => { abort.abort(); resolve(false); }, this.cleanupTimeoutMs); })]);
+    this.cleanupLocks.set(job.id, response);
+    void work.finally(() => { clearTimeout(timer); if (this.cleanupLocks.get(job.id) === response) this.cleanupLocks.delete(job.id); });
+    return response;
   }
   async drain() {
     if (this.busy) return; this.busy = true;
@@ -96,14 +154,14 @@ export class Runner {
         }
         if (this.budget && !this.budget.reserve(job.id, 1536)) break;
         this.lastWorkspace = job.workspaceId;
-        try { await this.run(job); } finally { if (job.telemetry?.failureKind !== 'cleanup') this.budget?.release(job.id); }
+        try { await this.run(job); } finally { if (!cleanupPending(job)) this.budget?.release(job.id); }
       }
     } finally { this.busy = false; }
   }
   async run(job) {
     const abort = new AbortController(); this.controllers.set(job.id, abort);
     let timedOut = false, storageFailed = false;
-    const timer = setTimeout(() => { timedOut = true; abort.abort(); }, this.timeoutMs);
+    const timer = setTimeout(() => { timedOut = true; abort.abort(); }, Math.max(1, Math.min(this.timeoutMs, job.execution ? Date.parse(job.execution.deadlineAt) - Date.now() : Infinity)));
     const name = `qa-repo-${job.id}`;
     job.telemetry = { workerId: 'vps-repository', heartbeatAt: new Date().toISOString(), startedAt: new Date().toISOString(), phaseStartedAt: new Date().toISOString(), operationKind: job.mode === 'inspect' ? 'inspect' : 'test' };
     let checkpointing = false;
@@ -114,9 +172,23 @@ export class Runner {
     }, 500);
     checkpoint.unref();
     const phase = async (status, message) => { job.status = status; job.message = message; job.telemetry.phaseStartedAt = new Date().toISOString(); await this.save(job); };
+    let commandIndex = 0;
+    const authorize = async (operationId, kind, payload) => {
+      if (!job.execution) return;
+      await this.admission.admit({ execution: job.execution, resourceId: job.id, operationId, kind, payloadHash: executionHash(payload) });
+      abort.signal.throwIfAborted();
+    };
     const exec = async args => {
       abort.signal.throwIfAborted();
+      const operationId = `command:${commandIndex++}`;
+      if (job.execution) {
+        job.commandJournal ||= {};
+        if (job.commandJournal[operationId]) throw new Error('Command outcome is already recorded or unknown; automatic replay is denied');
+        job.commandJournal[operationId] = { payloadHash: executionHash(args), state: 'unknown' }; await this.save(job);
+        await authorize(operationId, 'repository.command', args);
+      }
       const result = await this.execute(args, abort.signal, text => { job.logs = (job.logs + text).slice(-64000); job.updatedAt = new Date().toISOString(); });
+      if (job.execution) { job.commandJournal[operationId].state = 'completed'; await this.save(job); }
       job.logs = (job.logs + `\n[runner] Exit code: ${result.code}\n`).slice(-64000);
       if (abort.signal.aborted) throw new Error('Stopped');
       return result;
@@ -128,24 +200,37 @@ export class Runner {
     };
     let outcome = 'blocked', message = '';
     try {
+      await authorize('job', job.mode === 'inspect' ? 'repository.inspect' : 'repository.test', { fingerprint: job.fingerprint });
       await phase('preparing', 'Hämtar repository och identifierar projektet');
       const workspaceMount = this.storage ? ['--mount', `type=bind,src=${await this.storage.prepare(job.id)},dst=/workspace`] : ['--tmpfs', '/workspace:rw,exec,nosuid,nodev,size=4294967296,uid=1000,gid=1000'];
       const launched = await exec(['run', '-d', '--runtime=runsc', '--name', name, '--label', 'qa.repository-run=true', '--init', '--network', 'qa-repo-net', '--dns', '1.1.1.1', '--dns', '8.8.8.8', '--mount', 'type=bind,src=/opt/qa-repo-runner/resolv.conf,dst=/etc/resolv.conf,readonly', '--memory', '1536m', '--memory-swap', '1536m', '--cpus', '1', '--pids-limit', '256', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', '1000:1000', ...workspaceMount, '--tmpfs', '/tmp:rw,exec,nosuid,nodev,size=268435456,uid=1000,gid=1000', '-e', 'HOME=/workspace/.home', '-e', 'PLAYWRIGHT_BROWSERS_PATH=/workspace/browsers', '-e', 'JAVA_TOOL_OPTIONS=-Duser.home=/workspace/.home', '-e', 'GRADLE_USER_HOME=/workspace/.gradle', '-e', 'MAVEN_USER_HOME=/workspace/.m2', '-e', 'CI=true', '-e', 'GIT_TERMINAL_PROMPT=0', process.env.EXECUTION_IMAGE || 'qa-repo-runner:public', 'sleep', 'infinity']);
       if (launched.code !== 0) { job.telemetry.failureKind = 'runtime'; throw new Error('Testmiljön kunde inte startas'); }
       if (this.fixture) await this.fixture(name, exec);
-      else {
+      else if (job.expectedCommit) {
+        // A branch may move after discovery. Fetch and detach the frozen commit;
+        // never execute its replacement and merely report the expected SHA.
+        for (const args of [['init', 'repo'], ['-C', 'repo', 'remote', 'add', 'origin', job.url], ['-C', 'repo', '-c', 'http.followRedirects=false', 'fetch', '--depth=1', 'origin', job.expectedCommit], ['-C', 'repo', 'checkout', '--detach', 'FETCH_HEAD']]) {
+          const fetched = await exec(['exec', '-w', '/workspace', name, 'git', ...args]);
+          if (fetched.code !== 0) { job.telemetry.failureKind = 'checkout'; throw new Error('Den frysta committen kunde inte hämtas'); }
+        }
+      } else {
         const fetched = await exec(['exec', '-w', '/workspace', name, 'git', '-c', 'http.followRedirects=false', 'clone', '--depth=1', ...(job.ref ? ['--branch', job.ref] : []), '--', job.url, 'repo']);
         if (fetched.code !== 0) { job.telemetry.failureKind = 'checkout'; throw new Error('Repository kunde inte hämtas. Kontrollera att URL och branch är publika.'); }
       }
       const revision = await inside(['git', 'rev-parse', 'HEAD']);
       if (revision.code !== 0 || !/^[a-f0-9]{40}$/.test(revision.output.trim())) throw new Error('Kunde inte fastställa commit');
       job.commit = revision.output.trim();
+      if (job.expectedCommit && job.commit !== job.expectedCommit) throw new Error('Checkout does not match the inspected commit');
       const metadata = await inside(['node', '-e', inspectionCommand]);
       job.telemetry.failureKind = 'configuration';
       if (metadata.code !== 0) throw new Error('Projektfilerna kunde inte läsas. Se körloggen.');
       const inventory = JSON.parse(metadata.output.trim());
       job.projects = inventory.projects || [];
-      job.plan = executionPlan(inventory, job);
+      // Inventory is useful even for ambiguous monorepos or unsupported runtimes.
+      // Strategy selection happens after inspection, before executable test work.
+      try { job.plan = executionPlan(inventory, job); }
+      catch (error) { if (job.mode !== 'inspect') throw error; job.plan = null; job.planningNote = error.message; }
+      if (!job.plan) { outcome = 'review'; message = 'Projekt inventerade. Körningsplan behöver väljas; inga tester har körts.'; return; }
       job.package = job.plan.project.kind === 'node' ? job.plan.project : null;
       job.selectedScript = job.plan.selectedScript;
       job.telemetry.operationKind = job.plan.operationKind;
@@ -180,8 +265,7 @@ export class Runner {
       clearInterval(checkpoint);
       await phase('cleaning', 'Städar testmiljön').catch(() => { storageFailed = true; });
       try {
-        const removed = await this.execute(['rm', '-f', name], AbortSignal.timeout(30000));
-        if (removed.code !== 0 && !removed.output.includes('No such container')) { outcome = 'blocked'; job.telemetry.failureKind = 'cleanup'; message = 'Testmiljön kunde inte städas. Kontakta administratören.'; } else await this.storage?.remove(job.id);
+        if (!await this.cleanup(job)) { outcome = 'blocked'; job.telemetry.failureKind = 'cleanup'; message = 'Testmiljön kunde inte städas. Kontakta administratören.'; }
       } catch { outcome = 'blocked'; job.telemetry.failureKind = 'cleanup'; message = 'Testmiljön kunde inte städas. Administratören behöver kontrollera tjänsten.'; }
       if (['passed', 'review'].includes(outcome)) delete job.telemetry.failureKind;
       if (storageFailed && job.telemetry.failureKind !== 'cleanup') { outcome = 'blocked'; job.telemetry.failureKind = 'runtime'; message = 'Körstatus kunde inte sparas tillförlitligt. Se loggen och starta vid behov en ny körning.'; }

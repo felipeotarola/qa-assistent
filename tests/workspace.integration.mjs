@@ -59,6 +59,7 @@ try {
   const plan = converted.data.item;
   assert.equal(plan.content.kind, 'test_plan');
   assert.equal(plan.content.cases[0].steps, 'Open login');
+  assert.equal(plan.content.cases[0].checksVersion, 2);
   assert.equal(plan.content.cases[0].status, undefined);
   assert.equal((await tool(t2, { action: 'read', itemId: source.id })).data.item.version, 1);
   assert.equal((await tool(t2, { action: 'read', itemId: plan.id })).data.item.content.cases[0].id, plan.content.cases[0].id);
@@ -68,6 +69,7 @@ try {
   assert.equal(planUpdate.status, 200);
   assert.equal(planUpdate.data.item.version, 2);
   assert.equal(planUpdate.data.item.content.cases[0].id, plan.content.cases[0].id);
+  assert.deepEqual(planUpdate.data.item.content.cases, plan.content.cases);
   assert.equal((await tool(t2, { action: 'read', itemId: plan.id, version: 1 })).data.item.version, 1);
   assert.equal((await tool(other, { action: 'read', itemId: plan.id, version: 1 })).status, 404);
   const publicationPath = `/api/workspaces/${a}/items/${plan.id}/publication`;

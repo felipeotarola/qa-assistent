@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "source": "Privately authored deterministic fixtures; never served or placed in a repository checkout",
+  "scenarios": {
+    "REPO-10": { "fixture": "library", "directory": ".", "script": "test", "command": ["npm", "--ignore-scripts", "run", "test", "--"], "expectedExitCode": 1, "requiredLogText": ["the cart total includes every quantity", "1250", "3750"], "requiresBrowser": false, "requiresConfiguration": false },
+    "REPO-11": { "fixture": "keyless", "directory": ".", "port": 3000, "requiresBrowser": true, "requiresConfiguration": false, "observations": [{ "action": "open", "toPath": "/", "status": 200, "text": "Serviceguiden", "outcome": "passed" }, { "action": "click", "fromPaths": ["/", "/kontakt"], "toPath": "/hjalp", "status": 200, "text": "Hjälp", "outcome": "passed" }, { "action": "click", "fromPaths": ["/", "/hjalp", "/kontakt"], "toPath": "/kontakt-old", "status": 404, "text": "Sidan saknas", "outcome": "failed" }] },
+    "REPO-12": { "fixture": "configured", "directory": ".", "port": 3000, "requiresBrowser": true, "requiresConfiguration": true, "requiredNames": ["SERVICE_ACCESS_TOKEN", "SERVICE_BASE_URL"], "observations": [{ "action": "open", "toPath": "/", "status": 200, "text": "Konfiguration kontrollerad", "outcome": "passed" }, { "action": "click", "fromPath": "/", "toPath": "/hjalp", "status": 200, "text": "Hjälp", "outcome": "passed" }] }
+  }
+}

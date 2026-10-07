@@ -207,9 +207,60 @@ tests. `RUN_QUALITY_TESTS=1 node --env-file=.env tests/quality.integration.mjs`
 uses a disposable account to verify scope, conflicts, reset behavior and run
 history. Never use synthetic fixture outcomes as product test evidence.
 
-### Browser delegation: Iris
+### Autonomous missions (controller version 1)
 
-The main agent V delegates multi-step browser tests with `browser_job`. Iris
+The autonomous path is implemented behind `AUTONOMOUS_MISSIONS_ENABLED`.
+Implementation is not deployment certification: the dated verification and open
+acceptance gates are maintained in [the development plan](AUTONOMOUS_MISSIONS_PLAN.md)
+and [the rollout guide](AUTONOMY_ROLLOUT.md).
+
+V admits a bounded assignment through `qa_mission`. The persisted mission owns
+the original request, owner/workspace/runtime, target, mandate and plan revisions,
+budgets, deadlines, tasks, physical attempts and resource claims. Closing the
+chat disconnects its subscription; it does not own or stop this work.
+
+`agent/schedules/autonomy.ts` calls the authenticated controller every minute.
+`server/utils/mission-controller.ts` reconciles saved executor receipts and
+dispatches eligible tasks under a fenced database lease. Discovery, planning,
+Iris execution, Klara review and final reporting use that same mission. Repository
+inspection/testing and Otto's prepare/apply/preview path also join this controller;
+they are not a second continuation engine. Read-only activity, mission and
+assessment endpoints do not drive the queues.
+
+Each attempt has a stable dispatch identity and an explicit scope. An uncertain
+external acknowledgement is reconciled rather than treated as permission for a
+second start. Losing a lease is not evidence that a physical process stopped.
+Cancellation, expiry and disabled admission still need compatible callbacks and
+resource cleanup. Human-owned browser sessions retain their separate ownership.
+
+Observations, agent conclusions and independent evidence remain different data.
+Trusted capture paths bind saved bytes to run/attempt, target and content hash;
+uploading or rewriting an agent note cannot grant that provenance. Klara's review
+is stored separately from the original test result. Typed evidence gaps may
+create at most two scoped complement rounds within the original mandate and
+budget. A supported defect finishes an investigation; it does not trigger retries
+until the result becomes green. A report-only assignment cannot start tests.
+
+Final reports read a versioned mission snapshot. A deterministic bounded selector
+reads evidence before the report writer runs (at most 24 sources, including six
+images). Unread or unavailable evidence stays explicit. The writer receives the
+actual text/image bytes; validation checks citations, applicability and source
+freshness again before saving. Report delivery, review verdict and product outcome
+are separate states. Shared public/PIN reports use an allowlisted projection,
+not the internal workspace snapshot.
+
+Vault configuration and permission to apply it are separate. Otto must provide a
+verified repository/commit/start plan. Application requires a matching saved
+consent and current vault revision; a key merely existing does not authorize
+another repository or process. Runtime policy, deadlines and revision fencing
+apply again at physical execution. Default work duration is 60 minutes, user
+wait 15 minutes and final report delivery 10 minutes, within the saved mandate.
+Independent permitted work can continue while one branch waits. A late answer
+does not revive an expired assignment.
+
+### Legacy browser delegation: Iris
+
+Outside a version-1 autonomous mission, V can delegate browser tests with `browser_job`. Iris
 uses a separate durable Eve session through `agent/channels/iris.ts`; the model
 loop runs in Eve and browser actions run on the existing VPS browser service.
 This is an asynchronous worker session, not a synchronous subagent tool call.
@@ -241,7 +292,7 @@ ownership and cancellation. This opt-in test uses the configured pilot account,
 model provider and VPS browser and removes its disposable workspace afterwards.
 
 For channels, tools, connections, and deployment details, read Eve guides in `node_modules/eve/dist/docs/public/`.
-# Repository setup feedback and configuration
+## Legacy repository setup feedback and configuration
 
 Codex starts register a durable `pat_setup_jobs` record with workspace, thread,
 runtime, parent Eve session and sandbox identity. A startup task calls the worker's

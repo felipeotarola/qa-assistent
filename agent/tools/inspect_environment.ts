@@ -1,3 +1,4 @@
+import { denyIrisCapability } from '../lib/iris-capabilities';
 import { defineTool } from 'eve/tools';
 import { z } from 'zod';
 import { environmentInspectionCommand } from '../lib/environment-inspection.mjs';
@@ -7,6 +8,7 @@ export default defineTool({
   description: 'Read the current isolated VPS environment before cloning, reinstalling, retrying setup or starting an app. Returns existing repository paths, sanitized origins, branch/commit, local changes, dependency presence, processes, listening TCP ports and free disk. Reuse matching work before starting more. Dependencies present does not prove a complete installation; a port does not prove app health. This does not inspect other users or checkouts from disposable repository jobs.',
   inputSchema: z.object({}),
   async execute(_input, ctx) {
+    denyIrisCapability(ctx);
     const auth = ctx.session.auth.current;
     let vault: unknown = { available: false, note: 'Vault was not checked; do not claim keys are absent.' };
     if (auth?.authenticator === 'app' && auth.principalId && typeof auth.attributes.browserThreadId === 'string') {

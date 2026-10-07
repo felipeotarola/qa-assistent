@@ -49,7 +49,8 @@ async function fixture(t, accessMode = 'pilot') {
       return { status: 'completed', exitCode: 0, stdout: '{}', stderr: '' };
     },
   };
-  const worker = new CodexWorker({ directory, sandboxes, inspectionCommand: () => 'inspect-fixed', allowedUser: input.userId, accessMode });
+  // Persistence/ownership fixture never launches a real control process.
+  const worker = new CodexWorker({ directory, sandboxes, inspectionCommand: () => 'inspect-fixed', allowedUser: input.userId, accessMode, Client: class { constructor() { throw new Error('Unexpected real execution in synthetic fixture'); } } });
   worker.run = async () => {};
   await worker.init();
   t.after(async () => { await worker.close(); await rm(directory, { recursive: true, force: true }); });

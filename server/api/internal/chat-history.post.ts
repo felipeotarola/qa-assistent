@@ -1,11 +1,11 @@
 import { z } from "zod";
 import type { MessageStreamEvent } from "eve/client";
 import { requireInternalRequest } from "../../utils/internal-api";
-import { chatHistory, isChatRoot, saveChatEvents } from "../../utils/chat-history";
+import { chatHistory, isChatRoot, saveChatEvents, priorRequestMessages } from "../../utils/chat-history";
 
 export default defineEventHandler(async event => {
   requireInternalRequest(event);
-  const body = await readValidatedBody(event, z.object({ userId: z.string().uuid(), threadId: z.string().uuid(), sessionId: z.string().min(1), runtime: z.string().max(300).optional(), events: z.array(z.object({ type: z.string(), meta: z.object({ id: z.string(), at: z.string().datetime() }) }).passthrough()).max(100).optional() }).parse);
+  const body = await readValidatedBody(event, z.object({ userId: z.string().uuid(), threadId: z.string().uuid(), sessionId: z.string().min(1), runtime: z.string().max(300).optional(), requestTurnId: z.string().min(1).max(400).optional(), events: z.array(z.object({ type: z.string(), meta: z.object({ id: z.string(), at: z.string().datetime() }) }).passthrough()).max(100).optional() }).parse);
   if (body.events) {
     await saveChatEvents(body.userId, body.threadId, body.sessionId, body.events as MessageStreamEvent[], body.runtime);
     return { saved: true };
@@ -22,5 +22,7 @@ export default defineEventHandler(async event => {
     if (length + size > 60000) break;
     selected.unshift(entry); length += size;
   }
-  return { context: JSON.stringify(selected), truncated: selected.length < messages.length || messages.some(m => m.text.length > 50000) };
+  const requestMessages = body.requestTurnId && body.runtime
+    ? await priorRequestMessages(body.userId, body.threadId, body.sessionId, body.runtime, body.requestTurnId) : [];
+  return { requestMessages, context: JSON.stringify(selected), truncated: selected.length < messages.length || messages.some(m => m.text.length > 50000) };
 });

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "preparation": "versioned immutable WEB04 site plus actual POST/cookie AUTH09 fixture; no model or browser run claimed",
+  "regression": {
+    "origin": "http://qa-regression.test",
+    "before": "/regression/a",
+    "after": "/regression/b",
+    "checks": [
+      { "id": "return_fixed", "action": "click", "fromPath": "/regression/b/article", "toPath": "/regression/b", "heading": "Besöksinformation", "status": 200, "classification": "known_working", "visibleText": ["Låna böcker", "Kontakt", "Webbversion B"] },
+      { "id": "contact_unchanged", "action": "click", "fromPath": "/regression/b", "toPath": "/regression/b/contact", "heading": "Kontakt", "status": 200, "classification": "known_working", "visibleText": ["besok@linden.example.test", "Webbversion B"] }
+    ]
+  },
+  "authentication": {
+    "origin": "http://qa-auth.test",
+    "target": "/account",
+    "login": "/login",
+    "requirements": ["Unauthenticated /account returns 303 /login", "User submits a real form POST with valid CSRF and fictitious credentials", "Login returns 303 /account and an HttpOnly SameSite cookie", "The same physical browser makes authenticated GET /account using the issued cookie", "The returned agent observes profile contents in that exact browser session"],
+    "profile": { "heading": "Min profil", "name": "Elin Exempel", "email": "elin.fixture@example.test", "membership": "LINDEN-1042" }
+  }
+}

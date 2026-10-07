@@ -6,6 +6,8 @@ export const browserJobs = pgTable('pat_browser_jobs', {
   runtime: text('runtime').notNull(),
   parentSessionId: text('parent_session_id').notNull(),
   sessionId: text('session_id'),
+  dispatchLeaseToken: text('dispatch_lease_token'),
+  dispatchLeaseUntil: timestamp('dispatch_lease_until', { withTimezone: true }),
   task: text('task').notNull(),
   status: text('status').notNull().default('starting'),
   report: text('report').notNull().default(''),

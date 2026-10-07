@@ -10,7 +10,8 @@ import { Sandboxes } from './sandbox.mjs';
 import { workerHealth } from '../execution/health.mjs';
 import { SandboxStorage } from '../execution/storage.mjs';
 import { Previews } from './preview.mjs';
-import { CodexWorker } from '../codex-worker/worker.mjs';
+import { CodexWorker, setupCallbackResult } from '../codex-worker/worker.mjs';
+import { codexProcessIsolationCapability } from '../codex-worker/client.mjs';
 import { EnvironmentManager } from '../codex-worker/environment.mjs';
 import { environmentInspectionCommand } from '../codex-worker/environment-inspection.mjs';
 
@@ -25,10 +26,17 @@ const environments = new EnvironmentManager({ directory: `${directory}/environme
 await environments.init();
 const codex = new CodexWorker({ directory: `${directory}/codex`, sandboxes, environments, inspectionCommand: environmentInspectionCommand });
 await codex.init();
-const previews = new Previews({ sandboxes, base: process.env.REPO_PUBLIC_URL });
+const previews = new Previews({ sandboxes, base: process.env.REPO_PUBLIC_URL, environmentJob: id => codex.jobs.get(id) });
 await previews.init();
 sandboxes.onClose = id => previews.close(id);
-const runner = new Runner({ directory, budget, storage: new SandboxStorage(`${directory}/repo-disks`, 4), onState: job => events.publish(job.id, 'repository', terminal(job.status) ? 'completed' : 'progress', job) });
+// Browser subscriptions receive presentation state, never execution authority
+// or replay journals. Private REST and callbacks retain the exact binding.
+const visibleRepositoryJob = job => {
+  const visible = { ...job };
+  delete visible.execution; delete visible.fingerprint; delete visible.commandJournal;
+  return visible;
+};
+const runner = new Runner({ directory, budget, storage: new SandboxStorage(`${directory}/repo-disks`, 4), onState: job => events.publish(job.id, 'repository', terminal(job.status) ? 'completed' : 'progress', visibleRepositoryJob(job)) });
 await runner.init();
 const health = workerHealth(directory, budget);
 const callbackConfigured = !!(process.env.REPO_APP_URL && process.env.INTERNAL_API_SECRET);
@@ -70,21 +78,40 @@ const server = http.createServer(async (req, res) => {
       if (!preview) return reply(res, 404, { error: 'Preview closed' });
       if (preview.path === '/heartbeat' && req.method === 'POST') {
         const parent = sandboxes.sessions.get(preview.current.id);
-        await sandboxes.serial(parent.id, async () => { parent.expiresAt = Math.min(Date.now() + sandboxes.leaseMs, preview.current.expiresAt); await sandboxes.save(parent); });
+        if (!parent) throw new Error('Preview environment is unavailable');
+        if (parent.execution) {
+          const job = codex.jobs.get(preview.current.expectedEnvironment?.jobId);
+          if (!job) throw new Error('Preview environment is unavailable');
+          await codex.rpc({ action: 'mission_retain', id: parent.id, owner: parent.owner, userId: job.userId, workspaceId: parent.workspaceId, jobId: job.jobId, execution: job.execution }, { beforeRetain: () => previews.authorizeHeartbeat(preview.current) });
+        } else await sandboxes.serial(parent.id, async () => { parent.expiresAt = Math.min(Date.now() + sandboxes.leaseMs, preview.current.expiresAt); await sandboxes.save(parent); });
         return reply(res, 200, { renewed: true });
       }
-      if (!/^\/sessions\/[a-f0-9-]{36}(\/(human|agent))?(\?scoped=1)?$/.test(preview.path)) return reply(res, 404, { error: 'Preview endpoint not found' });
+      const sessionPath = preview.path.match(/^\/sessions\/([a-f0-9-]{36})(\/(human|agent|redaction|observation))?(\?scoped=1)?$/);
+      if (!sessionPath || sessionPath[1] !== preview.current.sessionId) return reply(res, 404, { error: 'Preview endpoint not found' });
       if (req.method === 'DELETE') { await previews.close(preview.current.id); return reply(res, 200, { closed: true }); }
       return previews.proxy(req, res, preview);
     }
     if (url.pathname === '/preview' && req.method === 'POST') {
-      if (runner.stopping) return reply(res, 503, { error: 'Worker is draining' });
       const input = await readJson(req);
+      if (runner.stopping && !['target', 'status', 'close'].includes(input.action)) return reply(res, 503, { error: 'Worker is draining' });
       const sandbox = sandboxes.owned(input.id, input.owner);
       if (sandbox.workspaceId !== input.workspaceId) return reply(res, 404, { error: 'Sandbox not found' });
+      if (sandbox.execution) {
+        if (input.action === 'handoff') {
+          if (Object.keys(input).some(key => !['action', 'id', 'owner', 'workspaceId', 'handoff'].includes(key))) return reply(res, 400, { error: 'Invalid preview handoff envelope' });
+          return reply(res, 200, await sandboxes.serial(sandbox.id, () => previews.handoff(sandbox, input.handoff)));
+        }
+        const bound = { execution: input.execution, expectedEnvironment: input.expectedEnvironment, ...(input.policy === undefined ? {} : { policy: input.policy }) };
+        if (!['target', 'open', 'status', 'close'].includes(input.action)) return reply(res, 400, { error: 'Choose an autonomous preview action' });
+        return reply(res, 200, await sandboxes.serial(sandbox.id, () => input.action === 'target' ? previews.target(sandbox, bound)
+          : input.action === 'status' ? previews.status(sandbox, input.port, bound)
+          : input.action === 'close' ? previews.closeBound(sandbox, input.port, bound)
+          : previews.open(sandbox, input.port, bound)));
+      }
+      if (input.execution !== undefined || input.expectedEnvironment !== undefined || input.policy !== undefined || input.handoff !== undefined || input.action === 'handoff') return reply(res, 400, { error: 'Execution cannot be added to a manual preview' });
       return reply(res, 200, await sandboxes.serial(sandbox.id, () => previews.open(sandbox, input.port)));
     }
-    if (url.pathname === '/health') { const status = await health(); return reply(res, status.ready ? 200 : 503, { ...status, draining: runner.stopping, active: runner.controllers.size, queued: [...runner.jobs.values()].filter(job => job.status === 'queued').length, callbackConfigured, callbackProtocol, protocol: 1 }); }
+    if (url.pathname === '/health') { const status = await health(), processIsolation = codexProcessIsolationCapability(); return reply(res, status.ready ? 200 : 503, { ...status, draining: runner.stopping, active: runner.controllers.size, queued: [...runner.jobs.values()].filter(job => job.status === 'queued').length, callbackConfigured, callbackProtocol, protocol: 1, autonomousExecution: { version: 1, admission: !!(process.env.AUTONOMY_APP_URL && process.env.INTERNAL_API_SECRET), frozenCommit: true, codexTurnAdmission: processIsolation.available, processIsolation, environmentExecution: 1, vaultPull: !!(process.env.AUTONOMY_APP_URL && process.env.INTERNAL_API_SECRET) } }); }
     if (url.pathname === '/drain' && req.method === 'POST') { runner.stopping = true; return reply(res, 200, { draining: true }); }
     if (url.pathname === '/templates' && req.method === 'POST') {
       const input = await readJson(req, 3200000);
@@ -138,7 +165,7 @@ server.listen(Number(process.env.REPO_RUNNER_PORT || 8090), process.env.REPO_RUN
 server.on('upgrade', (req, socket, head) => previews.upgrade(req, socket, head));
 void runner.drain().catch(error => console.error('Queue recovery failed:', error.message));
 const callback = setInterval(() => {
-  if (callbackConfigured) void codexOutbox.drain([...codex.jobs.values()].filter(job=>job.eventId).map(job=>({id:job.eventId,createdAt:job.updatedAt,result:{jobId:job.jobId,id:job.id,workspaceId:job.workspaceId,status:job.status,message:job.message,result:job.result,environment:job.environment,updatedAt:job.updatedAt}}))).catch(()=>console.error('Codex result delivery pending'));
+  if (callbackConfigured) void codexOutbox.drain([...codex.jobs.values()].filter(job=>job.eventId).map(job=>({id:job.eventId,createdAt:job.updatedAt,result:setupCallbackResult(job)}))).catch(()=>console.error('Codex result delivery pending'));
   if (callbackConfigured) void outbox.drain([...runner.jobs.values()].filter(job => terminal(job.status))).catch(error => console.error('Result delivery failed:', error.message));
 }, 1000);
 callback.unref();

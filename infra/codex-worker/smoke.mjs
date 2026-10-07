@@ -17,4 +17,4 @@ try {
   await client.request('turn/start', { threadId: thread.id, input: [{ type: 'text', text: 'Call ping exactly once. Then reply with its result. No other tools or actions.', text_elements: [] }] });
   assert.equal(await finished, 'completed'); assert.equal(calls, 1);
   console.log('PASS: subscription auth and scoped dynamic tool round trip');
-} finally { clearTimeout(timer); client.close(); }
+} finally { clearTimeout(timer); await client.close(); }

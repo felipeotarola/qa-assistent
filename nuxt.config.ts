@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { brand } from './shared/brand';
 const eveSharedDirectory = resolve(dirname(createRequire(import.meta.url).resolve("eve/client")), "../shared");
 const privateNoStore = { "cache-control": "private, no-store" } as const;
@@ -71,7 +72,9 @@ export default defineNuxtConfig({
     // Eve's package-internal #shared imports must resolve inside Eve, not
     // against Nuxt's application #shared alias.
     // Inline the client so Nitro doesn't omit its package-private dependencies.
-    externals: { inline: ["eve/client"] },
+    // Bundle local shared modules too. Nitro's Windows dev externalization can
+    // otherwise rebase relative .mjs imports against .nuxt/dev as C:/shared.
+    externals: { inline: ["eve/client", fileURLToPath(new URL('./shared/', import.meta.url))] },
     rollupConfig: {
       plugins: [{
         name: "eve-package-shared-imports",
@@ -131,7 +134,9 @@ export default defineNuxtConfig({
       dialect: "postgresql",
       driver: "postgres-js",
       // Local development and serverless instances share a small Supabase pool.
-      connection: { max: 2, idle_timeout: 10, connect_timeout: 15, prepare: false, ...(supabasePooler ? { port: 6543 } : {}) },
+      // Timestamp columns store UTC wall-clock values. Pin every SQL session so
+      // default timestamps and worker lease comparisons agree with JS Dates.
+      connection: { max: 2, idle_timeout: 10, connect_timeout: 15, prepare: false, connection: { TimeZone: 'UTC' }, ...(supabasePooler ? { port: 6543 } : {}) },
       // Use our prefixed migration ledger in the shared Supabase database.
       applyMigrationsDuringDev: false,
       applyMigrationsDuringBuild: false,

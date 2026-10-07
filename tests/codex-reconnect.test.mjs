@@ -6,6 +6,7 @@ import ts from 'typescript';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { missionBindingSchema } from '../shared/mission-binding.ts';
+import * as irisCapabilities from '../agent/lib/iris-capabilities.ts';
 
 function load(path, dependencies, globals = {}) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -29,6 +30,7 @@ function toolFixture(probeError) {
     '../lib/codex-turn': { codexTurn: { update() {} } },
     '../../shared/codex-handoff.mjs': { isCodexBackground: () => true },
     '../../shared/repository-map': { repositoryMapTask: (_url, task) => task },
+    '../lib/iris-capabilities': irisCapabilities,
   }, { fetch: async (_url, options) => {
     calls.push(JSON.parse(options.body));
     return { ok: true, json: async () => ({ status: 'starting' }) };
@@ -71,6 +73,19 @@ test('status and cancellation never open or restart a sandbox', async () => {
   for (const action of ['status', 'cancel']) await tool.execute({ action, jobId: randomUUID() }, ctx);
   assert.equal(calls.length, 2);
   assert.ok(calls.every(call => call.sessionKey === undefined));
+});
+
+test('Iris cannot use Otto through current or original session authority', async () => {
+  for (const authority of ['current', 'initiator']) {
+    const { tool, ctx, calls, probes } = toolFixture();
+    ctx.session.auth[authority] = { attributes: { browserWorker: 'iris' } };
+    ctx.getSandbox = () => { throw new Error('Denied caller must not touch a sandbox'); };
+    for (const action of ['start', 'status', 'cancel']) {
+      await assert.rejects(tool.execute({ action, task: 'Inspect', jobId: randomUUID() }, ctx), error => error.message === irisCapabilities.IRIS_CAPABILITY_DENIED);
+    }
+    assert.equal(probes.length, 0);
+    assert.equal(calls.length, 0);
+  }
 });
 
 function apiFixture({ denied = false } = {}) {

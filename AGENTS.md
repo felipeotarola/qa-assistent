@@ -7,13 +7,13 @@ Durable personal AI assistant built with Eve and Nuxt.
 | Command | Description |
 |---------|-------------|
 | `pnpm install` | Install dependencies |
-| `pnpm dev` | Generate Nuxt types, then start Nuxt + Eve |
-| `pnpm build` | Production build |
+| `pnpm dev` | Apply database migrations, generate Nuxt types, then start Nuxt + Eve |
+| `pnpm build` | Apply database migrations, then production build |
 | `pnpm lint` | ESLint (`pnpm lint:fix` to autofix) |
 | `pnpm typecheck` | TypeScript check — app/server/shared plus `agent/` |
 | `pnpm build:agent` | Build the Eve agent on its own |
-| `pnpm auth:schema` | Regenerate the Better Auth Drizzle schema |
-| `pnpm db:generate` | Regenerate the auth schema, then the Drizzle migration |
+| `pnpm test:unit` | Run local unit tests without application credentials |
+| `pnpm db:generate` | Generate the Drizzle migration from the current schema |
 | `pnpm db:migrate` | Apply migrations |
 
 ## Structure
@@ -33,6 +33,8 @@ personal-agent-template/
 - [Environment](docs/ENVIRONMENT.md) — Environment variables
 - [Customization](docs/CUSTOMIZATION.md) — Rename agent, add tools, integrations
 - [Design system](docs/DESIGN_SYSTEM.md) — Shared UI components, theme, and layout conventions
+- [Autonomous missions](docs/AUTONOMOUS_MISSIONS_PLAN.md) — Implementation order, contracts, and dated verification
+- [Autonomy rollout](docs/AUTONOMY_ROLLOUT.md) — Release gates, isolation, migration, and rollback
 - [README](README.md) — Quick start and feature overview
 
 ## UI and Layout Conventions
@@ -52,6 +54,21 @@ Read [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) before adding or changing UI
 This project uses Eve with a Nuxt frontend (`eve/nuxt` module). Before writing agent code, read the relevant guide in `node_modules/eve/docs/` — start with `docs/README.md`, which maps each task to its page.
 
 `nuxt typecheck` does not cover `agent/`, and `eve build` bundles without typechecking. `pnpm typecheck` runs both halves; keep it that way when adding agent code.
+
+## Verification isolation
+
+Authentication uses Supabase Auth. The app's tables use the `pat_` prefix.
+Never assume the repository's `.env` is an isolated test configuration. Both
+`dev` and `build` apply migrations. Use the guarded helpers in `tests/helpers/`
+for autonomous acceptance; they verify the local database, private dependency
+copy, compiled database connection, process identities, and fresh workflow store.
+A runtime `DATABASE_URL` alone does not override NuxtHub's compiled database
+connection. Never run model acceptance against a shared database accidentally.
+
+Pure tests, PostgreSQL tests with synthetic executors, actual Linux probes,
+real model acceptance, and production verification are different evidence levels.
+Do not report one as another. Read-only UI endpoints must not drive autonomous
+work; the durable controller and schedules own continuation.
 
 ## Internal API Pattern
 

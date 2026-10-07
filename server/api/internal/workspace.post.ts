@@ -8,6 +8,7 @@ import { requireInternalRequest } from "../../utils/internal-api";
 import { getThreadForUser } from "../../utils/threads";
 import { listItems, ownedItem, publicItem, requireWorkspace, saveItem, saveFile } from "../../utils/workspaces";
 import { captureWorkspaceBrowser } from "../../utils/browser";
+import { irisWorkspaceRead } from '../../utils/iris-workspace';
 
 const inputSchema = z.object({
   action: z.enum(["list", "read", "create", "update", "save_file", "screenshot", "link", "evidence"]),
@@ -20,11 +21,13 @@ const inputSchema = z.object({
 });
 export default defineEventHandler(async (event) => {
   requireInternalRequest(event);
-  const { userId, threadId, agentId, input } = await readValidatedBody(event, z.object({ userId: z.string().uuid(), threadId: z.string().uuid(), agentId: z.string().min(1).max(200).default('main'), input: inputSchema }).parse);
+  const { userId, threadId, agentId, input, browserJobId, executorSessionId, callId } = await readValidatedBody(event, z.object({ userId: z.string().uuid(), threadId: z.string().uuid(), agentId: z.string().min(1).max(200).default('main'), browserJobId: z.string().uuid().optional(), executorSessionId: z.string().min(1).max(200).optional(), callId: z.string().min(1).max(200).optional(), input: inputSchema }).strict().parse);
   const thread = await getThreadForUser(userId, threadId);
   if (!thread?.workspaceId) throw createError({ statusCode: 404, statusMessage: "Workspace not found" });
   const workspaceId = thread.workspaceId;
   const workspace = await requireWorkspace(userId, workspaceId);
+  const assigned = await irisWorkspaceRead(userId, workspaceId, threadId, agentId, input, { browserJobId, executorSessionId, callId });
+  if (assigned) return assigned;
   switch (input.action) {
     case "evidence": return { links: await evidenceForItem(userId, workspaceId, input.itemId ?? "") };
     case "link": {
@@ -43,15 +46,15 @@ export default defineEventHandler(async (event) => {
     case "update": {
       if (!input.content || (input.action === "create" && !input.title) || (input.action === "update" && (!input.itemId || !input.expectedVersion))) throw createError({ statusCode: 400, statusMessage: "Create requires title/content. Update requires itemId/content/expectedVersion; title is optional." });
       const title = input.title ?? (await ownedItem(userId, workspaceId, input.itemId!)).title;
-      return { item: await saveItem(userId, workspaceId, { title, content: input.content, threadId, ...(input.action === "update" ? { id: input.itemId, expectedVersion: input.expectedVersion } : {}) }) };
+      return { item: await saveItem(userId, workspaceId, { title, content: input.content, threadId, ...(input.action === "update" ? { id: input.itemId, expectedVersion: input.expectedVersion } : {}) }, db, { provenance: { version: 1, origin: 'agent', producer: 'agent-authored', observedAt: null } }) };
     }
     case "save_file": {
       if (!input.filename || input.text === undefined) throw createError({ statusCode: 400, statusMessage: "Filename and text required" });
-      return { item: await saveFile(userId, workspaceId, input.filename, "text/plain", Buffer.from(input.text), threadId) };
+      return { item: await saveFile(userId, workspaceId, input.filename, "text/plain", Buffer.from(input.text), threadId, db, { provenance: { version: 1, origin: 'agent', producer: 'agent-authored', observedAt: null } }) };
     }
     case "screenshot": {
       const bytes = await captureWorkspaceBrowser(userId, threadId, { agentId, sessionId: input.sessionId });
-      return { item: await saveFile(userId, workspaceId, `${input.title || "Skärmbild"}.png`, "image/png", bytes, threadId) };
+      return { item: await saveFile(userId, workspaceId, `${input.title || "Skärmbild"}.png`, "image/png", bytes, threadId, db, { provenance: { version: 1, origin: 'tool', producer: 'browser-screenshot', observedAt: new Date().toISOString() } }) };
     }
   }
 });

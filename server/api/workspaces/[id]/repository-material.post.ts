@@ -5,6 +5,7 @@ import { repositoryRuns } from '../../../db/schema/repositories';
 import { requireSessionUserId } from '../../../utils/session';
 import { requireWorkspace, publicItem, saveItem } from '../../../utils/workspaces';
 import { repoStatusLabels, repoTerminal } from '../../../../shared/repository';
+import { sanitizeEvidenceUrl, type EvidenceProvenance } from '../../../../shared/evidence-provenance';
 
 export default defineEventHandler(async event => {
   const userId = await requireSessionUserId(event);
@@ -25,7 +26,11 @@ export default defineEventHandler(async event => {
       return { item: publicItem(item) };
     }
     const text = [`Repository: ${job.url}`, `Körning: ${runId}`, `Commit: ${job.commit || 'Ej hämtad'}`, `Script: ${job.selectedScript || job.script} ${(job.args || []).join(" ")}`, `Status: ${repoStatusLabels[job.status]}`, `Exitkod: ${job.testExitCode ?? 'Ingen'}`, job.message, 'Ett lyckat kommando bekräftar inte enskilda testfall.', 'Körlogg (senaste 64 000 tecken):', job.logs].join('\n\n');
-    const item = await saveItem(userId, workspaceId, { title: `Repositorykörning · ${job.url.split('/').at(-1)} · ${runId.slice(0, 8)}`, content: { kind: 'text', text } }, tx);
+    const hasExecutionEvidence = !!job.logs.trim() || !!job.plan?.command.length || typeof job.testExitCode === 'number';
+    const provenance: EvidenceProvenance = hasExecutionEvidence
+      ? { version: 1, origin: 'tool', producer: 'repository-runner', sourceType: 'repository', sourceId: run.id, observedAt: job.updatedAt, url: sanitizeEvidenceUrl(job.url) }
+      : { version: 1, origin: 'agent', producer: 'agent-authored', sourceType: 'repository', sourceId: run.id, observedAt: null };
+    const item = await saveItem(userId, workspaceId, { title: `Repositorykörning · ${job.url.split('/').at(-1)} · ${runId.slice(0, 8)}`, content: { kind: 'text', text } }, tx, { provenance });
     await tx.insert(schema.workspaceEvidence).values({ id: receipt, workspaceId, itemId: item.id, itemVersion: item.version, kind: 'origin', label: `VPS-körning ${runId}` });
     return { item };
   });

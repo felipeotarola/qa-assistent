@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
       if (!item || item.deletedAt) throw createError({ statusCode: 409, statusMessage: 'Previously saved material is in the trash. Restore it there.' });
       return { item: publicItem(item) };
     }
-    const item = await saveItem(userId, workspaceId, { title: input.title, content: { kind: 'text', text: input.text }, threadId: input.threadId }, tx);
+    const item = await saveItem(userId, workspaceId, { title: input.title, content: { kind: 'text', text: input.text }, threadId: input.threadId }, tx, { provenance: { version: 1, origin: 'agent', producer: 'agent-authored', observedAt: null } });
     await tx.insert(schema.workspaceEvidence).values({ id: receipt, workspaceId, itemId: item.id, itemVersion: item.version, kind: 'origin', label: 'Sparat från aktivitetspanelen', threadId: input.threadId });
     return { item };
   });

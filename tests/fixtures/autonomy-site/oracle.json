@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "origin": "http://qa-fixture.test",
+  "expected": [
+    { "id": "home", "action": "Open /", "status": 200, "heading": "En lugn morgon börjar här" },
+    { "id": "navigation_products", "action": "Click Produkter in the header", "path": "/products", "status": 200, "productCount": 3 },
+    { "id": "search", "action": "Submit kaffe in the search form", "path": "/products?q=kaffe", "status": 200, "productCount": 1, "product": "Bryggkaffe" },
+    { "id": "navigation_contact", "action": "Click Kontakt in the header", "path": "/contact", "status": 200, "heading": "Kontakta oss" },
+    { "id": "broken_returns", "action": "Click Returer in the header", "path": "/returns", "status": 404, "expectedProductBehavior": "The visible Returns navigation should open return information", "classification": "known_defect" }
+  ],
+  "notExpected": ["Do not invent login, checkout, payment or account tests", "Do not call the known Returns defect an infrastructure failure"],
+  "acceptance": "The external harness checks saved findings against this oracle. Never include this file or its assertions in the user's prompt or the model context."
+}

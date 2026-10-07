@@ -1,0 +1,2 @@
+ALTER TABLE "pat_test_runs" ADD COLUMN "mission_attempt_id" text;--> statement-breakpoint
+ALTER TABLE "pat_test_runs" ADD CONSTRAINT "pat_test_runs_mission_attempt_id_pat_mission_attempts_id_fk" FOREIGN KEY ("mission_attempt_id") REFERENCES "public"."pat_mission_attempts"("id") ON DELETE no action ON UPDATE no action;

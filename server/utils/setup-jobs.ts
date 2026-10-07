@@ -12,6 +12,7 @@ import { appOrigin, internalHeaders } from '../../agent/lib/internal-api';
 import { repositoryRequestId } from '#shared/repository-request.mjs';
 import { repositoryMapTarget } from '../../shared/repository-map';
 import { saveRepositoryMap } from './repository-map';
+import { receiveMissionEnvironmentResult } from './mission-environment';
 
 const terminal = (status: string) => !['starting','running','configuring'].includes(status);
 const vaultScope = (workspaceId: string, repo: string) => `${workspaceId}:${repo}:test`;
@@ -29,6 +30,7 @@ export async function receiveSetupResult(input: unknown) {
   const result = setupResultSchema.parse(input);
   const [job] = await db.select().from(schema.setupJobs).where(eq(schema.setupJobs.id,result.jobId));
   if (!job) throw createError({ statusCode:404,statusMessage:'Unknown setup job' });
+  if (job.autonomy) return receiveMissionEnvironmentResult(input);
   const [thread] = await db.select().from(schema.threads).where(eq(schema.threads.id,job.threadId));
   if (!thread || result.workspaceId !== job.workspaceId || result.id !== sandboxScope(thread.userId,job.threadId,job.sessionKey).id) throw createError({statusCode:409,statusMessage:'Setup scope mismatch'});
   if (job.result && job.result.updatedAt > result.updatedAt) return;
@@ -67,19 +69,22 @@ export async function listSetupJobs(userId: string, workspaceId: string): Promis
   await requireWorkspace(userId,workspaceId);
   let jobs = await db.select().from(schema.setupJobs).where(and(eq(schema.setupJobs.workspaceId,workspaceId),eq(schema.setupJobs.runtime,runtimeScope()))).orderBy(desc(schema.setupJobs.createdAt)).limit(10);
   // Bounded fallback reconciles missed callbacks; never starts or retries work.
-  await Promise.all(jobs.filter(j=>!terminal(j.status)||j.notification==='pending').slice(0,3).map(async job=>{
+  await Promise.all(jobs.filter(j=>!j.autonomy && (!terminal(j.status)||j.notification==='pending')).slice(0,3).map(async job=>{
     try { const result = await repositoryRunner<SetupResult>('/codex',{action:'status',jobId:job.id,userId,workspaceId,...sandboxScope(userId,job.threadId,job.sessionKey)}); await receiveSetupResult(result); } catch { /* Preserve last known state. */ }
   }));
   jobs = await db.select().from(schema.setupJobs).where(and(eq(schema.setupJobs.workspaceId,workspaceId),eq(schema.setupJobs.runtime,runtimeScope()))).orderBy(desc(schema.setupJobs.createdAt)).limit(10);
   return Promise.all(jobs.map(async job=>{
     const stored = job.result?.environment ? await vault(workspaceId,job.result.environment.repoUrl) : undefined;
-    return {id:job.id,threadId:job.threadId,status:job.status,result:job.result,configuredNames:stored ? Object.keys(openEnvironment(stored.sealedValues,vaultScope(workspaceId,stored.repoUrl))) : [],revision:stored?.revision||0,notification:job.notification};
+    const result = job.result ? { jobId: job.result.jobId, id: job.result.id, workspaceId: job.result.workspaceId, status: job.result.status, message: job.result.message,
+      result: job.result.result, environment: job.result.environment, updatedAt: job.result.updatedAt } : null;
+    return {id:job.id,threadId:job.threadId,status:job.status,result,autonomous:!!job.autonomy,configuredNames:stored ? Object.keys(openEnvironment(stored.sealedValues,vaultScope(workspaceId,stored.repoUrl))) : [],revision:stored?.revision||0,notification:job.notification};
   }));
 }
 export async function configureSetup(userId: string, workspaceId: string, id: string, input: unknown) {
   const parsed = configureEnvironmentSchema.safeParse(input);
   if (!parsed.success) throw createError({statusCode:400,statusMessage:'Kontrollera variabelnamn och värden. Inga ändringar sparades.'});
   const body = parsed.data, job = await ownedSetup(userId,workspaceId,id), plan = job.result?.environment;
+  if (job.autonomy && body.continue) throw createError({ statusCode:409,statusMessage:'Spara variablerna i Vault och godkänn sedan uppdragets verifierade startplan. Direkta starter stöds inte för autonoma uppdrag.' });
   if (!plan || !['needs_configuration','failed','completed'].includes(job.status)) throw createError({statusCode:409,statusMessage:'Miljön kan inte konfigureras just nu. Uppdatera status.'});
   const names = new Set(plan.variables.map(v=>v.name));
   if ([...Object.keys(body.values),...body.forget].some(name=>!names.has(name))) throw createError({statusCode:400,statusMessage:'Endast variabler för detta uppdrag får ändras.'});
@@ -104,6 +109,7 @@ export async function configureSetup(userId: string, workspaceId: string, id: st
 }
 export async function resumeSetup(userId: string,workspaceId: string,id: string,revision: number,knownValues?: Record<string,string>) {
   const job = await ownedSetup(userId,workspaceId,id), plan = job.result?.environment;
+  if (job.autonomy) throw createError({ statusCode:409,statusMessage:'Uppdragets styrning återupptar miljön efter ett giltigt medgivande.' });
   if (!plan || job.applyRevision!==revision) throw createError({statusCode:409,statusMessage:'Ingen sparad fortsättning finns.'});
   const entry = await vault(workspaceId,plan.repoUrl);
   if (!entry || entry.revision!==revision) throw createError({statusCode:409,statusMessage:'Konfigurationen har ändrats. Bekräfta den nya versionen.'});

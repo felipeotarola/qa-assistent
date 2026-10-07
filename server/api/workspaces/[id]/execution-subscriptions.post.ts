@@ -26,7 +26,7 @@ export default defineEventHandler(async event => {
       streams.push({ kind: 'repository', url: `${process.env.REPO_RUNNER_URL.replace(/\/$/, '')}/events?token=${encodeURIComponent(grant.token)}`, expiresAt: grant.expiresAt });
     } catch { /* Rollout / unavailable worker: shared polling remains active. */ }
   }
-  const browserIds = browsers.filter(b => b.sessionId && b.projectId === 'self-hosted-v1' && b.expiresAt && b.expiresAt > new Date()).map(b => b.sessionId!);
+  const browserIds = browsers.filter(b => b.sessionId && (b.projectId === 'self-hosted-v1' || b.projectId?.startsWith('self-hosted-policy-v1:')) && b.expiresAt && b.expiresAt > new Date()).map(b => b.sessionId!);
   if (browserIds.length && process.env.BROWSER_SERVICE_URL && process.env.BROWSER_SERVICE_KEY) {
     try {
       const response = await fetch(`${process.env.BROWSER_SERVICE_URL.replace(/\/$/, '')}/subscriptions`, { method: 'POST', headers: { authorization: `Bearer ${process.env.BROWSER_SERVICE_KEY}`, 'content-type': 'application/json' }, body: JSON.stringify({ ids: browserIds.slice(0, 30), origin }), signal: AbortSignal.timeout(5000) });

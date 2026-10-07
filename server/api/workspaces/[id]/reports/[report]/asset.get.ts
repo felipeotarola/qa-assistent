@@ -1,6 +1,6 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { db, schema } from '@nuxthub/db';
-import { get } from '@vercel/blob';
+import { get } from '../../../../../utils/evidence-storage';
 import { requireSessionUserId } from '../../../../../utils/session';
 import { readOwnedReport } from '../../../../../utils/mission-reports';
 import { workspaceBlobToken } from '../../../../../utils/workspaces';

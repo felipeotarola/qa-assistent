@@ -17,7 +17,7 @@ const job = computed(() => {
 });
 const plan = computed(() => job.value?.result?.environment);
 const options = computed(() => [...new Set([...jobs.value.flatMap(j => j.result?.environment ? [j.result.environment.repoUrl] : []), ...entries.value.map(e => e.repoUrl)])].map(value => ({ label: value.split('/').slice(-2).join('/'), value })));
-const canContinue = computed(() => !!plan.value && !!job.value && ['needs_configuration', 'failed', 'completed'].includes(job.value.status) && plan.value.variables.every(field => !field.required || rows.value.some(row => row.name === field.name && !row.remove && (row.value || entry.value?.configuredNames.includes(row.name)))));
+const canContinue = computed(() => !!plan.value && !!job.value && !job.value.autonomous && ['needs_configuration', 'failed', 'completed'].includes(job.value.status) && plan.value.variables.every(field => !field.required || rows.value.some(row => row.name === field.name && !row.remove && (row.value || entry.value?.configuredNames.includes(row.name)))));
 function resetRows() {
   rows.value = [...new Set([...(plan.value?.variables.map(v => v.name) || []), ...(entry.value?.configuredNames || [])])].map(name => ({ name, value: '', remove: false }));
   if (!rows.value.length) rows.value = [{ name: '', value: '', remove: false }];
@@ -121,14 +121,15 @@ async function save(resume: boolean) {
         <UButton label="Lägg till variabel" icon="i-lucide-plus" variant="ghost" :disabled="busy || rows.length >= 30" @click="rows.push({ name: '', value: '', remove: false })" />
         <p class="text-xs text-muted">Befintliga värden visas aldrig. Import läses lokalt och sparas först när du klickar på Spara.</p>
         <p v-if="!plan" class="text-sm text-muted">Du kan spara nycklar redan nu. Be sedan Otto förbereda testmiljön. När en körplan finns kan du godkänna att repot använder nycklarna här.</p>
+        <p v-else-if="job?.autonomous" class="text-xs text-muted">Spara nycklarna här och gå tillbaka till uppdragets startplan för att godkänna användningen. Att spara i Vault startar inget arbete.</p>
         <p v-else class="text-xs text-muted">Spara och fortsätt ger detta repos kod tillgång till variablerna i körplanen och kontrollerar appens HTTP-svar.</p>
         <p v-if="info" role="status" class="text-sm text-success">{{ info }}</p>
         <p v-if="error" role="alert" class="text-sm text-error">{{ error }}</p>
       </div>
     </template>
     <template #footer><div class="flex flex-wrap gap-2">
-      <UButton label="Spara nycklar" icon="i-lucide-lock-keyhole" :loading="busy" :disabled="!loaded || loading || !repo.success" @click="save(false)" />
-      <UButton v-if="plan" label="Spara och fortsätt" variant="outline" :disabled="busy || loading || !canContinue" @click="save(true)" />
+      <UButton :label="job?.autonomous ? 'Spara i Vault' : 'Spara nycklar'" icon="i-lucide-lock-keyhole" :loading="busy" :disabled="!loaded || loading || !repo.success" @click="save(false)" />
+      <UButton v-if="plan && !job?.autonomous" label="Spara och fortsätt" variant="outline" :disabled="busy || loading || !canContinue" @click="save(true)" />
       <UButton label="Stäng" variant="ghost" :disabled="busy" @click="open = false" />
     </div></template>
   </UModal>

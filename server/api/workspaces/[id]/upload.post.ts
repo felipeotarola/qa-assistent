@@ -14,5 +14,5 @@ export default defineEventHandler(async (event) => {
   const form = await new Response(Buffer.concat(chunks), { headers: { "content-type": getRequestHeader(event, "content-type") || "" } }).formData();
   const file = form.get("file");
   if (!(file instanceof File)) throw createError({ statusCode: 400, statusMessage: "File required" });
-  return { item: await saveFile(userId, id, file.name, file.type || "application/octet-stream", Buffer.from(await file.arrayBuffer())) };
+  return { item: await saveFile(userId, id, file.name, file.type || "application/octet-stream", Buffer.from(await file.arrayBuffer()), undefined, undefined, { provenance: { version: 1, origin: 'user', producer: 'user-authored', observedAt: null } }) };
 });

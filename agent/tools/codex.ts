@@ -1,3 +1,4 @@
+import { denyIrisCapability } from '../lib/iris-capabilities';
 import { defineTool } from 'eve/tools';
 import { z } from 'zod';
 import { missionBindingSchema } from '../../shared/mission-binding';
@@ -8,9 +9,10 @@ import { isCodexBackground } from '../../shared/codex-handoff.mjs';
 import { repositoryMapTask } from '../../shared/repository-map';
 
 export default defineTool({
-  description: 'Delegate a repository setup/start/diagnosis task to Otto on the shared VPS service, when enabled for this authenticated caller. Uses THIS caller\'s isolated Eve sandbox, with existing files and processes, and shows logs in the Pågående arbete panel. start takes task; status/cancel take jobId. Returns immediately; running is not completed. Capacity is shared; only one Otto task runs at a time. A busy response means no new job started; never access another user\'s job or duplicate it through another executor. While active, do NOT use bash/repository to perform the same work or change the sandbox. Read status before any retry. Once completed, read the report and use preview(port) for a verified running app. If access is disabled or subscription login is required, explain that. Otto does not push or deploy.',
+  description: 'Delegate an explicitly requested standalone repository setup/start/diagnosis task or read-only repository architecture map to Otto, outside an autonomous QA assignment. For a map, use mode repository_map; never install or start an app merely to map it. QA of app or browser behavior must use qa_mission with repository surface application, including necessary startup even without an explicit start request; the controller delegates Otto itself. Do not split setup from that QA goal. The shared VPS service must be enabled for this authenticated caller. Uses THIS caller\'s isolated Eve sandbox, with existing files and processes, and shows logs in the Pågående arbete panel. start takes task; status/cancel take jobId. Returns immediately; running is not completed. Capacity is shared; only one Otto task runs at a time. A busy response means no new job started; never access another user\'s job or duplicate it through another executor. While active, do NOT use bash/repository to perform the same work or change the sandbox. Read status before any retry. Once completed, read the report and use preview(port) for a verified running app. If access is disabled or subscription login is required, explain that. Otto does not push or deploy.',
   inputSchema: z.object({ action: z.enum(['start', 'status', 'cancel']), mission: missionBindingSchema.optional(), task: z.string().min(1).max(12000).optional(), jobId: z.string().uuid().optional(), mode: z.enum(['setup', 'repository_map']).optional().describe('repository_map: read-only architecture map saved in Material. Include repositoryUrl and task scope (max 9000 characters).'), repositoryUrl: z.string().optional() }),
   async execute(input, ctx) {
+    denyIrisCapability(ctx);
     const auth = ctx.session.auth.current, threadId = auth?.attributes.browserThreadId;
     if (auth?.authenticator !== 'app' || !auth.principalId || typeof threadId !== 'string') throw new Error('Codex requires an authenticated workspace chat.');
     if (input.action === 'start' ? !input.task : !input.jobId) throw new Error('start requires task; status/cancel require jobId.');

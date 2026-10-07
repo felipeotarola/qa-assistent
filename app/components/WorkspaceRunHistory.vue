@@ -2,7 +2,7 @@
 import WorkspaceRunStatus from './WorkspaceRunStatus.vue';
 import WorkspaceRunReview from './WorkspaceRunReview.vue';
 import { runNarrative } from '#shared/run-narrative';
-import { runLabels, runCoverage, type TestRun } from '#shared/test-run';
+import { runLabels, runCoverage, runResultScope, type TestRun } from '#shared/test-run';
 import type { WorkspaceItem } from '#shared/workspace';
 const props = defineProps<{ item: WorkspaceItem; caseId: string }>();
 const runs = inject<Ref<TestRun[]>>('workspace-test-runs', ref([]));
@@ -10,6 +10,7 @@ const history = computed(() => runs.value.filter(r => r.itemId === props.item.id
 const chosen = ref('');
 const run = computed(() => history.value.find(r => r.id === chosen.value) ?? history.value[0]);
 const coverage = computed(() => run.value?.result ? runCoverage(run.value.snapshot, run.value.result) : null);
+const scope = computed(() => runResultScope(run.value?.result));
 const checkLabels = { verified: 'Verifierat', mismatch: 'Avvikelse', unverified: 'Ej verifierat', blocked: 'Blockerat' };
 const agent = useWorkspaceAgent();
 const busy = ref(false);
@@ -54,7 +55,8 @@ async function ask(task: string) {
         </div>
         <div><h5 class="text-sm font-medium">Förväntat vid körningen</h5><p class="whitespace-pre-wrap text-sm text-muted">{{ run.snapshot.expected }}</p></div>
         <div class="rounded-lg border border-default bg-default p-4"><h5 class="mb-3 text-sm font-semibold">Faktiskt resultat</h5><div class="readable-content document-markdown break-words text-sm leading-relaxed"><ChatComark :value="runNarrative(run.result.actual)" /></div></div>
-        <div v-if="run.result.unverified" class="rounded-lg bg-warning/10 p-3"><h5 class="font-medium text-warning">Ej verifierat</h5><p class="whitespace-pre-wrap text-sm">{{ run.result.unverified }}</p></div>
+        <div v-if="scope.remaining.length" class="rounded-lg bg-warning/10 p-3"><h5 class="font-medium text-warning">Ej verifierat</h5><p v-for="(remaining, index) in scope.remaining" :key="remaining.checkId ?? index" class="whitespace-pre-wrap text-sm">{{ remaining.checkId ? `${remaining.checkId}: ` : '' }}{{ remaining.reason }}</p></div>
+        <div v-if="scope.suggestedFollowUps.length" class="rounded-lg border border-default p-3 text-sm"><h5 class="font-medium">Frivilliga testidéer utanför detta testfall</h5><p class="text-xs text-muted">Ingår inte i återstående krav. Inget nytt arbete har startats.</p><ul class="mt-2 list-inside list-disc"><li v-for="(suggestion, index) in scope.suggestedFollowUps" :key="index" class="whitespace-pre-wrap">{{ suggestion }}</li></ul></div>
         <p v-if="run.result.observations.length" class="text-xs text-muted">Observationer är underlag för bedömningen, inte automatiskt fel. Skapa bara ett felärende för en bekräftad avvikelse från kraven.</p>
         <div v-for="(observation, index) in run.result.observations" :key="index" class="rounded-lg border border-default p-3">
           <UBadge v-if="observation.kind" :color="observation.kind === 'defect' ? 'error' : observation.kind === 'requirement_gap' ? 'warning' : 'neutral'" variant="soft" class="mb-2">{{ observation.kind === 'defect' ? 'Avvikelse' : observation.kind === 'requirement_gap' ? 'Krav behöver förtydligas' : 'Observation' }}</UBadge>

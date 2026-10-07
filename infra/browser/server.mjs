@@ -9,6 +9,8 @@ import { FrameHub } from './frame-hub.mjs';
 import { ExecutionStore } from '../execution/store.mjs';
 import { issueSubscription, verifySubscription, serveEvents } from '../execution/stream.mjs';
 import { readJson, allowedOrigins, frameAncestorsPolicy } from '../execution/http.mjs';
+import { parseBrowserPolicy, browserPolicyDigest, admitBrowserRequest, humanInputAllowed } from './policy.mjs';
+import { SessionRedaction, RedactionError, requireRedactionSession, readRedactionObservation, redactionPage } from './redaction.mjs';
 
 const key = process.env.BROWSER_SERVICE_KEY;
 const base = process.env.BROWSER_PUBLIC_URL;
@@ -23,7 +25,7 @@ const sessions = new Map();
 const previewOrigin = process.env.BROWSER_PREVIEW_ORIGIN || '';
 if (previewOrigin && !/^http:\/\/172\.30\.0\.\d{1,3}:\d{2,5}$/.test(previewOrigin)) throw new Error('Invalid assigned preview origin');
 const events = new ExecutionStore(`${process.env.BROWSER_DATA || '/tmp/qa-browser-state'}/events`);
-const snapshot = session => ({ id: session.id, status: session.closing ? 'closed' : 'ready', control: session.control, controlEpoch: session.controlEpoch, expiresAt: new Date(session.expiresAt).toISOString(), telemetry: { workerId: 'vps-browser', heartbeatAt: new Date().toISOString() } });
+const snapshot = session => ({ id: session.id, status: session.closing ? 'closed' : 'ready', control: session.control, controlEpoch: session.controlEpoch, expiresAt: new Date(session.expiresAt).toISOString(), ...(session.policy ? { policyVersion: 1, policyDigest: browserPolicyDigest(session.policy) } : {}), telemetry: { workerId: 'vps-browser', heartbeatAt: new Date().toISOString() } });
 const publish = (session, type) => events.publish(session.id, 'browser', type, snapshot(session));
 let starting = 0;
 const privateNetworks = new BlockList();
@@ -45,6 +47,7 @@ async function close(current) {
   if (!current) return;
   if (current.closing) return current.closing;
   current.closing = (async () => {
+    current.redaction?.clear();
     current.hub?.close();
     for (const ws of current.sockets) ws.terminate();
     try {
@@ -85,17 +88,26 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && url.pathname === '/health') return reply(res, 200, { ready: true, active: sessions.size > 0, activeSessions: sessions.size, startingSessions: starting, maxSessions });
     if (req.method === 'POST' && url.pathname === '/sessions') {
+      let policy;
+      try { policy = parseBrowserPolicy((await readJson(req)).policy); }
+      catch { return reply(res, 400, { error: 'Invalid browser policy' }); }
       if (starting + sessions.size >= maxSessions) return reply(res, 409, { error: 'Browser capacity reached. Retry after a session finishes.', maxSessions });
       starting++;
-      let dir, context;
+      let dir, context, session;
       try {
         dir = await mkdtemp('/tmp/qa-browser-');
-        context = await chromium.launchPersistentContext(dir, { headless: true, chromiumSandbox: true, viewport: { width: 1280, height: 900 }, acceptDownloads: false, args: ['--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1'] });
-        await context.route('**/*', async route => await publicDestination(route.request().url()) ? route.continue() : route.abort('blockedbyclient'));
-        await context.routeWebSocket('**/*', async route => { if (await publicDestination(route.url())) route.connectToServer(); else route.close(); });
+        context = await chromium.launchPersistentContext(dir, { headless: true, chromiumSandbox: true, viewport: { width: 1280, height: 900 }, acceptDownloads: false, ...(policy ? { serviceWorkers: 'block' } : {}), args: ['--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1'] });
+        await context.route('**/*', async route => {
+          const request = route.request();
+          const allowed = await admitBrowserRequest(policy, { url: request.url(), method: request.method(), navigation: request.isNavigationRequest() },
+            () => session && ({ control: session.control, controlEpoch: session.controlEpoch, closing: !!session.closing, expiresAt: session.expiresAt }), publicDestination);
+          if (allowed) await route.continue();
+          else await route.abort('blockedbyclient');
+        });
+        await context.routeWebSocket('**/*', async route => { if (!policy && await publicDestination(route.url())) route.connectToServer(); else route.close(); });
         const [port, debuggerPath] = (await readFile(`${dir}/DevToolsActivePort`, 'utf8')).trim().split('\n');
         if (!/^\d+$/.test(port) || !debuggerPath?.startsWith('/devtools/browser/')) throw new Error('Invalid Chromium endpoint');
-        const session = { id: randomUUID(), token: randomBytes(32).toString('hex'), viewerToken: randomBytes(32).toString('hex'), controlToken: randomBytes(32).toString('hex'), expiresAt: Date.now() + 1800_000, control: 'agent', controlEpoch: 0, inputQueue: Promise.resolve(), pendingInputs: 0, context, dir, endpoint: `ws://127.0.0.1:${port}${debuggerPath}`, sockets: new Set(), cdpSockets: new Set() };
+        session = { id: randomUUID(), token: randomBytes(32).toString('hex'), viewerToken: randomBytes(32).toString('hex'), controlToken: randomBytes(32).toString('hex'), expiresAt: Math.min(Date.now() + 1800_000, policy ? Date.parse(policy.deadlineAt) : Infinity), policy, redaction: new SessionRedaction(), control: 'agent', controlEpoch: 0, inputQueue: Promise.resolve(), pendingInputs: 0, context, dir, endpoint: `ws://127.0.0.1:${port}${debuggerPath}`, sockets: new Set(), cdpSockets: new Set() };
         session.hub = new FrameHub(async () => {
           const page = await pageFor(session);
           if (!page) throw new Error('No page');
@@ -105,7 +117,7 @@ const server = http.createServer(async (req, res) => {
         context.on('close', () => { void close(session).catch(() => {}); });
         await publish(session, 'started');
         const wsBase = base.replace(/^http/, 'ws');
-        return reply(res, 201, { sessionId: session.id, connectUrl: `${wsBase}/cdp/${session.id}?token=${session.token}`, liveUrl: `${base}/viewer#${session.id}:${session.viewerToken}`, expiresAt: new Date(session.expiresAt).toISOString() });
+        return reply(res, 201, { sessionId: session.id, connectUrl: `${wsBase}/cdp/${session.id}?token=${session.token}`, liveUrl: `${base}/viewer#${session.id}:${session.viewerToken}`, expiresAt: new Date(session.expiresAt).toISOString(), ...(policy ? { policyVersion: 1, policyDigest: browserPolicyDigest(policy) } : {}) });
       } catch (error) {
         await context?.close().catch(() => {});
         if (dir) await rm(dir, { recursive: true, force: true });
@@ -113,9 +125,31 @@ const server = http.createServer(async (req, res) => {
         return reply(res, 503, { error: 'Browser launch failed' });
       } finally { starting--; }
     }
-    const match = url.pathname.match(/^\/sessions\/([\w-]+)(?:\/(human|agent))?$/);
+    const match = url.pathname.match(/^\/sessions\/([\w-]+)(?:\/(human|agent|redaction|observation))?$/);
     const session = match && sessions.get(match[1]);
     if (!session || session.closing) return reply(res, 404, { error: 'Session not found' });
+    if (['redaction', 'observation'].includes(match[2])) {
+      if (req.method !== 'POST') return reply(res, 405, { error: 'Method not allowed' });
+      let body;
+      try { body = await readJson(req, 256 * 1024); }
+      catch { return reply(res, 413, { error: 'Invalid redaction request' }); }
+      const expected = match[2] === 'redaction' ? ['expectedPolicyDigest', 'values'] : ['expectedPolicyDigest', 'targetId'];
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(field => !expected.includes(field))) return reply(res, 400, { error: 'Invalid redaction request' });
+      const epoch = session.controlEpoch;
+      const digest = requireRedactionSession(session, body.expectedPolicyDigest, epoch);
+      if (match[2] === 'redaction') {
+        session.redaction.register(body.values);
+        return reply(res, 200, { redaction: session.redaction.receipt(digest) });
+      }
+      const page = await redactionPage(session.context, body.targetId);
+      requireRedactionSession(sessions.get(session.id), digest, epoch);
+      const raw = await readRedactionObservation(page);
+      // A human->agent round trip is also a new control epoch, not permission
+      // to publish an observation begun before the handoff.
+      requireRedactionSession(sessions.get(session.id), digest, epoch);
+      const observation = session.redaction.observation(raw);
+      return reply(res, 200, { observation, redaction: { ...session.redaction.receipt(digest), targetId: body.targetId } });
+    }
     if (req.method === 'DELETE') { await close(session); return reply(res, 200, { closed: true }); }
     if (req.method === 'GET' && !match[2]) return reply(res, 200, snapshot(session));
     if (req.method === 'POST' && match[2]) {
@@ -127,7 +161,7 @@ const server = http.createServer(async (req, res) => {
       return reply(res, 200, { control: session.control, controlEpoch: session.controlEpoch, liveUrl: `${base}/viewer#${session.id}:${session.control === 'human' ? session.controlToken : session.viewerToken}` });
     }
     reply(res, 405, { error: 'Method not allowed' });
-  } catch { reply(res, 500, { error: 'Browser service failed' }); }
+  } catch (error) { reply(res, error instanceof RedactionError ? error.status : 500, { error: error instanceof RedactionError ? error.code : 'Browser service failed' }); }
 });
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, base);
@@ -163,12 +197,12 @@ server.on('upgrade', (req, socket, head) => {
       let input;
       try { input = JSON.parse(data.toString()); } catch { return; }
       if (input.type === 'visibility') { current.hub.visibility(ws, input.visible === true); return; }
-      if (!isController || (current.scopedControl && !matches(url.searchParams.get('token'), current.controlToken)) || current.control !== 'human' || input.controlEpoch !== current.controlEpoch || current.pendingInputs >= 32) return;
+      if (!isController || (current.scopedControl && !matches(url.searchParams.get('token'), current.controlToken)) || !humanInputAllowed(current, input.controlEpoch) || current.pendingInputs >= 32) return;
       current.pendingInputs++;
       current.inputQueue = current.inputQueue.then(async () => {
-        if (sessions.get(current.id) !== current || current.closing || current.control !== 'human' || input.controlEpoch !== current.controlEpoch) return;
+        if (sessions.get(current.id) !== current || !humanInputAllowed(current, input.controlEpoch)) return;
         const page = await pageFor(current);
-        if (!page) return;
+        if (!page || sessions.get(current.id) !== current || !humanInputAllowed(current, input.controlEpoch)) return;
         if (input.type === 'click' && Number.isFinite(input.x) && Number.isFinite(input.y)) await page.mouse.click(Math.max(0, Math.min(1279, input.x)), Math.max(0, Math.min(899, input.y)));
         if (input.type === 'text' && typeof input.text === 'string' && input.text.length <= 10000) await page.keyboard.insertText(input.text);
         if (input.type === 'key' && ['Enter', 'Tab', 'Shift+Tab', 'Backspace', 'Delete', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Control+a'].includes(input.key)) await page.keyboard.press(input.key);

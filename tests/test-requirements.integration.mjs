@@ -21,7 +21,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
   }
   return next(specifier, context);
 } });
-const schema = { ...await import('../server/db/schema/workspaces.ts'), ...await import('../server/db/schema/auth.ts'), ...await import('../server/db/schema/external.ts'), ...await import('../server/db/schema/test-requirements.ts') };
+const schema = { ...await import('../server/db/schema/workspaces.ts'), ...await import('../server/db/schema/auth.ts'), ...await import('../server/db/schema/external.ts'), ...await import('../server/db/schema/test-requirements.ts'), ...await import('../server/db/schema/missions.ts') };
 // Match the application's small pool: publication must not request a third
 // connection while its lock and local apply transaction occupy both slots.
 const connection = postgres(process.env.POSTGRES_URL || process.env.POSTGRESQL_URL || process.env.DATABASE_URL, { prepare: false, max: 2 });
@@ -82,6 +82,11 @@ try {
   const updated=await getPlan();
   assert.equal(updated.content.summary,plan.summary);
   assert.deepEqual(updated.content.cases[1],plan.cases[1]);
+  assert.deepEqual(updated.content.cases[0],{...plan.cases[0],expected:fresh.expected});
+  assert.ok(updated.content.cases.every(testCase => !Object.hasOwn(testCase,'checksVersion')),'Direct requirement publication preserves the raw legacy parser');
+  assert.ok(plan.cases.every(testCase => !Object.hasOwn(testCase,'checksVersion')),'Raw legacy fixture must remain unchanged');
+  const originalVersion=(await db.select().from(schema.workspaceItemVersions).where(eq(schema.workspaceItemVersions.itemId,itemId))).find(version=>version.version===1);
+  assert.deepEqual(originalVersion.content,plan);
   assert.equal(updated.content.cases[0].expected,fresh.expected);
   assert.ok(issue.body.startsWith('Existing requirements must remain.\nChanged by another person'));
   assert.equal(updated.content.sources[0].itemId,saved.materialId);
@@ -92,6 +97,7 @@ try {
   await assert.rejects(publishRequirement(userId,workspaceId,next.id,2),e=>e.statusCode===409);
   assert.ok((await getRecord(next.id)).publishedAt,'Confirmed external success survives local conflict');
   assert.equal((await getRecord(next.id)).appliedVersion,null);
+  assert.deepEqual((await getPlan()).content.cases,updated.content.cases.map(testCase=>({...testCase,checksVersion:2})),'Only the ordinary save stamps a new parser version');
   onWrite=null;
   const resumed=await publishRequirement(userId,workspaceId,next.id,3);
   assert.equal(resumed.appliedVersion,4); assert.equal(resumed.materialId,saved.materialId);

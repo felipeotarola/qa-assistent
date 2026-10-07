@@ -11,6 +11,7 @@ import type { BrowserView } from '#shared/browser';
 import { repoTerminal } from '#shared/repository';
 import { browserReport, codexReport, repositoryReport, type WorkReport } from '#shared/work-report';
 import type { SetupView } from '#shared/project-environment';
+import { useAutonomousMissions } from '~/composables/useAutonomousMissions';
 
 const { snapshot, open, collapsed, requestedItem, workers } = useAgentActivity();
 const focusTarget = ref<string>();
@@ -23,7 +24,12 @@ function reveal(target?: string) { focusTarget.value = target; open.value = true
 const panelOpen = computed({ get: () => open.value, set: value => { if (value) reveal(); else collapse(); } });
 const { activeId } = useWorkspaces();
 const { data: missions } = useMissions(true);
-const missionReports = computed(() => missions.value?.missions.flatMap(m => m.reports) ?? []);
+const { data: autonomous, error: autonomyError } = useAutonomousMissions(true);
+const autonomousMissions = computed(() => autonomous.value?.missions ?? []);
+const missionReports = computed(() => [
+  ...(missions.value?.missions.filter(mission => mission.controllerVersion !== 1).flatMap(m => m.reports) ?? []),
+  ...autonomousMissions.value.flatMap(mission => mission.report ? [mission.report] : []),
+]);
 const { data: assessments } = useResultAssessments();
 const reviewJobs = computed(() => assessments.value?.workspaceId === activeId.value ? assessments.value.assessments : []);
 const reviewBusy = computed(() => [...reviewJobs.value, ...missionReports.value].some(j => ['queued', 'running'].includes(j.status)));
@@ -47,7 +53,7 @@ watchEffect(() => {
 const browser = useState<BrowserView | null>('activity-browser', () => null);
 const browserRequest = useState<string | null>('activity-browser-request', () => null);
 const backgroundBusy = computed(() => irisBusy.value || setupJobs.value.some(j=>['starting','running','configuring'].includes(j.status)) || sandboxes.value.some(s => ['starting', 'running', 'configuring'].includes(s.codex?.status || '') || !s.codex && s.processes.some(p => p.status === 'running')) || repositories.value?.runs.some(r => !r.job || !repoTerminal(r.job.status)));
-const hasWork = computed(() => !!missionReports.value.length || !!reviewJobs.value.length || !!setupJobs.value.length || !!browserJobs.value?.jobs.length || !!snapshot.value || !!browser.value || !!sandboxes.value.length || !!repositories.value?.runs.length);
+const hasWork = computed(() => !!autonomousMissions.value.length || !!autonomyError.value || !!missionReports.value.length || !!reviewJobs.value.length || !!setupJobs.value.length || !!browserJobs.value?.jobs.length || !!snapshot.value || !!browser.value || !!sandboxes.value.length || !!repositories.value?.runs.length);
 watch(irisBusy, (value, old) => { if (value && !old && !collapsed.value) open.value = true; });
 watch(reviewBusy, (value, old) => { if (value && !old && !collapsed.value) open.value = true; });
 const showSteps = ref(false);
@@ -83,6 +89,18 @@ const railItems = computed(() => {
   const items: RailItem[] = [];
   function add(id: string, label: string, icon: string, statuses: string[], role?: AgentRole) {
     if (statuses.length) items.push({ id, label, icon, role, count: statuses.length, ...activityRailState(statuses) });
+  }
+  if (autonomousMissions.value.length) {
+    const active = autonomousMissions.value.filter(mission => mission.lifecycle !== 'closed' || mission.cleanupPending);
+    const selected = active.length ? active : autonomousMissions.value;
+    const waiting = selected.some(mission => mission.waits.some(wait => wait.allowedAnswers.length));
+    const delayed = selected.some(mission => mission.scheduler.state === 'overdue' || mission.workers.state === 'deadline_passed');
+    const cleanup = selected.some(mission => mission.cleanupPending);
+    const executing = active.some(mission => ['accepted', 'running', 'cancelling'].includes(mission.lifecycle));
+    items.push({ id: 'missions', label: 'Uppdrag', icon: 'i-lucide-route', count: selected.length,
+      status: waiting || cleanup ? 'waiting' : delayed ? 'error' : executing ? 'working' : 'idle',
+      detail: waiting ? 'Behöver ditt svar' : cleanup ? 'Inväntar resursfrigöring' : delayed ? 'Status behöver följas upp'
+        : executing ? 'Fortsätter oberoende av chatten' : active.length ? active.every(mission => mission.lifecycle === 'paused') ? 'Uppdragen är pausade' : 'Inväntar uppdragsstyrningen' : 'Avslutade uppdrag och rapporter' });
   }
   if (snapshot.value) add('main', agentIdentities.main.name, 'i-lucide-bot', [snapshot.value.failed ? 'failed' : current.value?.status === 'waiting' ? 'waiting' : snapshot.value.busy ? 'working' : 'idle'], 'main');
   if (browserJobs.value?.workspaceId === activeId.value) add('iris', 'Iris · Webbtester', 'i-lucide-globe', browserJobs.value.jobs.map(j => j.status), 'browser');
@@ -125,7 +143,7 @@ watch(() => snapshot.value?.threadId, () => { draft.value = undefined; saveError
   </div>
   <AgentActivitySurface v-model:open="panelOpen" :docked="wide && hasWork" :focus-target="focusTarget">
       <template #rail><AgentActivityRail :items="railItems" @expand="reveal" /></template>
-      <WorkspaceMissions compact />
+      <div id="activity-section-missions" tabindex="-1"><WorkspaceMissions compact /></div>
       <div class="mb-5 space-y-4">
         <section v-if="reviewJobs.length" id="activity-section-reviewer" tabindex="-1" class="space-y-1 rounded-lg border border-default p-3" aria-label="Resultatgranskning"><p class="flex items-center gap-2 text-sm font-semibold"><AgentAvatar role="reviewer" class="size-9" />{{ agentIdentities.reviewer.name }} · Resultatgranskning</p><p class="text-sm" role="status">{{ reviewBusy ? 'Granskar resultat' : 'Resultatgranskning' }} · {{ reviewDone }} av {{ reviewJobs.length }} avslutade</p><p class="text-xs text-muted">Bedömningarna finns under respektive testkörning i Testning. {{ reviewJobs.filter(j => j.status === 'failed').length }} kunde inte slutföras.</p></section>
         <p v-if="backgroundBusy" class="flex items-center gap-2 text-xs text-muted" role="status"><span class="size-2 rounded-full bg-success motion-safe:animate-pulse" />Arbete pågår på VPS · Du kan fortsätta chatta</p>

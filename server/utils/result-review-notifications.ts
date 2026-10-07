@@ -9,11 +9,15 @@ import { appOrigin, internalHeaders } from '../../agent/lib/internal-api';
 import { buildReviewInput, hashReview } from './result-assessments';
 
 export async function notifyReviewedResults() {
-  const pending = await db.select().from(jobs).where(and(eq(jobs.runtime, runtimeScope()), eq(jobs.notification, 'pending'), sql`${jobs.status} in ('completed','failed') and ${jobs.finishedAt} < now() - interval '60 seconds'`)).limit(20);
+  const autonomous = sql`exists (select 1 from ${testRuns} where ${testRuns.id} = ${jobs.runId} and ${testRuns.missionAttemptId} is not null)`;
+  // The controller consumes these saved assessments. Older pending rows also
+  // become UI-only receipts; they must never enqueue an unrelated turn in V.
+  await db.update(jobs).set({ notification: 'recorded' }).where(and(eq(jobs.runtime, runtimeScope()), eq(jobs.notification, 'pending'), autonomous));
+  const pending = await db.select().from(jobs).where(and(eq(jobs.runtime, runtimeScope()), eq(jobs.notification, 'pending'), sql`not (${autonomous})`, sql`${jobs.status} in ('completed','failed') and ${jobs.finishedAt} < now() - interval '60 seconds'`)).limit(20);
   for (const threadId of [...new Set(pending.map(j => j.threadId))].slice(0, 1)) {
     const batch = await db.transaction(async tx => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`review-notify:${runtimeScope()}:${threadId}`}, 0))`);
-      const scope = and(eq(jobs.runtime, runtimeScope()), eq(jobs.threadId, threadId), eq(jobs.notification, 'pending'));
+      const scope = and(eq(jobs.runtime, runtimeScope()), eq(jobs.threadId, threadId), eq(jobs.notification, 'pending'), sql`not (${autonomous})`);
       const rows = await tx.select().from(jobs).where(scope);
       if (!rows.length || rows.some(j => !j.finishedAt || Date.now() - j.finishedAt.getTime() < 60000)) return [];
       const activeRuns = await tx.select({ id: testRuns.id }).from(testRuns).where(and(eq(testRuns.threadId, threadId), sql`${testRuns.finishedAt} is null`)).limit(1);

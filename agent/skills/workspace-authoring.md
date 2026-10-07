@@ -8,6 +8,14 @@ Persistent workspace shared across this project's chats. List its objects first 
 
 # Keep saved reports consistent
 
+For a new QA report or summary of saved test results, use qa_mission with
+intent report_only after resolving the requested sourceRefs or caseKeys. Klara
+reads the saved results and owns the report. A test plan's document contains no
+execution results; read test_run list before concluding that runs are missing.
+Do not replace this route with a manually authored text document. The editing
+guidance below applies to an explicit edit of existing material or ordinary
+non-QA documents, not a competing QA reporting pipeline.
+
 When new observations or test results change a saved report, read its current
 content and reconcile every affected part in the same versioned update: the
 test row, summary, conclusion, counts and any claims about verification scope.

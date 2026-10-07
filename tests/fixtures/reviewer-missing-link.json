@@ -1,0 +1,196 @@
+{
+  "kind": "preserved-failed-review-excerpt",
+  "version": 1,
+  "sourceArtifact": ".data/autonomy-isolation/repository-acceptance-51a1f0d2-9399-4809-8f37-be235c8b851a.json",
+  "sourceArtifactSha256": "bdcbf84af3b35fefd692c9dad23e55b9d057ff18a0e7e344c5c92e8c56e89421",
+  "evidenceArtifactSha256": "d0c1ead529941b53ad4e7b536b37d2667fe0529f824def76f205889a732829f9",
+  "reportId": "1d99336d-7145-4f52-b322-24c7fb91b77c",
+  "runId": "72307784-2a32-4738-88d5-49a1b20052e3",
+  "reviewId": "c89c6481-6601-4b4c-87f4-ea74ac07f656",
+  "sourceSha256": "33bad1cd5c67a5ebdc30ff8599af5d46ccb52c6edb1619a069f1fa19efde2d83",
+  "originalResult": "failed",
+  "recertified": false,
+  "expected": "Startsidan visar rubriken 'Serviceguiden', introtexten 'Välkommen till vår serviceguide. Här finns hjälp och kontaktuppgifter.' samt tre synliga navigeringslänkar ('Hem' → /, 'Hjälp' → /hjalp, 'Kontakt' → /kontakt-old).",
+  "reportedResult": {
+    "actual": "Startsidan http://172.30.0.2:3000/ laddades (titel 'Serviceguiden') med rubriken 'Serviceguiden', introtexten 'Välkommen till vår serviceguide. Här finns hjälp och kontaktuppgifter.' och tre synliga navigeringslänkar 'Hem', 'Hjälp', 'Kontakt'. Klick på 'Hjälp' navigerade till http://172.30.0.2:3000/hjalp (titel 'Hjälp'). Klick på 'Kontakt' navigerade till http://172.30.0.2:3000/kontakt-old (verifierad navigation), dvs. kravets mål. Bakåt-navigering återförde till startsidan.",
+    "checks": [
+      {
+        "id": "preconditions",
+        "actual": "Sidan http://172.30.0.2:3000/ laddades i isolerad testmiljö vid angiven revision, titel 'Serviceguiden'.",
+        "status": "verified"
+      },
+      {
+        "id": "step-1",
+        "actual": "Huvudrubriken 'Serviceguiden' synlig i sidtexten på startsidan.",
+        "status": "verified"
+      },
+      {
+        "id": "step-2",
+        "actual": "Introtexten 'Välkommen till vår serviceguide. Här finns hjälp och kontaktuppgifter.' synlig i sidtexten.",
+        "status": "verified"
+      },
+      {
+        "id": "step-3",
+        "actual": "Tre synliga länkar 'Hem', 'Hjälp', 'Kontakt'. Klick på 'Hjälp' → /hjalp och 'Kontakt' → /kontakt-old, båda med verifierad navigation enligt kravets mål.",
+        "status": "verified"
+      },
+      {
+        "id": "expected",
+        "actual": "Rubrik, introtext och tre länkar observerades på startsidan; länkmål /hjalp och /kontakt-old bekräftade via klick.",
+        "status": "verified"
+      }
+    ],
+    "outcome": "passed",
+    "remaining": [],
+    "observations": [
+      {
+        "kind": "note",
+        "title": "Observation utanför fallets omfattning: /kontakt-old visar felsida 'Sidan saknas'",
+        "detail": "URL http://172.30.0.2:3000/kontakt-old (länkmålet för 'Kontakt') visar sidan 'Sidan saknas – Vi hittar inte den här sidan.' med länk 'Till startsidan'. Fallets förväntningar omfattar endast startsidans innehåll och länkarnas mål, inte målsidornas innehåll; därför påverkas inte fallets utfall."
+      },
+      {
+        "kind": "note",
+        "title": "Länkmål verifierade via klick, ej href-avläsning",
+        "detail": "Länkmålen verifierades genom klick med bekräftad navigation (navigation.verified), inte via avläsning av href-attribut i snapshoten."
+      }
+    ],
+    "schemaVersion": 2,
+    "evidenceItemIds": [
+      "9af9b0c6-7fe8-4844-9794-ae9815102ad0",
+      "04abafc2-2635-450b-a10f-7443ee504677",
+      "838dc7e6-5616-4f62-b506-640579fa2674",
+      "092d706e-365c-485c-b5ea-45fc3ffd36c5",
+      "85b551d5-8f89-43f1-8ae8-8949305db5ef",
+      "660892f7-2d59-4dc6-9f43-eb546db477ee",
+      "1b8aadd5-db9a-4362-9e70-cdcb74d36b87",
+      "a83133c8-f936-4b6c-8bfe-b2dd190b1d01"
+    ],
+    "suggestedFollowUps": [
+      "Testa innehållet och vidare navigering på /kontakt-old, inklusive 'Till startsidan'-länken på felsidan, samt /hjalp."
+    ]
+  },
+  "assessment": {
+    "summary": "Utföraren rapporterade att startsidan laddades med rubriken 'Serviceguiden', introtexten och tre navigeringslänkar, och att klick på 'Hjälp' och 'Kontakt' navigerade till /hjalp respektive /kontakt-old. Det oberoende underlaget bekräftar detta: open-spåret visar HTTP 200 med titel 'Serviceguiden' och korrekt sidtext (04abafc2, 9af9b0c6), klick-spåret till /hjalp visar HTTP 200 med titel 'Hjälp' (092d706e, 838dc7e6) och klick-spåret till /kontakt-old bekräftar att länken leder till just /kontakt-old (a83133c8, 1b8aadd5). Bakåt-navigeringen till startsidan bekräftas av back-spåret (660892f7, 85b551d5). Värt att notera: /kontakt-old returnerar HTTP 404 och visar felsidan 'Sidan saknas'. Detta motsäger inte utförarens rapporterade observation, eftersom kravet för steg 3 och 'expected' endast anger att länken 'Kontakt' pekar på /kontakt-old, vilket underlaget bekräftar, och utföraren har ärligt redovisat 404-sidan som en separat observation utanför fallets omfattning. Samtliga kontrollpunkters rapporterade observationer stöds därmed av oberoende underlag.",
+    "verdict": "supported",
+    "findings": [
+      {
+        "gap": null,
+        "verdict": "supported",
+        "evidenceIds": [
+          "04abafc2-2635-450b-a10f-7443ee504677",
+          "9af9b0c6-7fe8-4844-9794-ae9815102ad0"
+        ],
+        "explanation": "Open-spåret (04abafc2) visar HTTP 200, titel 'Serviceguiden' och sidtext på http://172.30.0.2:3000/ vid rätt tidpunkt och miljö; skärmbilden (9af9b0c6) bekräftar det laddade tillståndet.",
+        "requirementId": "preconditions",
+        "suggestedNextStep": "Inget ytterligare steg krävs för denna kontrollpunkt."
+      },
+      {
+        "gap": null,
+        "verdict": "supported",
+        "evidenceIds": [
+          "04abafc2-2635-450b-a10f-7443ee504677",
+          "9af9b0c6-7fe8-4844-9794-ae9815102ad0"
+        ],
+        "explanation": "Både DOM-utdraget i open-spåret (headings: ['Serviceguiden']) och skärmbilden (9af9b0c6) visar rubriken 'Serviceguiden' på startsidan.",
+        "requirementId": "step-1",
+        "suggestedNextStep": "Inget ytterligare steg krävs för denna kontrollpunkt."
+      },
+      {
+        "gap": null,
+        "verdict": "supported",
+        "evidenceIds": [
+          "04abafc2-2635-450b-a10f-7443ee504677",
+          "9af9b0c6-7fe8-4844-9794-ae9815102ad0"
+        ],
+        "explanation": "Open-spårets sidtext (04abafc2) och skärmbilden (9af9b0c6) visar introtexten 'Välkommen till vår serviceguide. Här finns hjälp och kontaktuppgifter.' på startsidan.",
+        "requirementId": "step-2",
+        "suggestedNextStep": "Inget ytterligare steg krävs för denna kontrollpunkt."
+      },
+      {
+        "gap": null,
+        "verdict": "supported",
+        "evidenceIds": [
+          "092d706e-365c-485c-b5ea-45fc3ffd36c5",
+          "a83133c8-f936-4b6c-8bfe-b2dd190b1d01",
+          "1b8aadd5-db9a-4362-9e70-cdcb74d36b87",
+          "9af9b0c6-7fe8-4844-9794-ae9815102ad0"
+        ],
+        "explanation": "Skärmbilderna visar tre synliga länkar 'Hem', 'Hjälp' och 'Kontakt'. Klick-spåret till /hjalp (092d706e, HTTP 200, titel 'Hjälp') och klick-spåret till /kontakt-old (a83133c8) bekräftar att länkarna leder till de av kravet angivna målen. Klicket till /kontakt-old resulterade i HTTP 404 med felsidan 'Sidan saknas', men kravet för denna kontrollpunkt prövar endast länkarnas etiketter och mål, inte målsidornas funktion, och utföraren rapporterade korrekt att navigationen skedde till /kontakt-old och redovisade 404-sidan separat. Observationen stöds därmed.",
+        "requirementId": "step-3",
+        "suggestedNextStep": "Inget ytterligare steg krävs för denna kontrollpunkt."
+      },
+      {
+        "gap": null,
+        "verdict": "supported",
+        "evidenceIds": [
+          "04abafc2-2635-450b-a10f-7443ee504677",
+          "9af9b0c6-7fe8-4844-9794-ae9815102ad0",
+          "092d706e-365c-485c-b5ea-45fc3ffd36c5",
+          "a83133c8-f936-4b6c-8bfe-b2dd190b1d01"
+        ],
+        "explanation": "Rubrik, introtext och tre länkar är belagda av open-spåret och skärmbilden; länkmålen /hjalp och /kontakt-old är bekräftade via klick-spåren. Kravet anger endast länkarnas mål, inte att målsidorna fungerar, så den observerade 404-sidan på /kontakt-old motsäger inte den rapporterade observationen, som utföraren dessutom redovisat transparent.",
+        "requirementId": "expected",
+        "suggestedNextStep": "Inget ytterligare steg krävs för denna kontrollpunkt."
+      }
+    ]
+  },
+  "traces": [
+    {
+      "sha256": "1b736e4821d43a343bf2a2ca4f9e3f345f86fb656f2db515a4e323eb6e0e76b1",
+      "action": "open",
+      "fromUrl": null,
+      "toUrl": "http://172.30.0.2:3000/",
+      "observation": {
+        "title": "Serviceguiden",
+        "headings": [
+          "Serviceguiden"
+        ],
+        "text": "Hem Hjälp Kontakt\nServiceguiden\n\nVälkommen till vår serviceguide. Här finns hjälp och kontaktuppgifter.",
+        "truncated": false
+      }
+    },
+    {
+      "sha256": "16481a3f3985523aa61de96c4c1e52a4b455004a3797c7918a2dd2985a68c8f5",
+      "action": "click",
+      "fromUrl": "http://172.30.0.2:3000/",
+      "toUrl": "http://172.30.0.2:3000/hjalp",
+      "observation": {
+        "title": "Hjälp",
+        "headings": [
+          "Hjälp"
+        ],
+        "text": "Hem Hjälp Kontakt\nHjälp\n\nDu kan besöka receptionen vardagar klockan 10–18.",
+        "truncated": false
+      }
+    },
+    {
+      "sha256": "e365495f2e25c1c8624390f26f6ae63de01e2fa27ae4a82d4f7133de454580ed",
+      "action": "back",
+      "fromUrl": "http://172.30.0.2:3000/hjalp",
+      "toUrl": "http://172.30.0.2:3000/",
+      "observation": {
+        "title": "Serviceguiden",
+        "headings": [
+          "Serviceguiden"
+        ],
+        "text": "Hem Hjälp Kontakt\nServiceguiden\n\nVälkommen till vår serviceguide. Här finns hjälp och kontaktuppgifter.",
+        "truncated": false
+      }
+    },
+    {
+      "sha256": "93cbb1355f5d18f08fb9d4ace50f0eab345dbc04933a513e088bc9881abd48dd",
+      "action": "click",
+      "fromUrl": "http://172.30.0.2:3000/",
+      "toUrl": "http://172.30.0.2:3000/kontakt-old",
+      "observation": {
+        "title": "Sidan saknas",
+        "headings": [
+          "Sidan saknas"
+        ],
+        "text": "Hem Hjälp Kontakt\nSidan saknas\n\nVi hittar inte den här sidan.\n\nTill startsidan",
+        "truncated": false
+      }
+    }
+  ],
+  "limitation": "Exact excerpt of a failed real trial, not a newly executed model test. Screenshot pixels are not part of this excerpt."
+}

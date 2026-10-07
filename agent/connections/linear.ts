@@ -1,7 +1,9 @@
 import { ConnectionAuthorizationRequiredError, defineMcpClientConnection } from "eve/connections";
 import { appOrigin, internalHeaders } from "../lib/internal-api";
+import { isIrisSession, IRIS_CAPABILITY_DENIED } from '../lib/iris-capabilities';
 
 export default defineMcpClientConnection({
+  approval: ctx => isIrisSession(ctx) ? { type: 'denied', reason: IRIS_CAPABILITY_DENIED } : 'not-applicable',
   url: "https://mcp.linear.app/mcp/readonly",
   description: "Linear workspace: issues, projects, cycles, and comments. Connect your own Linear account in Settings > Integrations first. Writes use the external tool.",
   auth: {

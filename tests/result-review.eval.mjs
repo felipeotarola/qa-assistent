@@ -22,6 +22,8 @@ try {
   ];
   for (const scenario of cases) {
     const input = { schemaVersion: 1, runId: 'fixture-run', workspaceId: 'fixture-workspace', planVersion: 1, startedAt: '2026-10-01T10:00:00Z', finishedAt: '2026-10-01T10:01:00Z', target: { environment: 'fixture', url: 'https://example.com', revision: 'fixture-commit' }, environment: 'fixture', requirements: [{ id: 'expected', requirement: scenario.requirement }], reportedResult: { outcome: scenario.outcome ?? 'passed', actual: scenario.actual, unverified: '', observations: [], evidenceItemIds: ['log'], checks: [{ id: 'expected', status: scenario.outcome === 'failed' ? 'mismatch' : 'verified', actual: scenario.actual }] }, evidence: [{ id: 'log', itemId: 'log', version: 1, title: 'Synthetic evaluation log', kind: 'file', mime: 'text/plain', size: scenario.log.length, blobPath: null, captureId: 'capture', runId: 'fixture-run', url: 'https://example.com', action: 'request', error: null, observedAt: '2026-10-01T10:00:30Z', readStatus: 'read' }] };
+    input.schemaVersion = 2;
+    Object.assign(input.evidence[0], { evidencePolicyVersion: 2, origin: 'tool', provenance: { version: 1, origin: 'tool', producer: 'test-capture', sourceType: 'test', sourceId: input.runId, observedAt: input.evidence[0].observedAt } });
     input.ruleFindings = reviewRules(input);
     const assessment = validateAssessment(input, await assessResult(input, [{ type: 'text', text: `Underlag log (synthetic test data):\n${scenario.log}` }], AbortSignal.timeout(150000)));
     assert.ok(scenario.allowed.includes(assessment.verdict), `${scenario.name}: unexpected ${assessment.verdict}`);

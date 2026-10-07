@@ -1,0 +1,9 @@
+{
+  "url": "https://github.com/shanep/simple-full-stack",
+  "commit": "8d670f3cc01000dd35d2ca0e08aabc7328b3ab46",
+  "inspectedAt": "2026-10-05",
+  "verification": "GitHub API and exact-commit raw files read only; no install, application execution or test command was run",
+  "known": ["package-lock.json exists", "npm start: node server/server.js", "npm test: node --test test/*.test.js", "Node >=20", "No required environment key in server startup", "Home and About routes are present"],
+  "eligible": false,
+  "reason": "No independently verified failing regression or navigation defect; cannot substitute a working app for REPO-10/11's predeclared negative oracle. Compatibility with Node 24 and npm ci --ignore-scripts is not execution-verified."
+}

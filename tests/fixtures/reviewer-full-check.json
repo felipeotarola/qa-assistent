@@ -1,0 +1,343 @@
+{
+  "version": 1,
+  "recertified": false,
+  "sourceSha256": "adf5290ce2c54558011b986c92d7fef005dacc3f50eb2ab14f9c5c3d70f05208",
+  "provenance": {
+    "slicePath": ".data/autonomy-isolation/independent-WEB01-controller-rep1-bytes-75e12449-899e-4b44-a61f-817c1ab5c508.json",
+    "sliceSha256": "136949d4c3720b299755770cea552e3719fd2fb945be1418581ca11aca5c337f",
+    "semanticPath": ".data/autonomy-isolation/independent-WEB01-controller-rep1-semantic-a93b8f6d-d9db-45b2-8909-7946993a8339.json",
+    "semanticSha256": "a2ae2f286997c7737c01945aeac96c8081adea2dee091dc02b7a19b37128a484",
+    "originalInputHash": "db0c9717d7a7d9cc7da69281dd3dc319775b484591f63632127ee980b975ebf2"
+  },
+  "runId": "bf9be992-0c4c-4afc-86e1-ed1fbaf9aa52",
+  "originalSnapshot": {
+    "id": "8971a852-6364-4eae-ab07-67c74c2e9bc0",
+    "type": "browser",
+    "basis": {
+      "kind": "explicit_requirement",
+      "quote": "Testa http://qa-fixture.test",
+      "source": null
+    },
+    "steps": "1. Utgå från http://qa-fixture.test. Inspektera den öppnade startsidan och kontrollera att det centrala innehållet renderas: presentationstexten 'En lugn morgon börjar här' och introtexten om kaffe, te och tillbehör är synliga för läsning. Förväntat: Presentationstexten 'En lugn morgon börjar här' och introtexten om produkterna visas som läsbar sidoinnehåll på startsidan. (Källans textfält är ett begränsat utdrag; kontrollen är ett stickprov på detta innehåll, inte en fullständig innehållsgranskning.)\n2. Inspektera startsidans interaktiva kontroller och verifiera att navigationslänkarna 'Produkter', 'Returer' och 'Kontakt', uppmaningen 'Se alla produkter' samt sökflödet (fält med plats för sökterm och en 'Sök'-knapp) finns och är synliga. Förväntat: Alla fyra nämnda länkkontroller samt sökfältet med 'Sök'-knapp är synliga och klickbara/fyllbara på startsidan. Kontrollen begränsas till dessa observerade kontroller; övriga element på sidan ingår inte.",
+    "title": "Startsidans centrala innehåll och kontroller",
+    "entryUrl": "http://qa-fixture.test",
+    "expected": "Startsidan visar sitt centrala presentationsinnehåll och sina observerade kontroller (navigation, uppmaning, sökflöde) utan att sidan visar oväntad felstatus eller felvy.",
+    "preconditions": "Ingen särskild åtkomst krävs; sidan är publik enligt uppdraget."
+  },
+  "originalResult": {
+    "actual": "Startsidan http://qa-fixture.test/ öppnades (HTTP 200, 'Välkommen | Björk & Böna'). Synligt innehåll: 'En lugn morgon börjar här' samt introtext 'Upptäck vårt kaffe, te och tillbehör. Läs mer om våra produkter eller kontakta oss om du har frågor.' Kontroller observerade i DOM med inViewport=true: länkar 'Produkter', 'Returer', 'Kontakt', 'Se alla produkter', sökinput (type=search, placeholder 'Till exempel kaffe') och submit-knapp 'Sök'. Ingen felstatus eller felvy.",
+    "checks": [
+      {
+        "id": "preconditions",
+        "actual": "Sidan öppnades publikt utan inloggning; HTTP 200.",
+        "status": "verified"
+      },
+      {
+        "id": "step-1",
+        "actual": "'En lugn morgon börjar här' och 'Upptäck vårt kaffe, te och tillbehör. Läs mer om våra produkter eller kontakta oss om du har frågor.' observerade i sidtext.",
+        "status": "verified"
+      },
+      {
+        "id": "step-2",
+        "actual": "Länkar 'Produkter', 'Returer', 'Kontakt', 'Se alla produkter', sökinput och 'Sök'-knapp alla synliga (inViewport=true), klickbara/fyllbara refs returnerade.",
+        "status": "verified"
+      },
+      {
+        "id": "expected",
+        "actual": "Central innehåll och kontroller renderade, ingen felstatus eller felvy (HTTP 200, normal startsida).",
+        "status": "verified"
+      }
+    ],
+    "outcome": "passed",
+    "remaining": [],
+    "observations": [
+      {
+        "kind": "note",
+        "title": "Startsida renderad",
+        "detail": "HTTP 200 på http://qa-fixture.test/; presentationstext och introtext om kaffe, te och tillbehör synliga som sidtext."
+      },
+      {
+        "kind": "note",
+        "title": "Kontroller synliga",
+        "detail": "Alla fyra länkkontroller plus sökflöde (fält + 'Sök'-knapp) observerade i viewport i tillgänglighetsögonblicksbilden."
+      }
+    ],
+    "schemaVersion": 2,
+    "evidenceItemIds": [
+      "a5d8ef40-dbef-42be-aff6-b2f447a10193",
+      "7d6ce52f-86f0-4117-bb64-17f9f5734d87"
+    ]
+  },
+  "input": {
+    "basis": {
+      "kind": "explicit_requirement",
+      "quote": "Testa http://qa-fixture.test",
+      "source": null
+    },
+    "runId": "bf9be992-0c4c-4afc-86e1-ed1fbaf9aa52",
+    "target": {
+      "url": "http://qa-fixture.test",
+      "scope": {
+        "id": "730970b9-815f-43de-9899-88e140f405ae",
+        "kind": "observation",
+        "capturedAt": "2026-10-06T17:19:21.782Z"
+      },
+      "revision": "",
+      "environment": "Publik webb"
+    },
+    "evidence": [
+      {
+        "id": "7d6ce52f-86f0-4117-bb64-17f9f5734d87",
+        "url": "http://qa-fixture.test/",
+        "kind": "file",
+        "mime": "application/json",
+        "size": 1780,
+        "error": null,
+        "runId": "bf9be992-0c4c-4afc-86e1-ed1fbaf9aa52",
+        "title": "Test-8971a852-1-open.json",
+        "action": "trace:open",
+        "itemId": "7d6ce52f-86f0-4117-bb64-17f9f5734d87",
+        "origin": "tool",
+        "sha256": "628e05bf3ee02248d6e279bdc8e2a3f9afe0cfcacdf5829df8f223241a1ef6ad",
+        "version": 1,
+        "captureId": "71fd4af6-66c5-49dc-b8e5-2624e902484a",
+        "observedAt": "2026-10-06T17:21:13.474Z",
+        "provenance": {
+          "url": "http://qa-fixture.test/",
+          "origin": "tool",
+          "sha256": "628e05bf3ee02248d6e279bdc8e2a3f9afe0cfcacdf5829df8f223241a1ef6ad",
+          "version": 1,
+          "producer": "browser-action",
+          "sourceId": "bf9be992-0c4c-4afc-86e1-ed1fbaf9aa52",
+          "observedAt": "2026-10-06T17:21:13.474Z",
+          "sourceType": "test"
+        },
+        "readStatus": "read",
+        "evidencePolicyVersion": 2
+      },
+      {
+        "id": "a5d8ef40-dbef-42be-aff6-b2f447a10193",
+        "url": "http://qa-fixture.test/",
+        "kind": "image",
+        "mime": "image/png",
+        "size": 40523,
+        "error": null,
+        "runId": "bf9be992-0c4c-4afc-86e1-ed1fbaf9aa52",
+        "title": "Test-8971a852-1-open.png",
+        "action": "open",
+        "itemId": "a5d8ef40-dbef-42be-aff6-b2f447a10193",
+        "origin": "tool",
+        "sha256": "23a78aa04905ffd2a5b2f8d776b515c099675a1e00e88be9e421f88ec38cc31d",
+        "version": 1,
+        "captureId": "b29e09b4-d225-41de-ac7f-c4a6b4c5bc59",
+        "observedAt": "2026-10-06T17:21:13.554Z",
+        "provenance": {
+          "url": "http://qa-fixture.test/",
+          "origin": "tool",
+          "sha256": "23a78aa04905ffd2a5b2f8d776b515c099675a1e00e88be9e421f88ec38cc31d",
+          "version": 1,
+          "producer": "test-capture",
+          "sourceId": "bf9be992-0c4c-4afc-86e1-ed1fbaf9aa52",
+          "observedAt": "2026-10-06T17:21:13.554Z",
+          "sourceType": "test"
+        },
+        "readStatus": "read",
+        "evidencePolicyVersion": 2
+      }
+    ],
+    "startedAt": "2026-10-06T17:21:07.595Z",
+    "finishedAt": "2026-10-06T17:21:20.775Z",
+    "environment": "Publik webb",
+    "planVersion": 1,
+    "workspaceId": "e6676ecc-dca3-4995-87a2-8bfe15d1c150",
+    "requirements": [
+      {
+        "id": "preconditions",
+        "requirement": "Ingen särskild åtkomst krävs; sidan är publik enligt uppdraget."
+      },
+      {
+        "id": "step-1",
+        "requirement": "1. Utgå från http://qa-fixture.test. Inspektera den öppnade startsidan och kontrollera att det centrala innehållet renderas: presentationstexten 'En lugn morgon börjar här' och introtexten om kaffe, te och tillbehör är synliga för läsning. Förväntat: Presentationstexten 'En lugn morgon börjar här' och introtexten om produkterna visas som läsbar sidoinnehåll på startsidan. (Källans textfält är ett begränsat utdrag; kontrollen är ett stickprov på detta innehåll, inte en fullständig innehållsgranskning.)"
+      },
+      {
+        "id": "step-2",
+        "requirement": "2. Inspektera startsidans interaktiva kontroller och verifiera att navigationslänkarna 'Produkter', 'Returer' och 'Kontakt', uppmaningen 'Se alla produkter' samt sökflödet (fält med plats för sökterm och en 'Sök'-knapp) finns och är synliga. Förväntat: Alla fyra nämnda länkkontroller samt sökfältet med 'Sök'-knapp är synliga och klickbara/fyllbara på startsidan. Kontrollen begränsas till dessa observerade kontroller; övriga element på sidan ingår inte."
+      },
+      {
+        "id": "expected",
+        "requirement": "Startsidan visar sitt centrala presentationsinnehåll och sina observerade kontroller (navigation, uppmaning, sökflöde) utan att sidan visar oväntad felstatus eller felvy."
+      }
+    ],
+    "ruleFindings": [],
+    "schemaVersion": 2,
+    "reportedResult": {
+      "actual": "Startsidan http://qa-fixture.test/ öppnades (HTTP 200, 'Välkommen | Björk & Böna'). Synligt innehåll: 'En lugn morgon börjar här' samt introtext 'Upptäck vårt kaffe, te och tillbehör. Läs mer om våra produkter eller kontakta oss om du har frågor.' Kontroller observerade i DOM med inViewport=true: länkar 'Produkter', 'Returer', 'Kontakt', 'Se alla produkter', sökinput (type=search, placeholder 'Till exempel kaffe') och submit-knapp 'Sök'. Ingen felstatus eller felvy.",
+      "checks": [
+        {
+          "id": "preconditions",
+          "actual": "Sidan öppnades publikt utan inloggning; HTTP 200.",
+          "status": "verified"
+        },
+        {
+          "id": "step-1",
+          "actual": "'En lugn morgon börjar här' och 'Upptäck vårt kaffe, te och tillbehör. Läs mer om våra produkter eller kontakta oss om du har frågor.' observerade i sidtext.",
+          "status": "verified"
+        },
+        {
+          "id": "step-2",
+          "actual": "Länkar 'Produkter', 'Returer', 'Kontakt', 'Se alla produkter', sökinput och 'Sök'-knapp alla synliga (inViewport=true), klickbara/fyllbara refs returnerade.",
+          "status": "verified"
+        },
+        {
+          "id": "expected",
+          "actual": "Central innehåll och kontroller renderade, ingen felstatus eller felvy (HTTP 200, normal startsida).",
+          "status": "verified"
+        }
+      ],
+      "outcome": "passed",
+      "remaining": [],
+      "observations": [
+        {
+          "kind": "note",
+          "title": "Startsida renderad",
+          "detail": "HTTP 200 på http://qa-fixture.test/; presentationstext och introtext om kaffe, te och tillbehör synliga som sidtext."
+        },
+        {
+          "kind": "note",
+          "title": "Kontroller synliga",
+          "detail": "Alla fyra länkkontroller plus sökflöde (fält + 'Sök'-knapp) observerade i viewport i tillgänglighetsögonblicksbilden."
+        }
+      ],
+      "schemaVersion": 2,
+      "evidenceItemIds": [
+        "a5d8ef40-dbef-42be-aff6-b2f447a10193",
+        "7d6ce52f-86f0-4117-bb64-17f9f5734d87"
+      ]
+    }
+  },
+  "originalAssessment": {
+    "summary": "Utföraren rapporterade att startsidan http://qa-fixture.test/ öppnades publikt (HTTP 200), att presentationstexten 'En lugn morgon börjar här' samt introtexten om kaffe, te och tillbehör var synliga, att länkarna 'Produkter', 'Returer', 'Kontakt' och uppmaningen 'Se alla produkter' samt sökflödet (fält + 'Sök'-knapp) fanns synliga, och att sidan visade normal vy utan felstatus. Det oberoende underlaget stöder detta: spårloggen (7d6ce52f, läst) visar HTTP 200, sidtitel 'Välkommen | Björk & Böna', rubriken 'En lugn morgon börjar här', sidtext innehållande båda citerade textstyckena samt CSS-synliga ankare för alla fyra länkkontroller med rimliga mål (Produkter → /products, Returer → /returns, Kontakt → /contact, Se alla produkter → /products). Skärmdumpen (a5d8ef40, läst) bekräftar att innehållet och kontrollerna renderas: rubrik, introtext, alla fyra länkar och sökfältet med 'Sök'-knapp syns i viewport. Det magenta täckta området är verktygets sekretessmaskering av inmatningsfält, inte webbplatsens design. Samtliga kontrollpunkter bedöms som supports_reported_observation. Begränsningar noteras: underlaget styrker förekomst och synlighet, inte faktiska klick på länkarna eller att sökfältet går att fylla i med en term — men kravet i denna körning omfattar endast att kontrollerna finns synliga/klickbara-fyllbara som kontroller, och inget i underlaget motsäger detta.",
+    "verdict": "supported",
+    "findings": [
+      {
+        "gap": null,
+        "verdict": "supported",
+        "evidenceIds": [
+          "7d6ce52f-86f0-4117-bb64-17f9f5734d87"
+        ],
+        "explanation": "Rapporterad åtkomstförutsättning (publik sida utan inloggning, HTTP 200) stöds av spårloggen: open-action mot http://qa-fixture.test/ resulterade i HTTP 200 utan inloggningstecken.",
+        "requirementId": "preconditions",
+        "suggestedNextStep": "Ingen; förutsättningen är underbyggd."
+      },
+      {
+        "gap": null,
+        "verdict": "supported",
+        "evidenceIds": [
+          "7d6ce52f-86f0-4117-bb64-17f9f5734d87",
+          "a5d8ef40-dbef-42be-aff6-b2f447a10193"
+        ],
+        "explanation": "Båda textinnehållsdelen ('En lugn morgon börjar här' och introtexten om kaffe, te och tillbehör) återfinns i spårloggningens sidtext och syns tydligt renderade på skärmdumpen som läsbar startsidesinnehåll.",
+        "requirementId": "step-1",
+        "suggestedNextStep": "Ingen; stickprovsinnehållet är underbyggt enligt kravets begränsning."
+      },
+      {
+        "gap": null,
+        "verdict": "supported",
+        "evidenceIds": [
+          "7d6ce52f-86f0-4117-bb64-17f9f5734d87",
+          "a5d8ef40-dbef-42be-aff6-b2f447a10193"
+        ],
+        "explanation": "Spårloggningens linkObservation visar CSS-synliga ankare för 'Produkter', 'Returer', 'Kontakt' och 'Se alla produkter'; skärmdumpen bekräftar att alla fyra länkar samt sökfältet och 'Sök'-knappen renderas i viewport. Rapporten om att klickbara/fyllbara refs returnerades är utförarens eget verktygsresultat och motsägs inte av underlaget. Notera att underlaget inte bevisar faktiska klick eller fyllning — men kravet i denna körning prövar bara att kontrollerna finns synliga, vilket stöds.",
+        "requirementId": "step-2",
+        "suggestedNextStep": "Om senare körning vill pröva fungerande klick eller sökfunktion krävs då separat handlingsbevis; inom detta kravs omfattning finns inget lucka."
+      },
+      {
+        "gap": null,
+        "verdict": "supported",
+        "evidenceIds": [
+          "7d6ce52f-86f0-4117-bb64-17f9f5734d87",
+          "a5d8ef40-dbef-42be-aff6-b2f447a10193"
+        ],
+        "explanation": "Oberoende underlag visar HTTP 200, normal startsida med renderat innehåll och kontroller, och ingen indikation på felstatus eller felvy — i överensstämmelse med rapporten.",
+        "requirementId": "expected",
+        "suggestedNextStep": "Ingen."
+      }
+    ]
+  },
+  "reportObservation": {
+    "text": "Fall 1: Länkobservationen i item:7d6ce52f listar synliga ankare 'Produkter', 'Returer', 'Kontakt' och 'Se alla produkter' med respektive href, samt texten 'Sök bland våra produkter' och 'Sök' i sidtexten. Metoden anges som 'dom-css-visible-anchors' med begränsningen 'No viewport, occlusion, rendered text, click or HTTP-response proof' – närvaro och CSS-synlighet är underbyggd, men källan bevisar inte viewport-position eller klickbarhet.",
+    "subject": {
+      "relation": "supports",
+      "requirement": "2. Inspektera startsidans interaktiva kontroller och verifiera att navigationslänkarna 'Produkter', 'Returer' och 'Kontakt', uppmaningen 'Se alla produkter' samt sökflödet (fält med plats för sökterm och en 'Sök'-knapp) finns och är synliga. Förväntat: Alla fyra nämnda länkkontroller samt sökfältet med 'Sök'-knapp är synliga och klickbara/fyllbara på startsidan. Kontrollen begränsas till dessa observerade kontroller; övriga element på sidan ingår inte."
+    },
+    "evidenceIds": [
+      "item:7d6ce52f-86f0-4117-bb64-17f9f5734d87"
+    ],
+    "originLabel": "Läst oberoende verktygsunderlag"
+  },
+  "trace": {
+    "version": 1,
+    "browserJobId": "a6b4a338-0766-4bee-9e8f-a343dbd51097",
+    "callId": "call_2fed8907f1484709ac2b7ef3",
+    "execution": {
+      "attemptId": "2afb3ac4-15f4-4fb7-8af9-fcd8a41a779b",
+      "dispatchId": "a6b4a338-0766-4bee-9e8f-a343dbd51097"
+    },
+    "action": "open",
+    "startedAt": "2026-10-06T17:21:13.302Z",
+    "finishedAt": "2026-10-06T17:21:13.474Z",
+    "fromUrl": null,
+    "toUrl": "http://qa-fixture.test/",
+    "httpStatus": 200,
+    "outcome": "observed",
+    "observation": {
+      "title": "Välkommen | Björk & Böna",
+      "headings": [
+        "En lugn morgon börjar här"
+      ],
+      "text": "Björk & Böna\nProdukter\nReturer\nKontakt\nEn lugn morgon börjar här\n\nUpptäck vårt kaffe, te och tillbehör. Läs mer om våra produkter eller kontakta oss om du har frågor.\n\nSe alla produkter\n\nSök bland våra produkter\nSök\n© Björk & Böna · Webbversion 1.0",
+      "truncated": false,
+      "linkObservation": {
+        "method": "dom-css-visible-anchors",
+        "links": [
+          {
+            "label": "Björk & Böna",
+            "href": "http://qa-fixture.test/"
+          },
+          {
+            "label": "Produkter",
+            "href": "http://qa-fixture.test/products"
+          },
+          {
+            "label": "Returer",
+            "href": "http://qa-fixture.test/returns"
+          },
+          {
+            "label": "Kontakt",
+            "href": "http://qa-fixture.test/contact"
+          },
+          {
+            "label": "Se alla produkter",
+            "href": "http://qa-fixture.test/products"
+          }
+        ],
+        "truncated": false,
+        "limitation": "DOM anchors passing CSS visibility and nonempty layout checks at observation time. No viewport, occlusion, rendered text, click or HTTP-response proof. Query, fragment and URL credentials omitted; known exact field values redacted. Bounded list, not proof of absence."
+      }
+    },
+    "failedRequests": [],
+    "limitation": "Observerad webbläsarhandling och begränsat DOM-utdrag. En bild visar tillstånd, inte att alla testkrav är uppfyllda. Saknad navigation eller HTTP-status är inte i sig ett produktfel. Nätverksfel kan bero på läsmandatet; kontrollera failedRequests."
+  },
+  "attachments": [
+    {
+      "itemId": "7d6ce52f-86f0-4117-bb64-17f9f5734d87",
+      "sha256": "628e05bf3ee02248d6e279bdc8e2a3f9afe0cfcacdf5829df8f223241a1ef6ad",
+      "bytes": 1780
+    },
+    {
+      "itemId": "a5d8ef40-dbef-42be-aff6-b2f447a10193",
+      "sha256": "23a78aa04905ffd2a5b2f8d776b515c099675a1e00e88be9e421f88ec38cc31d",
+      "bytes": 40523
+    }
+  ]
+}

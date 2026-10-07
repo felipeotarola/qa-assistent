@@ -7,12 +7,18 @@ import ts from 'typescript';
 function fixture(projectId, control = 'agent', providerFails = false) {
   const row = { id: 'assignment', userId: 'user', workspaceId: 'workspace', threadId: 'thread', agentId: 'main', projectId, control, sessionId: 'session', liveUrl: 'https://viewer.example', expiresAt: new Date(Date.now() + 1800000), activeAt: new Date(0) };
   const calls = [];
-  const tx = { execute: async () => {}, select: () => ({ from: () => ({ where: async () => [row] }) }), update: () => ({ set: changes => ({ where: async () => Object.assign(row, changes) }) }) };
+  const tx = { transaction: fn => fn(tx), execute: async () => {}, select: () => ({ from: () => ({ where: () => Object.assign(Promise.resolve([row]), { for: async () => [row] }) }) }), update: () => ({ set: changes => ({ where: async () => Object.assign(row, changes) }) }) };
   const imports = {
     'node:crypto': { randomUUID: () => 'unused' }, '@browserbasehq/sdk': { default: class {} }, 'playwright-core': {},
     'drizzle-orm': { and() {}, eq() {}, isNotNull() {}, lt() {}, sql() {} },
-    '@nuxthub/db': { db: { transaction: fn => fn(tx) }, schema: { browserAssignments: {} } },
+    '@nuxthub/db': { db: tx, schema: { browserAssignments: {} } },
     './threads': { getThreadForUser: async () => ({ workspaceId: 'workspace' }) }, './workspaces': { requireWorkspace: async () => {} }, './test-captures': {},
+    './browser-mission-guard': {}, './browser-action-trace': {}, './browser-trace-privacy': {}, './mission-preview': {},
+    './mission-browser-return': { browserActorAssignment: () => assert.fail('A viewer heartbeat must not resolve a new executor assignment') },
+    './mission-control': { autonomyEnabled: () => false }, '../../shared/runtime-scope': { runtimeScope: () => 'lease-unit-fixture' },
+    // This suite isolates heartbeat semantics; real cross-process lock/rollback
+    // behavior is covered by browser-lock.integration.mjs against PostgreSQL.
+    './browser-lock': { withBrowserLock: (_key, fn) => fn(), assertBrowserLock: async () => {}, browserLockSignal: () => undefined },
     './vps-browser': { vpsBrowserRequest: async (...args) => { calls.push(args); if (providerFails) throw Error('Preview expired'); return { renewed: true }; } },
   };
   const code = ts.transpileModule(fs.readFileSync(new URL('../server/utils/browser.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;

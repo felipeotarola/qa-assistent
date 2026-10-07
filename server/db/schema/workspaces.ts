@@ -1,6 +1,7 @@
 import { pgTable, text, timestamp, jsonb, integer, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import type { ItemContent } from "../../../shared/workspace";
+import type { EvidenceProvenance } from '../../../shared/evidence-provenance';
 
 export const workspaces = pgTable("pat_workspaces", {
   id: text("id").primaryKey(),
@@ -14,6 +15,7 @@ export const workspaceItems = pgTable("pat_workspace_items", {
   workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   content: jsonb("content").$type<ItemContent>().notNull(),
+  provenance: jsonb('provenance').$type<EvidenceProvenance>(),
   blobPath: text("blob_path"),
   deletedAt: timestamp("deleted_at"),
   version: integer("version").notNull().default(1),
@@ -25,6 +27,7 @@ export const workspaceItemVersions = pgTable("pat_workspace_item_versions", {
   version: integer("version").notNull(),
   title: text("title").notNull(),
   content: jsonb("content").$type<ItemContent>().notNull(),
+  provenance: jsonb('provenance').$type<EvidenceProvenance>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, t => [uniqueIndex("pat_item_version_idx").on(t.itemId, t.version)]).enableRLS();
 export const workspaceBrowsers = pgTable("pat_workspace_browsers", {

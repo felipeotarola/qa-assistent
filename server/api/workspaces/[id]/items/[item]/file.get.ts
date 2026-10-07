@@ -1,4 +1,4 @@
-import { get } from "@vercel/blob";
+import { get } from '../../../../../utils/evidence-storage';
 import { ownedItem, workspaceBlobToken } from "../../../../../utils/workspaces";
 import { requireSessionUserId } from "../../../../../utils/session";
 export default defineEventHandler(async (event) => {
