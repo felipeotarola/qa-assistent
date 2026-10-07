@@ -18,6 +18,10 @@ const conflict = (message: string) => createError({ statusCode: 409, statusMessa
 /** Persist the exact physical intent and its source membership before HTTP.
  * A lost response is reconciled by dispatchId, never by issuing a new identity. */
 export async function dispatchMissionRepository(lease: MissionLease, attemptId: string) {
+  const capabilities = await repositoryRunner<{ autonomousExecution?: { version: number; admission: boolean; frozenCommit: boolean } }>('/health');
+  if (capabilities.autonomousExecution?.version !== 1 || !capabilities.autonomousExecution.admission || !capabilities.autonomousExecution.frozenCommit) {
+    throw createError({ statusCode: 503, message: 'Körservern behöver uppdateras eller konfigureras för autonoma uppdrag.', data: { code: 'repository_protocol_unavailable' } });
+  }
   const run = await db.transaction(async tx => {
     const mission = await claimedMission(tx, lease);
     const [attempt] = await tx.select().from(missionAttempts).where(and(eq(missionAttempts.id, attemptId), eq(missionAttempts.missionId, mission.id)));
@@ -86,8 +90,6 @@ export async function dispatchMissionRepository(lease: MissionLease, attemptId: 
     return saved;
   });
   if (run.job && repoTerminal(run.job.status)) return repositoryProjection(run.job);
-  const capabilities = await repositoryRunner<{ autonomousExecution?: { version: number; admission: boolean; frozenCommit: boolean } }>('/health');
-  if (capabilities.autonomousExecution?.version !== 1 || !capabilities.autonomousExecution.admission || !capabilities.autonomousExecution.frozenCommit) throw conflict('Utföraren stöder inte uppdragets bindnings- och commitprotokoll.');
   // No SQL lock during the network call. Worker rechecks the live epoch before
   // every physical effect, including if cancellation races this saved intent.
   const job = await repositoryRunner<RepoJob>('/jobs', { id: run.id, ...run.config });
@@ -114,6 +116,11 @@ export async function reconcileMissionRepository(mission: ControlledMission, att
     // transport errors or generic HTTP 404 as permission to start again.
     const result = await repositoryRunner<{ jobs: RepoJob[] }>(`/jobs?ids=${run.id}`);
     let job = result.jobs.find(value => value.id === run.id);
+    if (!job && options.cancel && !run.job) {
+      // A bound durable cancellation prevents an in-flight/late POST from
+      // resurrecting this ID. Old workers return an error: retain the claim.
+      job = await repositoryRunner<RepoJob>(`/jobs/${run.id}/cancel-unsubmitted`, { id: run.id, ...run.config });
+    }
     if (!job) return { ...repositoryProjection(run.job), unknown: true, unsubmitted: false, retryableDispatch: !run.job && !options.cancel };
     // Explicit controller cleanup may repair a terminal job's failed removal;
     // GET status remains read-only and never replays the repository command.

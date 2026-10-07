@@ -4,6 +4,13 @@ import { presentMission } from '../shared/mission-presentation.ts';
 
 const now = new Date('2026-10-05T12:00:00Z');
 const before = '2026-10-05T11:00:00Z', future = '2026-10-05T12:30:00Z';
+test('resource wait is explicit without disclosing the holder, and never overrides active or closed work', () => {
+  const x = input(); x.mission.lifecycle = 'accepted'; x.resourceWait = 'busy';
+  assert.equal(presentMission(x).nextStep.code, 'resource_wait');
+  assert.match(presentMission(x).nextStep.text, /Väntar på körplats/);
+  x.attempts.push(attempt()); assert.equal(presentMission(x).nextStep.code, 'continue');
+  x.attempts = []; x.mission.lifecycle = 'closed'; assert.equal(presentMission(x).nextStep.code, 'closed');
+});
 function input() {
   return { mission: { id: 'public-mission', threadId: 'public-thread', title: 'Granska navigation', intent: 'explore', lifecycle: 'running', phase: 'execute', mandateRevision: 2, planRevision: 3,
     closureReason: null, deadlineAt: future, reportDeadlineAt: null, closedAt: null, heartbeatAt: '2026-10-05T11:59:50Z', nextWakeAt: now,

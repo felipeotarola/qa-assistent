@@ -1,5 +1,36 @@
 # Syna: införande, kompatibilitet och återställning av autonomi
 
+## Tillägg 2026-10-07: körplats efter obekräftad repository-start
+
+Implementerat lokalt: repository-protokollet kontrolleras innan ett nytt fysiskt
+startintent sparas. Saknat stöd ger ett blockerat delsteg med en konkret orsak.
+Ett tidigare sparat intent behåller sitt resursanspråk tills städning bekräftats.
+
+Vid explicit controller-städning av ett saknat jobb använder appen den nya
+autentiserade `POST /jobs/:id/cancel-unsubmitted` med exakt sparad konfiguration
+och execution-bindning. Runnern sparar en terminal avbokning före fysisk städning.
+Ett sent identiskt submit får samma avbokning, även efter omstart. Resursen släpps
+först efter ett validerat städkvitto. Timeout, 404 från äldre runner, felaktig
+bindning eller misslyckad städning behåller reservationen. GET-status startar
+eller avbokar aldrig ett autonomt jobb.
+
+Controller sparar resursväntan på den egna väntande deluppgiften. UI visar
+”Väntar på körplats” utan att exponera den andra användarens uppdrag; vid lyckad
+reservation rensas väntorsaken. Ett enbart accepterat uppdrag visas som ”Mottaget”.
+
+Körverifierat med `tests/repository-slot-recovery.integration.mjs`: verklig
+isolerad PostgreSQL, controller och runner-persistens; nätverk och Docker är
+syntetiska. Täcker protokollfel före start, väntande nästa uppdrag, nätfel,
+felaktigt kvitto, städning och nästa reservation. Separata runner-tester täcker
+sen leverans, omstart och misslyckad fysisk städning. Detta är inte produktions-
+eller modellacceptans och ändrar inga historiska acceptansutfall nedan.
+
+Driftsättning kräver matchande app/controller och VPS-runner. Uppdatera runnern
+med det redan planerade autonomiprotokollet, dess delade moduler och callback-
+konfiguration (`AUTONOMY_APP_URL`, intern autentisering och isolering enligt
+nedanstående releasegrindar). Kontrollera `/health` innan ny admission tillåts.
+Denna lokala ändring uppdaterar inte VPS:en och tar inte bort produktionslås manuellt.
+
 Datum: 2026-10-07 UTC; senaste kontrollpunkt 01:28 UTC (00d7-fönstret). **Arbetsdokument för P5; ingen produktionsändring är utförd
 genom detta dokument.** [Utvecklingsplanen](AUTONOMOUS_MISSIONS_PLAN.md) äger
 paketens acceptansgrindar och daterade körbevis. Att en kodväg beskrivs här betyder

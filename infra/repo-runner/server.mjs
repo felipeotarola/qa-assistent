@@ -153,6 +153,12 @@ const server = http.createServer(async (req, res) => {
       if (runner.stopping || !(await health()).ready) return reply(res, 503, { error: 'Worker is unavailable or draining' });
       return reply(res, 200, await runner.submit(await readJson(req)));
     }
+    const absentCancel = url.pathname.match(/^\/jobs\/([a-f0-9-]{36})\/cancel-unsubmitted$/);
+    if (absentCancel && req.method === 'POST') {
+      const input = await readJson(req);
+      if (input.id !== absentCancel[1]) return reply(res, 400, { error: 'Run identity mismatch' });
+      return reply(res, 200, await runner.cancelUnsubmitted(input));
+    }
     const match = url.pathname.match(/^\/jobs\/([a-f0-9-]{36})(\/cancel)?$/);
     const job = match && runner.jobs.get(match[1]);
     if (!job) return reply(res, 404, { error: 'Run not found' });

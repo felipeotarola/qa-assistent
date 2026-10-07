@@ -95,6 +95,25 @@ export class Runner {
     else { job.status = 'cancelled'; job.message = 'Avbruten'; job.finishedAt = new Date().toISOString(); if (job.execution) job.cleanup = { resourceId: job.id, confirmed: true, observedAt: job.finishedAt }; await this.save(job); }
     return job;
   }
+  /** Persist a cancellation barrier even when a dispatch never arrived. A late
+   * identical submit sees the terminal record; absence alone never frees a slot. */
+  async cancelUnsubmitted(input) {
+    const config = validate(input);
+    if (!config.execution) throw new Error('Execution binding required');
+    const fingerprint = executionHash(config), previous = this.jobs.get(config.id);
+    if (previous) {
+      if (previous.fingerprint !== fingerprint) throw new Error('Run ID already used');
+      return this.cancel(config.id);
+    }
+    const at = new Date().toISOString();
+    const job = { ...config, fingerprint, status: 'cancelled', message: 'Avbokad före bekräftad start', logs: '', commit: null, package: null, testExitCode: null,
+      createdAt: at, updatedAt: at, finishedAt: at, cleanup: { resourceId: config.id, confirmed: false, observedAt: at } };
+    this.jobs.set(job.id, job);
+    // Keep the in-memory barrier on write failure too; do not admit this ID.
+    await this.save(job);
+    await this.cleanup(job, true);
+    return job;
+  }
   /** Cleanup is an idempotent physical removal, never a replay of repository
    * commands. Reserve each attempt durably before effects, including on restart. */
   async cleanup(job, initial = false) {

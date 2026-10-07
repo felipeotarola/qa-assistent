@@ -21,7 +21,7 @@ export type MissionPresentation = {
   allowedActions: MissionAllowedAction[];
   waits: { id: string; reason: MissionWait['reason']; question: string; deadlineAt: string;
     status: 'waiting' | 'deadline_passed'; allowedAnswers: AnswerKind[]; setupJobId?: string }[];
-  nextStep: { code: 'cleanup' | 'answer' | 'wait_expired' | 'resume' | 'report_deleted' | 'read_report' | 'delivery_failed' | 'closed' | 'delayed' | 'continue'; text: string };
+  nextStep: { code: 'cleanup' | 'answer' | 'wait_expired' | 'resume' | 'report_deleted' | 'read_report' | 'delivery_failed' | 'closed' | 'delayed' | 'continue' | 'resource_wait'; text: string };
   cleanupPending: boolean;
   resources: { held: number; humanControlled: number; uncertain: number };
   execution: { active: number; overdue: number; unconfirmedDispatch: number };
@@ -42,6 +42,7 @@ export type MissionPresentationInput = {
   claims: { attemptId: string; owner: 'agent' | 'human'; state: 'claimed' | 'releasing' | 'uncertain'; expiresAt: Instant }[];
   waits: { id: string; state: 'waiting' | 'answered' | 'expired' | 'cancelled'; deadlineAt: Instant; definition: MissionWait }[];
   report: MissionReportPresentation | null; autonomyEnabled: boolean; now: Date;
+  resourceWait?: 'busy' | 'human';
 };
 const activeStates = new Set<MissionAttemptState>(['reserved', 'dispatching', 'dispatch_unknown', 'running']);
 const iso = (value: Instant) => value === null ? null : new Date(value).toISOString();
@@ -105,6 +106,9 @@ export function presentMission(input: MissionPresentationInput): MissionPresenta
   else if (m.lifecycle === 'closed' && input.report?.status === 'completed') nextStep = { code: 'read_report', text: input.report.freshness === 'stale' ? 'Läs rapporten med förbehåll: dess underlag har ändrats.' : 'Öppna den sparade rapporten och dess bedömningar.' };
   else if (m.lifecycle === 'closed') nextStep = { code: 'closed', text: 'Uppdraget är avslutat. Ett avslut är inte ett testgodkännande.' };
   else if (scheduler.state === 'overdue' || overdue) nextStep = { code: 'delayed', text: 'En sparad tidsgräns har passerats. Utförarens aktuella tillstånd är inte bekräftat.' };
+  else if (answerable && !active.length && input.resourceWait) nextStep = { code: 'resource_wait', text: input.resourceWait === 'human'
+    ? 'Körplatsen används manuellt. Uppdraget fortsätter automatiskt när den lämnas tillbaka.'
+    : 'Väntar på körplats. Ett tidigare arbete använder resursen eller inväntar bekräftad frigöring. Uppdraget fortsätter automatiskt inom sin tidsgräns.' };
   else nextStep = { code: 'continue', text: m.lifecycle === 'cancelling' ? 'Inväntar stopp och sammanställning av utfört arbete.' : 'Uppdraget fortsätter inom sitt mandat. Chatten behöver inte vara öppen.' };
   return {
     version: MISSION_PRESENTATION_VERSION, id: m.id, threadId: m.threadId, title: m.title, intent: m.intent, lifecycle: m.lifecycle, phase: m.phase,

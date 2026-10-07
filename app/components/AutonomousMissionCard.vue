@@ -14,7 +14,7 @@ const notice = computed(() => controls.notice(props.workspaceId, props.mission.i
 const detail = computed(() => controls.detail(props.workspaceId, props.mission.id));
 const telemetry = computed(() => detail.value?.telemetry);
 const lifecycleLabels: Record<MissionPresentation['lifecycle'], string> = {
-  accepted: 'Startar', running: 'Pågår', waiting: 'Väntar på svar', paused: 'Pausat', cancelling: 'Avbryter', closed: 'Avslutat',
+  accepted: 'Mottaget', running: 'Pågår', waiting: 'Väntar på svar', paused: 'Pausat', cancelling: 'Avbryter', closed: 'Avslutat',
 };
 const phaseLabels: Record<MissionPresentation['phase'], string> = {
   discover: 'Undersöker förutsättningar', plan: 'Planerar tester', prepare: 'Förbereder miljön', execute: 'Utför arbetet',
@@ -57,7 +57,7 @@ watch([() => props.workspaceId, () => props.mission.id], () => { answers.value =
       <div class="min-w-0 flex-1 space-y-1">
         <h4 class="break-words text-sm font-semibold">{{ mission.title }}</h4>
         <div class="flex flex-wrap items-center gap-2 text-xs text-muted">
-          <UBadge :color="statusColor" variant="soft" size="sm">{{ lifecycleLabels[mission.lifecycle] }}</UBadge>
+          <UBadge :color="statusColor" variant="soft" size="sm">{{ mission.nextStep.code === 'resource_wait' ? 'Väntar på körplats' : lifecycleLabels[mission.lifecycle] }}</UBadge>
           <span>{{ mission.lifecycle === 'closed' && mission.closureReason ? closureLabels[mission.closureReason] : phaseLabels[mission.phase] }}</span>
         </div>
       </div>

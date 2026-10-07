@@ -677,7 +677,10 @@ async function dispatchSafely(lease: MissionLease, mission: ControlledMission, t
       else { await finishAttempt(lease, attempt, 'failed', { error: 'Miljön kunde inte förberedas; ingen utförare startades.' }); await releaseMissionResource(attempt.id, null, true); }
     } else if (task.spec?.kind === 'repository_check' || task.spec?.kind === 'discovery' && task.spec.target.kind === 'repository') {
       const [run] = await db.select().from(schema.repositoryRuns).where(eq(schema.repositoryRuns.id, attempt.dispatchId));
-      if (run) await markMissionDispatch(lease, attempt.id, true);
+      if ((error as { data?: { code?: string } }).data?.code === 'repository_protocol_unavailable') {
+        await finishAttempt(lease, attempt, 'failed', { taskState: 'blocked', error: 'Körservern behöver uppdateras eller konfigureras för autonoma uppdrag. Ingen ny start skickades.' });
+        if (!run) await releaseMissionResource(attempt.id, null, true);
+      } else if (run) await markMissionDispatch(lease, attempt.id, true);
       else { await finishAttempt(lease, attempt, 'failed', { error: 'Repository-körningen kunde inte förberedas; ingen utförare startades.' }); await releaseMissionResource(attempt.id, null, true); }
     } else if (task.spec?.kind === 'browser_tests') {
       const [job] = await db.select().from(schema.browserJobs).where(eq(schema.browserJobs.id, attempt.dispatchId));

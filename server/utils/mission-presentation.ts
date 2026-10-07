@@ -18,6 +18,8 @@ async function project(connection: WorkspaceDatabase, userId: string, workspaceI
   const attempts = await connection.select().from(missionAttempts).where(inArray(missionAttempts.missionId, ids));
   const claims = await connection.select().from(missionResourceClaims).where(and(inArray(missionResourceClaims.missionId, ids), eq(missionResourceClaims.workspaceId, workspaceId)));
   const waits = await connection.select().from(missionWaits).where(and(inArray(missionWaits.missionId, ids), eq(missionWaits.state, 'waiting')));
+  const queuedTasks = await connection.select({ missionId: missionTasks.missionId, blockedReason: missionTasks.blockedReason, planRevision: missionTasks.planRevision })
+    .from(missionTasks).where(and(inArray(missionTasks.missionId, ids), inArray(missionTasks.state, ['pending', 'ready'])));
   const reports = await connection.selectDistinctOn([missionReports.missionId], { report: { id: missionReports.id, missionId: missionReports.missionId, status: missionReports.status }, snapshot: { missionId: missionSnapshots.missionId, input: missionSnapshots.input }, item: { id: schema.workspaceItems.id, deletedAt: schema.workspaceItems.deletedAt } })
     .from(missionReports).innerJoin(missionSnapshots, eq(missionSnapshots.id, missionReports.snapshotId))
     .leftJoin(schema.workspaceItems, and(eq(schema.workspaceItems.id, missionReports.itemId), eq(schema.workspaceItems.workspaceId, workspaceId)))
@@ -50,6 +52,8 @@ async function project(connection: WorkspaceDatabase, userId: string, workspaceI
       phase: mission.phase, mandateRevision: mission.mandateRevision, planRevision: mission.planRevision },
     attempts: attempts.filter(a => a.missionId === mission.id), claims: claims.filter(c => c.missionId === mission.id),
     waits: waits.filter(w => w.missionId === mission.id).map(w => ({ ...w, definition: { ...w.definition, question: text(w.definition.question, 3000) } })),
+    resourceWait: queuedTasks.some(t => t.missionId === mission.id && t.planRevision === mission.planRevision && t.blockedReason === 'resource_human_control') ? 'human'
+      : queuedTasks.some(t => t.missionId === mission.id && t.planRevision === mission.planRevision && t.blockedReason === 'resource_busy') ? 'busy' : undefined,
     report, autonomyEnabled: autonomyEnabled(), now }));
   }
   return result;

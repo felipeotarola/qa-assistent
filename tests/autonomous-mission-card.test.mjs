@@ -60,6 +60,12 @@ test('failed automatic telemetry read offers an explicit read retry', async () =
   assert.match(html, /Försök hämta igen/);
   assert.match(html, /role="alert"/);
 });
+
+test('queued mission names the resource wait instead of claiming it is starting', async () => {
+  const html = await render(mission({ lifecycle: 'accepted', nextStep: { code: 'resource_wait', text: 'Väntar på körplats. Tidigare resurser behöver frigöras.' } }));
+  assert.match(html, /Väntar på körplats/); assert.doesNotMatch(html, /Startar/);
+  assert.match(html, /Tidigare resurser behöver frigöras/);
+});
 test('closed report stays distinct from test success and stale evidence is never presented as current', async () => {
   const html = await render(mission({ lifecycle: 'closed', closureReason: 'investigated', allowedActions: [], nextStep: { code: 'read_report', text: 'Öppna rapporten.' },
     report: { id: 'report', itemId: 'item', status: 'completed', freshness: 'stale', deleted: false } }), {}, true);

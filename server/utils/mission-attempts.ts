@@ -146,6 +146,7 @@ export async function reserveMissionAttempt(lease: MissionLease, taskId: string,
       if (existing && existing.id !== returned?.claim.id) {
         // Expiry is uncertainty, never evidence that a browser or process stopped.
         if (existing.expiresAt <= now && existing.owner !== 'human') await tx.update(missionResourceClaims).set({ state: 'uncertain', updatedAt: now }).where(eq(missionResourceClaims.id, existing.id));
+        await tx.update(missionTasks).set({ blockedReason: existing.owner === 'human' ? 'resource_human_control' : 'resource_busy', updatedAt: now }).where(eq(missionTasks.id, task.id));
         return { status: 'deferred' as const, reasons: [existing.owner === 'human' ? 'human_control' : 'resource_busy'] };
       }
     }
@@ -162,7 +163,7 @@ export async function reserveMissionAttempt(lease: MissionLease, taskId: string,
         attempt!.executorResourceId = attempt!.dispatchId;
       }
     } else if (resource) await tx.insert(missionResourceClaims).values({ id: randomUUID(), ...resource, missionId: mission.id, attemptId: attempt!.id, workspaceId: mission.workspaceId, runtime: runtimeScope(), leaseToken: attempt!.leaseToken!, fence: attempt!.fence, expiresAt: attempt!.deadlineAt });
-    await tx.update(missionTasks).set({ state: 'running', updatedAt: now }).where(eq(missionTasks.id, task.id));
+    await tx.update(missionTasks).set({ state: 'running', blockedReason: null, updatedAt: now }).where(eq(missionTasks.id, task.id));
     await tx.update(missions).set({ lifecycle: 'running' }).where(eq(missions.id, mission.id));
     await recordMissionEvent(tx, mission, 'attempt_reserved', { attemptId: attempt!.id, taskId, dispatchId: attempt!.dispatchId, kind: task.spec.kind, reservedTokens: attempt!.reservedTokens, deadlineAt: attempt!.deadlineAt.toISOString() });
     return { status: 'reserved' as const, attempt: attempt!, task };
