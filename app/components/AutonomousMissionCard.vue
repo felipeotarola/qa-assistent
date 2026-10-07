@@ -129,7 +129,8 @@ watch([() => props.workspaceId, () => props.mission.id], () => { answers.value =
           <dt>Kostnad</dt><dd>Inte uppmätt</dd>
         </dl>
         <p v-if="detail">Mätvärden hämtade {{ date(detail.mission.observedAt) }}.</p>
-        <UButton label="Uppdatera mätvärden" icon="i-lucide-refresh-cw" size="sm" color="neutral" variant="ghost" :loading="controls.detailLoading(workspaceId, mission.id)" @click="loadDetails()" />
+        <p class="text-muted">Uppdateras automatiskt medan fliken är synlig.</p>
+        <UButton v-if="controls.detailError(workspaceId, mission.id)" label="Försök hämta igen" icon="i-lucide-refresh-cw" size="sm" color="neutral" variant="ghost" :loading="controls.detailLoading(workspaceId, mission.id)" @click="loadDetails()" />
       </div>
     </details>
   </article>

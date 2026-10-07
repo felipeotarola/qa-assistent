@@ -85,7 +85,20 @@ export function useAutonomousMissions(polling = false) {
   }
   let timer: ReturnType<typeof setTimeout> | undefined, disposed = false;
   async function poll() {
-    try { if (document.visibilityState === 'visible' && activeId.value) await state.refresh(); }
+    if (disposed) return;
+    try {
+      if (document.visibilityState === 'visible' && activeId.value) {
+        const workspaceId = activeId.value;
+        await state.refresh();
+        if (disposed || document.visibilityState !== 'visible' || activeId.value !== workspaceId) return;
+        // Refresh telemetry that the user has requested, including failed first
+        // reads. Both card locations share this cache and in-flight guard.
+        await Promise.all((data.value?.missions ?? []).filter(mission => {
+          const id = operationKey(workspaceId, mission.id);
+          return details.value[id] || detailErrors.value[id];
+        }).map(mission => loadDetails(workspaceId, mission.id)));
+      }
+    }
     catch { /* The view exposes the failed read; polling does not drive work. */ }
     finally { if (!disposed) timer = setTimeout(poll, 7000); }
   }

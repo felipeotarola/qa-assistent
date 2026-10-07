@@ -51,6 +51,14 @@ test('running card shows server phase/actions without exposing private fields or
   const html = await render(mission({ leaseToken: 'PRIVATE-LEASE', attempts: [{ id: 'PRIVATE-ATTEMPT' }] }));
   assert.match(html, /Granska kundflödet/); assert.match(html, /Utför arbetet/); assert.match(html, /Pausa/); assert.match(html, /Avbryt uppdrag/);
   assert.doesNotMatch(html, /Återuppta|Godkänt|PRIVATE-/);
+  assert.match(html, /Uppdateras automatiskt/);
+  assert.doesNotMatch(html, /Uppdatera mätvärden|Försök hämta igen/);
+});
+
+test('failed automatic telemetry read offers an explicit read retry', async () => {
+  const html = await render(mission(), { detailError: () => 'Uppdragets mätvärden kunde inte hämtas.' });
+  assert.match(html, /Försök hämta igen/);
+  assert.match(html, /role="alert"/);
 });
 test('closed report stays distinct from test success and stale evidence is never presented as current', async () => {
   const html = await render(mission({ lifecycle: 'closed', closureReason: 'investigated', allowedActions: [], nextStep: { code: 'read_report', text: 'Öppna rapporten.' },

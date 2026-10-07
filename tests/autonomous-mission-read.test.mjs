@@ -51,3 +51,41 @@ test('explicit telemetry reads use the bound workspace and mission without sendi
   assert.equal(f.client.detail('workspace-b', 'mission-a'), undefined);
   assert.equal(f.client.detail('workspace-a', 'mission-a').telemetry.tokens.total, null);
 });
+
+test('polling refreshes requested telemetry without reading unopened missions', async () => {
+  const f = fixture(); let revision = 0;
+  f.transport.read = async url => url.endsWith('/autonomy')
+    ? { missions: [{ id: 'mission-a' }, { id: 'unopened' }], hasMore: false }
+    : { revision: ++revision };
+  await f.client.loadDetails('workspace-a', 'mission-a');
+  f.mounted.forEach(fn => fn()); await f.timers.shift()();
+  assert.equal(f.client.detail('workspace-a', 'mission-a').revision, 2);
+  assert.deepEqual(f.reads, ['/api/workspaces/workspace-a/autonomy/mission-a', '/api/workspaces/workspace-a/autonomy', '/api/workspaces/workspace-a/autonomy/mission-a']);
+  f.document.visibilityState = 'hidden'; await f.timers.shift()();
+  assert.equal(revision, 2);
+});
+
+test('failed telemetry automatically recovers and overlapping card reads are deduplicated', async () => {
+  const f = fixture(); f.transport.read = async () => { throw new Error('offline'); };
+  await f.client.loadDetails('workspace-a', 'mission-a');
+  assert.ok(f.client.detailError('workspace-a', 'mission-a'));
+  let release;
+  f.transport.read = async url => url.endsWith('/autonomy')
+    ? { missions: [{ id: 'mission-a' }], hasMore: false }
+    : new Promise(resolve => { release = resolve; });
+  f.mounted.forEach(fn => fn()); const pending = f.timers.shift()();
+  while (!release) await Promise.resolve();
+  await f.client.loadDetails('workspace-a', 'mission-a');
+  assert.equal(f.reads.length, 3);
+  release({ recovered: true }); await pending;
+  assert.equal(f.client.detail('workspace-a', 'mission-a').recovered, true);
+  assert.equal(f.client.detailError('workspace-a', 'mission-a'), '');
+});
+
+test('navigation during a list refresh prevents subsequent old-workspace telemetry reads', async () => {
+  const f = fixture(); await f.client.loadDetails('workspace-a', 'mission-a');
+  let release; f.transport.read = () => new Promise(resolve => { release = resolve; });
+  f.mounted.forEach(fn => fn()); const pending = f.timers.shift()();
+  f.activeId.value = 'workspace-b'; release({ missions: [{ id: 'mission-a' }] }); await pending;
+  assert.equal(f.reads.length, 2); assert.equal(f.client.data.value, undefined);
+});
