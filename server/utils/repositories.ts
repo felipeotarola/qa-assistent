@@ -1,3 +1,4 @@
+import { callRepositoryRunner as repositoryRunner } from './repository-runner';
 import { createHash, randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { and, eq, desc, sql } from 'drizzle-orm';
@@ -34,16 +35,7 @@ export async function saveRepositoryJob(job: RepoJob) {
   await db.update(repositoryRuns).set({ job }).where(and(eq(repositoryRuns.id, job.id), newer));
   if (run.config.execution) await db.update(missions).set({ nextWakeAt: new Date() }).where(and(eq(missions.id, run.config.execution.missionId), eq(missions.runtime, runtimeScope()), sql`${missions.lifecycle} in ('running','waiting','paused','cancelling')`));
 }
-export async function repositoryRunner<T>(path: string, body?: unknown, timeoutMs = 10000) {
-  const base = process.env.REPO_RUNNER_URL, key = process.env.REPO_RUNNER_KEY;
-  if (!base || !key) throw createError({ statusCode: 503, statusMessage: 'Repository-testning är inte konfigurerad.' });
-  const response = await fetch(`${base.replace(/\/$/, '')}${path}`, { method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(timeoutMs) });
-  if (!response.ok) {
-    const result = await response.json().catch(() => ({})) as { error?: string };
-    throw createError({ statusCode: response.status === 400 ? 400 : 502, statusMessage: result.error?.slice(0, 200) || 'Testtjänsten är inte tillgänglig. Försök igen.' });
-  }
-  return await response.json() as T;
-}
+export { callRepositoryRunner as repositoryRunner } from './repository-runner';
 const runner = repositoryRunner;
 function repositoryView(run: typeof repositoryRuns.$inferSelect, compact = false) {
   const { execution: _execution, ...config } = run.config;
