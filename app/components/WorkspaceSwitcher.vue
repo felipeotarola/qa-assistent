@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { startNewChat } from "~/composables/chat/navigation";
-const { workspaces, activeId, selected, refresh } = useWorkspaces();
+const { allWorkspaces, activeId, selected, refresh } = useWorkspaces();
 const creating = ref(false);
 const name = ref("");
 const busy = ref(false);
@@ -26,7 +26,8 @@ async function create() {
 <template>
   <div class="space-y-2 px-2 py-3">
     <div class="flex items-center gap-1">
-      <USelect :model-value="activeId || 'overview'" :items="[{ label: 'Alla workspaces', value: 'overview' }, ...workspaces.map(w => ({ label: w.name, value: w.id }))]" aria-label="Välj workspace" class="min-w-0 flex-1" @update:model-value="select($event as string)" />
+      <USelect :model-value="activeId || 'overview'" :items="[{ label: 'Alla workspaces', value: 'overview' }, ...allWorkspaces.filter(w => !w.archivedAt || w.id === activeId).map(w => ({ label: w.archivedAt ? `${w.name} (arkiverat)` : w.name, value: w.id }))]" aria-label="Välj workspace" class="min-w-0 flex-1" @update:model-value="select($event as string)" />
+      <WorkspaceArchiveAction v-if="allWorkspaces.find(w => w.id === activeId)" :workspace="allWorkspaces.find(w => w.id === activeId)!" />
       <UButton icon="i-lucide-plus" aria-label="Skapa workspace" variant="ghost" color="neutral" @click="creating = !creating" />
     </div>
     <form v-if="creating" class="flex gap-1" @submit.prevent="create">

@@ -5,10 +5,10 @@ import { useThreadList } from "~/composables/chat/useThreads";
 import { DEFAULT_CHAT_MODEL, DEFAULT_REASONING } from '#shared/chat-models';
 
 const { profile } = useProfile();
-const { workspaces, activeId, pending: workspacesPending, error: workspacesError, refresh: refreshWorkspaces } = useWorkspaces();
+const { workspaces, allWorkspaces, archivedWorkspaces, activeId, pending: workspacesPending, error: workspacesError, refresh: refreshWorkspaces } = useWorkspaces();
 const { threads, pending, error: threadsError, refresh } = useThreadList();
 const firstName = computed(() => profile.value?.name.trim().split(/\s+/)[0] || "");
-const workspaceName = computed(() => workspaces.value.find(workspace => workspace.id === activeId.value)?.name);
+const workspaceName = computed(() => allWorkspaces.value.find(workspace => workspace.id === activeId.value)?.name);
 function lastActive(timestamp: number) {
   return `Senast aktiv ${new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short', timeZone: profile.value?.timezone || 'Europe/Stockholm' }).format(timestamp)}`;
 }
@@ -110,9 +110,13 @@ function onSubmit() {
               <p v-if="!recentChats.length && !threadsError" class="text-sm text-muted">Inga chattar ännu. Skriv ovan för att börja i detta workspace.</p>
             </div>
             <div v-else class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-2.5">
-              <HomeRecentCard v-for="workspace in recentWorkspaces" :key="workspace.id" :to="`/?workspace=${workspace.id}`" :title="workspace.name" :description="workspace.lastActivity ? lastActive(workspace.lastActivity) : 'Öppna och börja arbeta tillsammans'" icon="i-lucide-folder" />
+              <div v-for="workspace in recentWorkspaces" :key="workspace.id" class="flex items-center gap-1"><HomeRecentCard :to="`/?workspace=${workspace.id}`" :title="workspace.name" :description="workspace.lastActivity ? lastActive(workspace.lastActivity) : 'Öppna och börja arbeta tillsammans'" icon="i-lucide-folder" /><WorkspaceArchiveAction :workspace="workspace" /></div>
               <p v-if="!recentWorkspaces.length && !workspacesError" class="text-sm text-muted">Skapa ett workspace med plusknappen i sidomenyn.</p>
             </div>
+            <UCollapsible v-if="!activeId && archivedWorkspaces.length" class="border-t border-default pt-3">
+              <UButton :label="`Arkiverade (${archivedWorkspaces.length})`" icon="i-lucide-archive" trailing-icon="i-lucide-chevron-down" color="neutral" variant="ghost" />
+              <template #content><div class="space-y-2 pt-3"><div v-for="workspace in archivedWorkspaces" :key="workspace.id" class="flex items-center justify-between gap-3 rounded-lg bg-muted/40 p-3"><span class="min-w-0 break-words text-sm">{{ workspace.name }}</span><WorkspaceArchiveAction :workspace="workspace" /></div></div></template>
+            </UCollapsible>
           </section>
 
         </div>

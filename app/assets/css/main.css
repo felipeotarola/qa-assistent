@@ -98,3 +98,8 @@ html.dark .shiki span {
   font-weight: var(--shiki-dark-font-weight) !important;
   text-decoration: var(--shiki-dark-text-decoration) !important;
 }
+
+/* Shared compact action confirmations; editors retain the default width. */
+.qaa-modal-confirmation {
+  --app-dialog-width: 32rem;
+}
