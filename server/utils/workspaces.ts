@@ -20,7 +20,7 @@ export async function requireWorkspace(userId: string, id: string, connection: W
 export async function defaultWorkspace(userId: string) {
   return db.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace:${userId}`}, 0))`);
-    const [existing] = await tx.select().from(schema.workspaces).where(eq(schema.workspaces.userId, userId)).orderBy(schema.workspaces.createdAt).limit(1);
+    const [existing] = await tx.select().from(schema.workspaces).where(and(eq(schema.workspaces.userId, userId), isNull(schema.workspaces.archivedAt))).orderBy(schema.workspaces.createdAt).limit(1);
     if (existing) return existing.id;
     const id = crypto.randomUUID();
     await tx.insert(schema.workspaces).values({ id, userId, name: "Mitt workspace" });
@@ -28,8 +28,9 @@ export async function defaultWorkspace(userId: string) {
   });
 }
 export async function listWorkspaces(userId: string) {
-  await defaultWorkspace(userId);
-  return db.select({ id: schema.workspaces.id, name: schema.workspaces.name }).from(schema.workspaces).where(eq(schema.workspaces.userId, userId)).orderBy(schema.workspaces.createdAt);
+  const rows = await db.select({ id: schema.workspaces.id, name: schema.workspaces.name, archivedAt: schema.workspaces.archivedAt }).from(schema.workspaces).where(eq(schema.workspaces.userId, userId)).orderBy(schema.workspaces.createdAt);
+  if (!rows.length) { await defaultWorkspace(userId); return listWorkspaces(userId); }
+  return rows.map(row => ({ ...row, archivedAt: row.archivedAt?.toISOString() ?? null }));
 }
 export function publicItem(row: typeof schema.workspaceItems.$inferSelect) {
   return { id: row.id, workspaceId: row.workspaceId, title: row.title, content: row.content, version: row.version, updatedAt: row.updatedAt.toISOString() };

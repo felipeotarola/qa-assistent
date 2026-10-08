@@ -6,7 +6,7 @@ import { useThreadList } from "~/composables/chat/useThreads";
 import WorkspaceOverview from './WorkspaceOverview.vue';
 import WorkspaceTesting from './WorkspaceTesting.vue';
 import { defaultQuality, type QualitySettings } from '#shared/quality';
-const { activeId, workspaces } = useWorkspaces();
+const { activeId, allWorkspaces } = useWorkspaces();
 const vault = useWorkspaceVault();
 const route = useRoute();
 const router = useRouter();
@@ -161,7 +161,7 @@ async function create(kind: "text" | "table" | "test_plan" | "diagram") {
   finally { busy.value = false; }
 }
 const connectionsOpen = ref(false);
-const workspaceName = computed(() => workspaces.value.find(w => w.id === activeId.value)?.name || 'Workspace');
+const workspaceName = computed(() => allWorkspaces.value.find(w => w.id === activeId.value)?.name || 'Workspace');
 const workspaceActions = computed<DropdownMenuItem[][]>(() => {
   const groups: DropdownMenuItem[][] = [[{ label: workspaceName.value, type: 'label' }]];
   if (!trash.value && view.value === 'material') groups.push([
@@ -205,7 +205,7 @@ async function uploadFile(event: Event) {
   <aside class="workspace-surface relative flex h-full min-h-0 flex-col overflow-hidden" aria-label="Workspace">
     <header class="flex min-h-(--ui-header-height) shrink-0 flex-wrap items-center gap-2 border-b border-default bg-default px-4 py-2">
       <UIcon name="i-lucide-layout-grid" class="size-4 text-dimmed" />
-      <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ workspaces.find(w => w.id === activeId)?.name || 'Workspace' }}</span>
+      <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ workspaceName }}</span>
       <UButton label="Vault" icon="i-lucide-key-round" aria-label="Öppna vault – API-nycklar och miljövariabler" variant="outline" size="sm" :disabled="!activeId" @click="activeId && vault.open(activeId)" />
       <UDropdownMenu :items="workspaceActions" :content="{ align: 'end' }" :ui="{ content: 'w-60' }">
         <UButton label="Verktyg" trailing-icon="i-lucide-chevron-down" color="neutral" variant="ghost" :disabled="!activeId" class="shrink-0" aria-label="Workspace-verktyg" />

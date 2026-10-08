@@ -211,6 +211,13 @@
       "when": 1791235059209,
       "tag": "0029_provider_pacing",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791417600000,
+      "tag": "0030_workspace_archive",
+      "breakpoints": true
     }
   ]
 }

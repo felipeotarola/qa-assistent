@@ -64,7 +64,7 @@ Page content uses the available width (`--ui-container: 100%`). Settings section
 use `.app-page` and `--app-page-padding`; do not reintroduce centered page max-widths.
 Inputs, small preview cards and authentication forms may retain their own widths.
 Dialogs share `--app-dialog-width` through the global Nuxt UI modal theme, with
-viewport gutters on small screens. Do not override individual dialog widths.
+viewport gutters on small screens. Use the shared `qaa-modal-confirmation` content class for compact action confirmations (32rem); detail/editor dialogs retain the default width. Do not introduce one-off dialog widths.
 Standard tables share their header and row styling through the Nuxt UI table theme.
 
 Material has persistent card/table presentation and a common title/ID search.

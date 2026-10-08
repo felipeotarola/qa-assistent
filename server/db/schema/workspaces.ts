@@ -7,6 +7,7 @@ export const workspaces = pgTable("pat_workspaces", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
+  archivedAt: timestamp("archived_at"),
   cardOrder: jsonb("card_order").$type<string[]>().notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }).enableRLS();
